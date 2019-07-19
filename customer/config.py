@@ -8,7 +8,7 @@ import os
 from PyQt5.QtCore import QSettings
 VERSION = "2019.1"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SERVER_ADDR = "http://192.168.0.105:8008/"
+SERVER_ADDR = "http://127.0.0.1:8008/"
 CLIENT_HEADERS = {"User-Agent": "DAssistant-Client/" + VERSION}
 # 首页中间Frame最小高度
 HOME_PAGE_MIDDLE_WINDOW_MIN_HEIGHT = 200

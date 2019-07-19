@@ -276,7 +276,7 @@ class MasterWindow(FrameLessWindow):
         try:
             # 请求主菜单数据
             response = requests.get(
-                url=config.SERVER_ADDR + "limits/module/",
+                url=config.SERVER_ADDR + "basic/module/",
                 headers=config.CLIENT_HEADERS,
                 data=json.dumps({"machine_code": config.app_dawn.value('machine')})
             )

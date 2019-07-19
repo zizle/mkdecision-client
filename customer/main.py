@@ -1,5 +1,4 @@
 import sys
-import asyncio
 from PyQt5.QtWidgets import QApplication
 
 from windows.master import MasterWindow
