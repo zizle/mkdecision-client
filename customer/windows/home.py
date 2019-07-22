@@ -274,21 +274,6 @@ class HomePageWindow(QWidget):
         self.fill_bulletin_thread.finished.connect(self.fill_bulletin_thread.deleteLater)
         self.fill_bulletin_thread.start()
 
-        # response = requests.get(url=url, headers=headers, data=json.dumps({"machine_code": settings.app_conf["machine_code"]}))
-        # data = json.loads(response.content.decode("utf-8"))["data"]
-        # # 整理数据
-        # data = [item['fields'] for item in data]
-        # print(data)
-        # 公告条目
-        # data = [{
-        #     "id": 1,
-        #     "name": "新的一周将出现冷热交替",
-        #     "file": "http:file-1-file_list.com",
-        #     "create_time": "2019-05-09"
-        # }] * 2
-        # keys = ["name", "file", "create_time"]
-        # self.bulletin.setDataContents(data, keys=keys, button_col=1)
-
     def fill_bulletin_table_content(self, content):
         """线程返回数据填充表格"""
         self.bulletin_loading.hide()
@@ -928,6 +913,7 @@ class HomePageWindow(QWidget):
     def set_bulletin_data(self, signal):
         """设置好的公告内容上传"""
         headers = config.CLIENT_HEADERS
+        cookies = config.app_dawn.value('cookies')
         if signal["set_option"] == "new_bulletin":
             data = dict()
             data["name"] = signal["name"]
@@ -944,7 +930,7 @@ class HomePageWindow(QWidget):
             data = encode_data[0]
             headers['Content-Type'] = encode_data[1]
             # response = requests.post(url=config.SERVER_ADDRESS + "homepage/bulletin/", headers=headers, data=data)
-            response = requests.post(url=config.SERVER_ADDR + "homepage/bulletin/", headers=headers, data=data)
+            response = requests.post(url=config.SERVER_ADDR + "homepage/bulletin/", headers=headers, data=data, cookies=cookies)
             response_data = json.loads(response.content.decode("utf-8"))
             self.set_bulletin_dialog.close()
             QMessageBox.information(self, "提示", response_data["message"], QMessageBox.Yes)
@@ -952,7 +938,7 @@ class HomePageWindow(QWidget):
         elif signal["set_option"] == "days":
             # 发起请求
             headers = config.CLIENT_HEADERS
-            client = config.app_conf["machine_code"]
+            client = config.app_dawn.value("machine")
             # url = config.SERVER_ADDRESS + 'system/bulletin_days/?days={}'.format(signal["days"])
             url = config.SERVER_ADDR + "limits/client/"
             response = requests.put(url=url, headers=headers, data=json.dumps({"bulletin_days": signal["days"],"machine_code": client}))

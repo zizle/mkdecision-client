@@ -1,6 +1,6 @@
 # _*_ coding:utf-8 _*_
+# date: 20190722
 # author: zizle
-# Date: 20190513
 import requests
 import json
 from PyQt5.QtWidgets import QMessageBox
@@ -12,17 +12,9 @@ import config
 def auto_login(mount_window):
     """开机自动登录"""
     # 读取配置
-    app_init_config = QSettings("conf/config.ini", QSettings.IniFormat)
-    login = int(app_init_config.value('auto_login')) if app_init_config.value('auto_login') else 0
-    username = app_init_config.value('username')
-    password = app_init_config.value('password')
-    capsules = app_init_config.value('capsules')
-    print("从init配置文件读取设置login:", login, type(login))
-    print("从init配置文件读取设置username", username)
-    print("从init配置文件读取设置password", password)
-    print("从init配置文件读取设置capsules", capsules, type(capsules))
-    # login = app_conf.get("login", None)
-    # if login is None:
+    login = int(config.app_dawn.value('auto_login')) if config.app_dawn.value('auto_login') else 0
+    username = config.app_dawn.value('username')
+    password = config.app_dawn.value('password')
     if not username:
         print('没有自动登录信息')
         return
@@ -41,8 +33,8 @@ def auto_login(mount_window):
         user_data = user_login(username=username, password=password, mount_window=mount_window)
         if user_data:
             # 成功写入模块权限
-            app_init_config.setValue("capsules", user_data['capsules'])
-            app_init_config.setValue("cookies", user_data['cookies'])
+            config.app_dawn.setValue("capsules", user_data['capsules'])
+            config.app_dawn.setValue("cookies", user_data['cookies'])
             show_name = user_data["nick_name"] if user_data["nick_name"] else user_data["username"]
             mount_window.loginBar.setLoginMessage(message="欢迎您! " + show_name)  # 设置显示登录信息
     else:
@@ -56,7 +48,7 @@ def user_login(username, password, mount_window):
     machine = app_config.value('machine')
     try:
         response = requests.post(
-            url=config.SERVER_ADDR + "user/login/",
+            url=config.SERVER_ADDR + "user/passport/?option=login",
             headers=config.CLIENT_HEADERS,
             data=json.dumps({"username": username, "password": password, 'machine_code': machine})
         )
@@ -67,12 +59,29 @@ def user_login(username, password, mount_window):
     else:
         if response.status_code == 200:
             response_data['data']['cookies'] = response.cookies
-            from requests.cookies import RequestsCookieJar
             return response_data["data"]
         else:
             QMessageBox.warning(mount_window, "错误", '登录失败!\n{}'.format(response_data["message"]), QMessageBox.Yes)
             return False
 
+
+def user_logout(mount_window):
+    """用户退出"""
+    try:
+        response = requests.post(
+            url=config.SERVER_ADDR + 'user/passport/?option=logout',
+            headers=config.CLIENT_HEADERS,
+            cookies=config.app_dawn.value('cookies')
+        )
+        if response.status_code != 200:
+            response_data = json.loads(response.content.decode('utf-8'))
+            QMessageBox.warning(mount_window, "错误", response_data['message'], QMessageBox.Yes)
+            return False
+    except Exception as error:
+        QMessageBox.warning(mount_window, "错误", '注销失败!\n{}'.format(error), QMessageBox.Yes)
+        return False
+    else:
+        return True
 
 def get_desktop_path():
     """获取用户桌面路径"""

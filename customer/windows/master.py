@@ -3,7 +3,6 @@
 # author: zizle
 import json
 import requests
-import importlib
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIcon, QCursor
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings
@@ -14,7 +13,7 @@ from windows import ProductServiceWindow, FundamentalWindow, TechnicalAnalysisWi
 
 import config
 # from settings import BASE_DIR, VERSION, SERVER_ADDR, app_conf, CLIENT_HEADERS
-from utils import user_login
+from utils import user_login, user_logout
 
 
 class MasterWindow(FrameLessWindow):
@@ -55,9 +54,13 @@ class MasterWindow(FrameLessWindow):
                 
     def close(self):
         """退出要删除权限"""
-        app_init_config = QSettings("conf/config.ini", QSettings.IniFormat)
-        app_init_config.remove('capsules')
-        super(MasterWindow, self).close()
+        # 登出
+        if user_logout(self):
+            config.app_dawn.remove('capsules')
+            config.app_dawn.remove('cookies')
+            super(MasterWindow, self).close()
+        else:
+            return
 
     def in_login_dialog_clicked(self, signal):
         """登录弹窗里的按钮点击"""
@@ -84,18 +87,21 @@ class MasterWindow(FrameLessWindow):
             if user_data:
                 # 成功写入模块权限
                 # settings.app_conf["capsules"] = user_data['capsules']
-                app_init_config = QSettings("conf/config.ini", QSettings.IniFormat)
-                app_init_config.setValue("capsules", user_data['capsules'])
-                app_init_config.setValue('auto_login', open_login)
-                app_init_config.setValue('cookies', user_data['cookies'])
+                config.app_dawn.setValue("capsules", user_data['capsules'])
+                config.app_dawn.setValue('auto_login', open_login)
+                config.app_dawn.setValue('cookies', user_data['cookies'])
+                # app_init_config = QSettings("conf/config.ini", QSettings.IniFormat)
+                # app_init_config.setValue("capsules", user_data['capsules'])
+                # app_init_config.setValue('auto_login', open_login)
+                # app_init_config.setValue('cookies', user_data['cookies'])
                 # 有记住写入信息
                 if remember:
                     # settings.app_conf["login"] = {"id": user_data["id"],"username": user_data["username"], "password": password, "open_login": open_login}
-                    app_init_config.setValue('username', user_data['username'])
-                    app_init_config.setValue('password', password)
+                    config.app_dawn.setValue('username', user_data['username'])
+                    config.app_dawn.setValue('password', password)
                 else:
-                    app_init_config.remove('password')
-                    app_init_config.remove('username')
+                    config.app_dawn.remove('password')
+                    config.app_dawn.remove('username')
                 show_name = user_data['nick_name'] if user_data["nick_name"] else user_data["username"]
                 self.loginBar.setLoginMessage(message="欢迎您! " + show_name)  # 设置显示登录信息
             else:
@@ -217,20 +223,11 @@ class MasterWindow(FrameLessWindow):
         elif signal == "exit":
             is_exit = QMessageBox.information(self, "提示", "确定注销？\n注销后下次不再享受便捷登录.", QMessageBox.Yes|QMessageBox.No)
             if is_exit == QMessageBox.Yes:
-                # 清除记录的登录信息
-                app_init_config = QSettings('conf/config.ini', QSettings.IniFormat)
-                app_init_config.remove('capsules')
-                app_init_config.remove('password')
-                app_init_config.remove('cookies')
-                # if settings.app_conf.get('login', None):
-                #     del settings.app_conf["login"]
-                # if settings.app_conf.get('capsules', None):
-                #     del settings.app_conf['capsules']
-                #     with open("conf/app.conf", "w", encoding="utf-8") as f:
-                #         f.write(str(settings.app_conf))
-                #
-                # if 0 < self.models.currentIndex() < len(self.menus):
-                #     self.menu_clicked(self.menus[0])
+               if user_logout(self):
+                    # 清除记录的登录信息
+                    config.app_dawn.remove('capsules')
+                    config.app_dawn.remove('password')
+                    config.app_dawn.remove('cookies')
             else:
                 return
             self.loginBar.exitLogin()  # 退出登录相应状态栏的改变
