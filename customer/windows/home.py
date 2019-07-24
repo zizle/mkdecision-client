@@ -107,11 +107,8 @@ class HomePageWindow(QWidget):
 
     def __init_ui(self):
         bc_option_layout = QHBoxLayout()
-        add_bulletin = QPushButton("设置公告")
-        add_bulletin.clicked.connect(self.set_bulletin_show)
         add_carousel = QPushButton("设置广告")
         add_carousel.clicked.connect(self.set_carousel_show)
-        bc_option_layout.addWidget(add_bulletin)
         bc_option_layout.addWidget(add_carousel)
         bc_option_layout.addStretch()
 
@@ -965,13 +962,6 @@ class HomePageWindow(QWidget):
                 QMessageBox.warning(self, "失败", response_data["message"], QMessageBox.Yes)
         else:
             pass
-
-    def set_bulletin_show(self):
-        """设置公告栏"""
-        self.set_bulletin_dialog = SetBulletinDialog()
-        self.set_bulletin_dialog.set_bulletin_signal.connect(self.set_bulletin_data)
-        if not self.set_bulletin_dialog.exec():
-            del self.set_bulletin_dialog
         
     def set_carousel_image(self, signal):
         """设置广告轮播图信息"""
