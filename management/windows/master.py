@@ -9,8 +9,8 @@ from PyQt5.QtCore import Qt, pyqtSignal, QSettings
 from widgets import FrameLessWindow
 from widgets.dialog import LoginDialog, RegisterDialog
 from windows.home import HomePageScrollWindow
-from windows import ProductServiceWindow, FundamentalWindow, TechnicalAnalysisWindow, ArbitrageAnalysisWindow, HedgingAnalysisWindow, MaintenanceWindow, SystemSetupWindow
-# from .maintainWidgets import MaintenanceWindow
+from windows import ProductServiceWindow, FundamentalWindow, TechnicalAnalysisWindow, ArbitrageAnalysisWindow, HedgingAnalysisWindow, SystemSetupWindow
+from .maintenance import MaintenanceWindow
 
 import config
 # from settings import BASE_DIR, VERSION, SERVER_ADDR, app_conf, CLIENT_HEADERS

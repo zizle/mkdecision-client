@@ -1,49 +1,20 @@
 # _*_ coding:utf-8 _*_
 """
-all of tab in data-maintenance
-Update: 2019-07-24
+clients and users info in project
+Update: 2019-07-25
 Author: zizle
 """
 import re
 import json
 import requests
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QCursor, QIntValidator, QFont
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 import config
 from threads import RequestThread
 from widgets.maintain_widgets import TableCheckBox
-from popups.maintain import CreateNewClient, CreateNewBulletin
-
-
-class BulletinInfo(QWidget):
-    def __init__(self):
-        super(BulletinInfo, self).__init__()
-        layout = QVBoxLayout()
-        action_layout = QHBoxLayout()
-        create_btn = QPushButton("设置")
-        refresh_btn = QPushButton('刷新')
-        create_btn.clicked.connect(self.create_new_bulletin)
-        self.show_bulletin_table = QTableWidget()
-        action_layout.addWidget(create_btn)
-        action_layout.addWidget(refresh_btn)
-        action_layout.addStretch()
-        layout.addLayout(action_layout)
-        layout.addWidget(self.show_bulletin_table)
-        self.setLayout(layout)
-
-    def create_new_bulletin(self):
-        # dialog widget for edit bulletin information
-        try:
-            popup = CreateNewBulletin()
-        except Exception as e:
-            print(e)
-        if not popup.exec():
-            del popup
-
-
-
+from popup.maintain import CreateNewClient
 
 class ClientInfo(QWidget):
     # 客户端信息
@@ -230,4 +201,3 @@ class NoDataWindow(QWidget):
         label.setFont(font)
         layout.addWidget(label)
         self.setLayout(layout)
-

@@ -9,7 +9,7 @@ import json
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
-from windows.maintain_tab import NoDataWindow, BulletinInfo, ClientInfo, UserInfo
+from frame.maintain import NoDataWindow, BulletinInfo, ClientInfo, UserInfo
 from threads import RequestThread
 import config
 
@@ -21,13 +21,13 @@ class MaintenanceWindow(QWidget):
         self.left_tree = QTreeWidget()
         self.left_tree.setExpandsOnDoubleClick(False)
         self.left_tree.clicked.connect(self.left_tree_clicked)
+        self.left_tree.setRootIsDecorated(False)  # remove root icon
+        self.left_tree.setHeaderHidden(True)
         # a tab show windows
         self.right_tab = QTabWidget()
         self.right_tab.setTabsClosable(True)
+        # self.right_tab.setTabBarAutoHide(True)  # hide tabBar when only one tab
         self.right_tab.tabCloseRequested.connect(self.close_tab)
-
-        self.frame_windows = QStackedWidget()
-
         hor_layout.addWidget(self.left_tree, alignment=Qt.AlignLeft)
         hor_layout.addWidget(self.right_tab)
         layout = QVBoxLayout()
@@ -89,21 +89,9 @@ class MaintenanceWindow(QWidget):
         for module in content['data']:
             menu = QTreeWidgetItem(self.left_tree)
             menu.setText(0, module['name'])
+            menu.setTextAlignment(0, Qt.AlignCenter)
             menu.id = module['id']
             sub_menus = module['subs']
-            # # 同时创建窗口(根节点窗口)
-            # if module['name'] == "首页":
-            #     home_page = HomePage(frame_names=sub_menus)
-            #     home_page.id = module['id']
-            #     home_page.name = module['name']
-            #     self.frame_windows.addWidget(home_page)
-            # elif module['name'] == '系统信息':
-            #     system_page = SystemPage(frame_names=sub_menus)
-            #     system_page.id = module['id']
-            #     system_page.name = module['name']
-            #     self.frame_windows.addWidget(system_page)
-            # else:
-            #     pass
             # 添加子节点
             for sub_module in sub_menus:
                 child = QTreeWidgetItem()
