@@ -4,34 +4,35 @@ homepage frame window will make in tab
 Update: 2019-07-25
 Author: zizle
 """
+import sys
 from PyQt5.QtWidgets import *
-from piece.home import ShowBulletin
 
+import config
+from piece.base import MenuBar
+from piece.home import ShowReport
 
-class HomePage(QScrollArea):
+class Report(QWidget):
     def __init__(self, *args, **kwargs):
-        super(HomePage, self).__init__(*args, **kwargs)
-        self.home = QWidget()
-        self.draw_home()
-        self.setWidgetResizable(True)
-        self.setWidget(self.home)
+        super(Report, self).__init__(*args, *kwargs)
+        layout = QVBoxLayout(spacing=5)
+        menu_bar = MenuBar()
+        menu_bar.setContentsMargins(0,0,0,0)
+        menu_bar.addMenuButtons(["全部", "日报", "周报", "月报", "年报", "专题", "投资报告", "其他"])
+        menu_bar.addStretch()
+        menu_bar.menu_btn_clicked.connect(self.menu_clicked)
+        # report table
+        self.show_table = ShowReport()
+        layout.addWidget(menu_bar)
+        layout.addWidget(self.show_table)
+        self.setStyleSheet("""
+        MenuBar {
+            background-color:rgb(255,255,255);
+        }
+        """)
+        self.setLayout(layout)
+        # get report
+        self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/')  # query param type=None
 
-    def draw_home(self):
-        layout = QVBoxLayout()
-        ble_crl_layout = QHBoxLayout() # bulletin and carousel layout
-        lmn_frame_layout = QHBoxLayout()  # left list menu and middle frame window layout
-        bull_table = ShowBulletin()  # bulletin table
-        bull_table.setMaximumWidth(400)
-        caro_show = QLabel("Advertising Rotation")  # advertisement carousel widget
-        # add bulletin widget and advertisement widget to layout
-        ble_crl_layout.addWidget(bull_table)
-        ble_crl_layout.addWidget(caro_show)
-        left_tree = QTreeWidget()  # left list menu
-        show_tab = QTabWidget()  # middle frame window container (use QTabWidget)
-        # add left tree menu widget and frame window container to layout
-        lmn_frame_layout.addWidget(left_tree)
-        lmn_frame_layout.addWidget(show_tab)
-        # add child layout to main layout
-        layout.addLayout(ble_crl_layout)
-        layout.addLayout(lmn_frame_layout)
-        self.home.setLayout(layout)  # add layout to home widget
+    def menu_clicked(self, menu):
+        print(menu.text())
+        self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/?category=')

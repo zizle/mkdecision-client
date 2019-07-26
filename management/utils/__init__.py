@@ -3,6 +3,7 @@
 # author: zizle
 import requests
 import json
+import fitz
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QSettings
 from win32com.shell import shell, shellcon
@@ -87,3 +88,22 @@ def get_desktop_path():
     """获取用户桌面路径"""
     ilist = shell.SHGetSpecialFolderLocation(0, shellcon.CSIDL_DESKTOP)
     return shell.SHGetPathFromIDList(ilist).decode("utf-8")
+
+def get_server_file(url, file, title):
+        """获取文件"""
+        # 请求文件
+        headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
+        try:
+            response = requests.get(url=url, headers=headers, data={"file": file})
+            f = open("cache/1a2b3c4d5e.file", "wb")
+            f.write(response.content)
+            f.close()
+        except Exception as e:
+            print(e)
+            return
+        doc = fitz.open("cache/1a2b3c4d5e.file")
+        # 弹窗显示相应文件内容
+        from widgets.dialog import PDFReaderDialog
+        read_dialog = PDFReaderDialog(doc, file=file, title=title)
+        if not read_dialog.exec():
+            del read_dialog  # 弹窗生命周期未结束,手动删除

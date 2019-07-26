@@ -10,7 +10,7 @@ from PyQt5.QtGui import QFont
 
 
 class NoDataWindow(QWidget):
-    def __init__(self,name, *args):
+    def __init__(self, name, *args):
         super(NoDataWindow, self).__init__(*args)
         layout = QHBoxLayout()
         label = QLabel(name + "暂未开放!\n敬请期待,感谢支持~.")

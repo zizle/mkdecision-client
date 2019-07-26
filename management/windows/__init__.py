@@ -8,4 +8,3 @@ from .technology import TechnicalAnalysisWindow
 from .arbitrage import ArbitrageAnalysisWindow
 from .hedging import HedgingAnalysisWindow
 from .systematic import SystemSetupWindow
-from .maintenance import MaintenanceWindow

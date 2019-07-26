@@ -5,6 +5,7 @@ Create: 2019-07-22
 Update: 2019-07-22
 Author: zizle
 """
+import sys
 import json
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
@@ -14,9 +15,9 @@ from threads import RequestThread
 import config
 
 
-class MaintenanceWindow(QWidget):
+class Maintenance(QWidget):
     def __init__(self):
-        super(MaintenanceWindow, self).__init__()
+        super(Maintenance, self).__init__()
         hor_layout = QHBoxLayout()
         self.left_tree = QTreeWidget()
         self.left_tree.setExpandsOnDoubleClick(False)
@@ -44,7 +45,6 @@ class MaintenanceWindow(QWidget):
             # self.close()  # 当只有1个tab时，关闭主窗口
             return
 
-
     def get_list_menu(self):
         """ get menus """
         headers = config.CLIENT_HEADERS
@@ -56,7 +56,7 @@ class MaintenanceWindow(QWidget):
             cookies=config.app_dawn.value('cookies')
         )
         self.left_tree_thread.finished.connect(self.left_tree_thread.deleteLater)
-        self.left_tree_thread.response_signal.connect(self.set_list_menu)
+        self.left_tree_thread.response_signal.connect(self.set_tree_menu)
         self.left_tree_thread.start()
 
     def left_tree_clicked(self):
@@ -80,16 +80,16 @@ class MaintenanceWindow(QWidget):
                 tab = NoDataWindow(name=text)
             self.right_tab.addTab(tab, text)
             self.right_tab.setCurrentWidget(tab)
-        print("点击事项完毕")
 
-    def set_list_menu(self, content):
+    def set_tree_menu(self, content):
         """ set the left list navigate"""
+        print('windows.maintenance.py {} : '.format(str(sys._getframe().f_lineno)), content)
         if content['error']:
             return
         for module in content['data']:
             menu = QTreeWidgetItem(self.left_tree)
             menu.setText(0, module['name'])
-            menu.setTextAlignment(0, Qt.AlignCenter)
+            # menu.setTextAlignment(0, Qt.AlignCenter)
             menu.id = module['id']
             sub_menus = module['subs']
             # 添加子节点

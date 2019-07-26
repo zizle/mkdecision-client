@@ -4,11 +4,17 @@ all dialog of data-maintenance module, in the home page
 Update: 2019-07-25
 Author: zizle
 """
+import sys
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QIcon
+
+from utils import get_desktop_path
 
 
 class CreateNewBulletin(QDialog):
+    new_data_signal = pyqtSignal(dict)
+
     def __init__(self):
         super(CreateNewBulletin, self).__init__()
         self.setWindowTitle('设置')
@@ -32,22 +38,25 @@ class CreateNewBulletin(QDialog):
         tab_0_label_1 = QLabel("展示：")
         self.tab_0_label_2 = QLabel('文件：')
         self.tab_0_label_3 = QLabel('内容：')
-        tab_0_edit_0 = QLineEdit()  # 名称
+        self.tab_0_edit_0 = QLineEdit()  # 名称
         self.tab_0_edit_1 = QLineEdit()  # 文件路径
-        tab_0_edit_0.setPlaceholderText("输入条目展示的名称(默认文件名)")
-        tab_0_combo = QComboBox()
-        tab_0_combo.addItems(['文件展示', '显示文字'])
-        tab_0_combo.currentTextChanged.connect(self.tab_0_show_type_changed)
+        self.tab_0_edit_0.setPlaceholderText("输入条目展示的名称(默认文件名)")
+        self.tab_0_combo = QComboBox()
+        self.tab_0_combo.addItems(['文件展示', '显示文字'])
+        self.tab_0_combo.currentTextChanged.connect(self.tab_0_show_type_changed)
         self.tab_0_btn_0  = QPushButton('浏览')
+        self.tab_0_btn_0.setMaximumWidth(30)
         tab_0_btn_1 = QPushButton('提交')
+        self.tab_0_btn_0.clicked.connect(self.select_file)
+        tab_0_btn_1.clicked.connect(self.submit_bulletin)
         self.tab_0_edit_2 = QTextEdit()  # 内容
         # initial hide the content edit
         self.tab_0_label_3.hide()
         self.tab_0_edit_2.hide()
         grid_layout_0.addWidget(tab_0_label_0, 0, 0)
-        grid_layout_0.addWidget(tab_0_edit_0, 0, 1, 1, 2)
+        grid_layout_0.addWidget(self.tab_0_edit_0, 0, 1, 1, 2)
         grid_layout_0.addWidget(tab_0_label_1, 1, 0)
-        grid_layout_0.addWidget(tab_0_combo, 1, 1, 1, 2)
+        grid_layout_0.addWidget(self.tab_0_combo, 1, 1, 1, 2)
         grid_layout_0.addWidget(self.tab_0_label_2, 2, 0)
         grid_layout_0.addWidget(self.tab_0_edit_1, 2, 1)
         grid_layout_0.addWidget(self.tab_0_btn_0, 2, 2)
@@ -86,3 +95,58 @@ class CreateNewBulletin(QDialog):
             self.tab_0_btn_0.hide()
             self.tab_0_label_3.show()
             self.tab_0_edit_2.show()
+
+    def select_file(self):
+        """ select file when show type is file """
+        # 弹窗
+        desktop_path = get_desktop_path()
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.pdf)")
+        if not file_path:
+            return
+        if not self.tab_0_edit_0.text().strip(' '):  # set bulletin name
+            file_raw_name = file_path.rsplit("/", 1)
+            file_name_list = file_raw_name[1].rsplit(".", 1)
+            self.tab_0_edit_0.setText(file_name_list[0])
+        self.tab_0_edit_1.setText(file_path)  # set file path
+
+    def submit_bulletin(self):
+        """ create new bulletin in server """
+        # collect data
+        data = dict()
+        show_dict = {
+            "文件展示": "show_file",
+            "显示文字": "show_text",
+        }
+        show_type = show_dict.get(self.tab_0_combo.currentText(), None)
+        file_path = self.tab_0_edit_1.text()
+        if not show_type:
+            QMessageBox.warning(self, "错误", "未选择展示方式!", QMessageBox.Yes)
+            return
+        if show_type == "show_file" and not file_path:
+            QMessageBox.warning(self, "错误", "请选择文件!", QMessageBox.Yes)
+            return
+        if show_type == "show_file" and not self.tab_0_edit_0.text().strip(' '):
+            # doesn't names for this bulletin when show type is file
+            file_raw_name = file_path.rsplit("/", 1)
+            file_name_list = file_raw_name.rsplit(".", 1)
+            self.tab_0_edit_0.setText(file_name_list[0])
+        if show_type == "show_text" and not self.tab_0_edit_0.text().strip(' '):
+            # doesn't names for this bulletin when show type is text
+            QMessageBox.warning(self, "错误", "展示文本时需输入条目名称!", QMessageBox.Yes)
+            return
+        content_list = self.tab_0_edit_2.toPlainText().strip(' ').split('\n') # 去除前后空格和分出换行
+        if show_type == "show_text" and not content_list[0]:
+            QMessageBox.warning(self, "错误", "请输入展示文本的内容!", QMessageBox.Yes)
+            return
+        # 处理文本内容
+        text_content = ""
+        if show_type == "show_text":
+            for p in content_list:
+                text_content += "<p style='margin:0;'><span>&nbsp;&nbsp;</span>" + p + "</p>"
+        data["name"] = self.tab_0_edit_0.text().strip(' ')
+        data["show_type"] = show_type
+        data["file"] = file_path
+        data["content"] = text_content
+        data["set_option"] = "new_bulletin"
+        print('popup.maintain.home.py {} : '.format(str(sys._getframe().f_lineno)), "上传公告:", data)
+        self.new_data_signal.emit(data)

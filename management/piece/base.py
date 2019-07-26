@@ -1,52 +1,37 @@
 # _*_ coding:utf-8 _*_
 """
 small control in base window
-Update: 2019-07-25
+Update: 2019-07-26
 Author: zizle
 """
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QTreeWidget
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint
-from PyQt5.QtGui import QFont,  QColor
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer
+from PyQt5.QtGui import QFont,  QColor, QCursor
 
 
 class MenuBar(QWidget):
     menu_btn_clicked = pyqtSignal(QPushButton)
     def __init__(self, *args, **kwargs):
         super(MenuBar, self).__init__(*args, **kwargs)
-        styleSheet = """
-        MenuBar{
-            background-color:rgb(60,63,65);
-        }
-        QPushButton{
-            background-color:rgb(60,63,65);
-            color: rgb(192,192,192);
-            border: 0.5px solid rgb(170,170,170);
-            padding:0 7px;
-            margin-left:5px;
-            height:18px;
-            color: #FFFFFF
-        }
-        QPushButton:hover {
-            background-color: #CD3333;
-        }
-        """
         # 支持qss设置背景
         self.setAttribute(Qt.WA_StyledBackground, True)
-        # 设置背景颜色,否则由于受到父窗口的影响导致透明
-        self.setAutoFillBackground(True)
-        palette = self.palette()
-        palette.setColor(palette.Window, QColor(240,240,240))
-        self.setPalette(palette)
         layout = QHBoxLayout(spacing=0)
-        layout.setContentsMargins(10,0,0,4)
-        self.setStyleSheet(styleSheet)
         self.setLayout(layout)
+
+    def setContentsMargins(self, *__args):
+        self.layout().setContentsMargins(*__args)
 
     def addMenuButton(self, button):
         if not isinstance(button, QPushButton):
             raise ValueError('menu instance must be QPushButton QObject')
         button.clicked.connect(lambda :self.menu_btn_clicked.emit(button))
         self.layout().addWidget(button, alignment=Qt.AlignLeft)
+
+    def addMenuButtons(self, buttons):
+        if not isinstance(buttons, list):
+            raise ValueError('buttons instance has no iterable')
+        for name in buttons:
+            self.addMenuButton(QPushButton(name))
 
     def addStretch(self):
         self.layout().addStretch()
@@ -194,3 +179,116 @@ class TitleBar(QWidget):
         else:  # 还原
             self.buttonMaximum.setText('1')
             self.windowNormaled.emit()
+
+
+class PermitBar(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(PermitBar, self).__init__(*args, **kwargs)
+        styleSheet = """
+        PermitBar {
+            background-color: rgb(60,63,65);
+        }
+        QPushButton {
+            background-color: rgb(60,63,65);
+            border:none;
+            padding-left: 4px;
+            padding-right: 4px;
+            height:18px;
+            color: #FFFFFF
+        }
+            QPushButton:hover {
+            color: rgb(54,220,180);
+        }
+            QLabel {
+            background-color: rgb(60,63,65);
+            height:18px;
+            color: rgb(210, 200, 205)
+        }
+        """
+        # 支持qss设置背景
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        # 设置背景颜色,否则由于受到父窗口的影响导致透明
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(palette.Window, QColor(255,255,255))
+        self.setPalette(palette)
+        layout = QHBoxLayout(spacing=0)
+        layout.setContentsMargins(0,0,0,0)
+        # widgets
+        self.login_button = QPushButton('登录')
+        self.register_button = QPushButton('注册')
+        self.exit_button = QPushButton("退出")
+        # signal connect slot
+        self.login_button.clicked.connect(self.login_button_clicked)
+        self.register_button.clicked.connect(self.register_button_clicked)
+        self.exit_button.clicked.connect(self.exit_button_clicked)
+        # widgets styles and actions
+        self.login_message = QLabel("")
+        self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.register_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.exit_button.hide()
+        self.setStyleSheet(styleSheet)
+        self.exit_button.setStyleSheet("""
+        QPushButton {
+            background-color: rgb(60,63,65);
+            border:none;
+            padding-left: 10px;
+            padding-right: 8px;
+            height:18px;
+            font-size:11px;
+            color: rgb(210,210,210)
+        }
+        QPushButton:hover {
+            color: rgb(230,0,5);
+        }
+        """)
+        # add to layout
+        layout.addWidget(self.login_button)
+        layout.addWidget(self.register_button)
+        layout.addWidget(self.login_message)
+        layout.addWidget(self.exit_button)
+        self.setLayout(layout)
+
+    def dynamic_user_info(self):
+        # show username dynamic
+        if self.timer_finished_count == len(self.username):
+            self.login_message.setText(self.username)
+            self.timer_finished_count = 0
+        else:
+            self.login_message.setText(self.username[self.timer_finished_count:] + " " + self.username[:self.timer_finished_count])
+            self.timer_finished_count += 1
+
+    def login_button_clicked(self):
+        # dialog for user login
+        from popup.base import Login  # import when required because import with file top will make a circle import
+        def has_login(text):
+            self.username = text
+            self.timer_finished_count = 0
+            self.login_button.hide()
+            self.register_button.hide()
+            self.exit_button.show()
+            self.login_message.setText(self.username)
+            self.timer = QTimer()  # timer would be bind to self
+            self.timer.start(500)
+            self.timer.timeout.connect(self.dynamic_user_info)
+            # self.login_message.setText(message)
+            # self.message = self.login_message.text()
+            # # 动态展示登录信息
+            # self.finish_count = 0
+            # self.timer = QTimer()
+            # self.timer.start(500)
+            # self.timer.timeout.connect(self._time_record)
+
+        popup = Login()
+        popup.successful_login.connect(has_login)
+        if not popup.exec():
+            del popup
+
+    def register_button_clicked(self):
+        from popup.base import RegisterDialog
+        popup = RegisterDialog()
+        if not popup.exec():
+            del popup
+
+    def exit_button_clicked(self):
+        pass

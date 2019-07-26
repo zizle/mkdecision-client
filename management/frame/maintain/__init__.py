@@ -5,4 +5,4 @@ Update: 2019-07-25
 Author: zizle
 """
 from .home import BulletinInfo
-from .basic import NoDataWindow, ClientInfo, UserInfo
+from .base import NoDataWindow, ClientInfo, UserInfo

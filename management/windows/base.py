@@ -13,10 +13,10 @@ from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
 
 import config
-from piece.base import TitleBar, MenuBar
+from windows.maintenance import Maintenance
+from piece.base import TitleBar, MenuBar, PermitBar
 from frame.base import NoDataWindow
-from windows.home import HomePageScrollWindow
-from frame.home import HomePage
+from .home import HomePage
 # 枚举左上右下以及四个定点
 Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
 
@@ -28,6 +28,10 @@ class Base(QWidget):
     def __init__(self, *args, **kwargs):
         super(Base, self).__init__(*args, **kwargs)
         self.resize(1280, 768)
+        # windows centered(three step)
+        myself = self.frameGeometry()  # 自身窗体信息(虚拟框架)
+        myself.moveCenter(QDesktopWidget().availableGeometry().center())  # 框架中心移动到用户桌面中心
+        self.move(myself.topLeft())  # 窗口左上角与虚拟框架左上角对齐
         self._pressed = False  # 按住鼠标标记
         self.Direction = None  # 方向标记
         # 背景透明
@@ -41,6 +45,9 @@ class Base(QWidget):
         # margins for resize window
         layout.setSpacing(0)
         layout.setContentsMargins(self.Margins, self.Margins, self.Margins, self.Margins)
+        # menu bar and permit bar layout
+        mp_layout = QHBoxLayout(spacing=0)
+        mp_layout.setContentsMargins(0,0,0,0)
         # window title
         title_bar = TitleBar()
         # signal slot
@@ -54,18 +61,46 @@ class Base(QWidget):
         # menu bar
         self.menu_bar = MenuBar()
         self.menu_bar.installEventFilter(self)
+        # 设置背景颜色,否则由于受到父窗口的影响导致透明
+        self.menu_bar.setAutoFillBackground(True)
+        palette = self.menu_bar.palette()
+        palette.setColor(palette.Window, QColor(255,255,255))
+        self.menu_bar.setPalette(palette)
+        self.menu_bar.setContentsMargins(10, 0, 0, 4)
+        self.menu_bar.setStyleSheet("""
+        MenuBar{
+            background-color:rgb(60,63,65);
+        }
+        QPushButton{
+            background-color:rgb(60,63,65);
+            color: rgb(192,192,192);
+            border: 0.5px solid rgb(170,170,170);
+            padding:0 7px;
+            margin-left:5px;
+            height:18px;
+            color: #FFFFFF
+        }
+        QPushButton:hover {
+            background-color: #CD3333;
+        }
+        """)
         self.menu_bar.menu_btn_clicked.connect(self.menu_clicked)
+        # permit bar
+        permit_bar = PermitBar()
         # add tab container
         self.tab = QTabWidget()
         self.tab.setAutoFillBackground(True)  # 设置背景,否则由于受到父窗口的影响导致透明
         self.tab.setTabBarAutoHide(True)
         palette = self.tab.palette()
-        palette.setColor(palette.Window, QColor(240, 240, 240))
+        palette.setColor(palette.Window, QColor(255,255,255))
         self.tab.setPalette(palette)
         self.tab.installEventFilter(self) # 事件过滤
-        # add widgets to layout
+        # add widget to menu and permit layout
+        mp_layout.addWidget(self.menu_bar)
+        mp_layout.addWidget(permit_bar)
+        # add widgets and layout to main layout
         layout.addWidget(title_bar)
-        layout.addWidget(self.menu_bar)
+        layout.addLayout(mp_layout)
         layout.addWidget(self.tab)
         self.setLayout(layout)
         # set icon and title
@@ -79,12 +114,13 @@ class Base(QWidget):
         print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), menu.unum, menu.text())
         text = menu.text()
         if text == '首页':
-            tab = HomePage()
+            tab = HomePage(menu_parent=menu.unum)
+        elif text == '数据维护':
+            tab = Maintenance()
         else:
             tab = NoDataWindow(name=text)
         self.tab.clear()
         self.tab.addTab(tab, text)
-
 
     def eventFilter(self, obj, event):
         """事件过滤器,用于解决鼠标进入其它控件后还原为标准鼠标样式"""
@@ -96,27 +132,22 @@ class Base(QWidget):
         try:
             # 请求主菜单数据
             response = requests.get(
-                url=config.SERVER_ADDR + "basic/module/",
+                url=config.SERVER_ADDR + "basic/module/",  # query param: parent=None
                 headers=config.CLIENT_HEADERS,
                 data=json.dumps({"machine_code": config.app_dawn.value('machine')})
             )
-            response_content = json.loads(response.content.decode("utf-8"))
-            message = response_content['message']
-            menu_data = response_content["data"]
         except Exception as e:
             QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
             return
+        response_content = json.loads(response.content.decode("utf-8"))
         if response.status_code != 200:
-            QMessageBox.information(self, "获取数据错误", message, QMessageBox.Yes)
+            QMessageBox.information(self, "获取数据错误", response_content['message'], QMessageBox.Yes)
             return
-        print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), "获取主菜单:", menu_data)
-        for item in menu_data:
-            if item['subs']:
-                print(item['name'],'subs')
-            else:
-                menu_btn = QPushButton(item['name'])
-                menu_btn.unum = item['id']
-                self.menu_bar.addMenuButton(menu_btn)
+        print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), "获取主菜单:", response_content)
+        for item in response_content["data"]:
+            menu_btn = QPushButton(item['name'])
+            menu_btn.unum = item['id']
+            self.menu_bar.addMenuButton(menu_btn)
         self.menu_bar.addStretch()
 
     def mouseMoveEvent(self, event):
