@@ -4,11 +4,12 @@ the base window of project
 Update: 2019-07-25
 Author: zizle
 """
+import os
 import sys
 import json
 import requests
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QCoreApplication
 from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
 
@@ -105,7 +106,7 @@ class Base(QWidget):
         self.setLayout(layout)
         # set icon and title
         self.setWindowIcon(QIcon(config.BASE_DIR + "/media/logo.png"))
-        self.setWindowTitle("瑞达期货研究院分析决策系统v" + config.VERSION)
+        self.setWindowTitle("瑞达期货研究院分析决策系统-管理端 " + config.VERSION)
         # get menus in server
         self.get_menus()
         self.count = 0
@@ -138,7 +139,7 @@ class Base(QWidget):
             )
         except Exception as e:
             QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
-            return
+            sys.exit()  # catch exception sys exit
         response_content = json.loads(response.content.decode("utf-8"))
         if response.status_code != 200:
             QMessageBox.information(self, "获取数据错误", response_content['message'], QMessageBox.Yes)
@@ -294,6 +295,3 @@ class Base(QWidget):
         """还原,要保留上下左右边界,否则没有边框无法调整"""
         super(Base, self).showNormal()
         self.layout().setContentsMargins(self.Margins, self.Margins, self.Margins, self.Margins)
-
-
-

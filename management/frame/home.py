@@ -11,6 +11,7 @@ import config
 from piece.base import MenuBar
 from piece.home import ShowReport
 
+
 class Report(QWidget):
     def __init__(self, *args, **kwargs):
         super(Report, self).__init__(*args, *kwargs)
@@ -34,5 +35,5 @@ class Report(QWidget):
         self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/')  # query param type=None
 
     def menu_clicked(self, menu):
-        print(menu.text())
+        print('frame.home.py {} 点击类别:'.format(str(sys._getframe().f_lineno)), menu.text())
         self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/?category=')

@@ -150,3 +150,107 @@ class CreateNewBulletin(QDialog):
         data["set_option"] = "new_bulletin"
         print('popup.maintain.home.py {} : '.format(str(sys._getframe().f_lineno)), "上传公告:", data)
         self.new_data_signal.emit(data)
+
+
+class CreateNewCarousel(QDialog):
+    def __init__(self):
+        super(CreateNewCarousel, self).__init__()
+        layout = QGridLayout()
+        # labels
+        name_label = QLabel('名称：')
+        image_label = QLabel('图片：')
+        style_label = QLabel('广告方式：')
+        self.file_label = QLabel('文件：')
+        self.content_label = QLabel('内容：')
+        self.url_label = QLabel('网址：')
+        self.content_label.hide()
+        self.url_label.hide()
+        # edits
+        self.name_edit = QLineEdit()
+        self.image_edit = QLineEdit()
+        self.file_edit = QLineEdit()
+        self.url_edit = QLineEdit()
+        self.content_edit = QTextEdit()
+        self.content_edit.hide()
+        self.url_edit.hide()
+        # combos
+        show_combo = QComboBox()
+        show_combo.addItems(['文件展示', '显示内容', '链接网址'])
+        show_combo.currentTextChanged.connect(self.change_show_style)
+        # buttons
+        self.select_file_btn = QPushButton('选择')
+        select_img_btn = QPushButton('图片')
+        submit_btn = QPushButton('提交')
+        # add layout
+        # named
+        layout.addWidget(name_label, 0, 0)
+        layout.addWidget(self.name_edit, 0, 1, 1, 2)
+        # select image
+        layout.addWidget(image_label, 1, 0)
+        layout.addWidget(self.image_edit, 1, 1)
+        layout.addWidget(select_img_btn, 1, 2)
+        # show style
+        layout.addWidget(style_label, 2, 0)
+        layout.addWidget(show_combo, 2, 1, 1, 2)
+        # select file
+        layout.addWidget(self.file_label, 3, 0)
+        layout.addWidget(self.file_edit, 3, 1)
+        layout.addWidget(self.select_file_btn, 3, 2)
+        # edit content
+        layout.addWidget(self.content_label, 4, 0)
+        layout.addWidget(self.content_edit, 4, 1, 1, 2)
+        # edit url address
+        layout.addWidget(self.url_label, 5, 0)
+        layout.addWidget(self.url_edit, 5, 1, 1,2)
+        # submit
+        layout.addWidget(submit_btn, 6, 1, 1, 2)
+        self.setLayout(layout)
+
+    def change_show_style(self, text):
+        if text == '文件展示':
+            # hide content
+            self.content_label.hide()
+            self.content_edit.clear()
+            self.content_edit.hide()
+            # hide url
+            self.url_label.hide()
+            self.url_edit.clear()
+            self.url_edit.hide()
+            # show file
+            self.file_label.show()
+            self.file_edit.show()
+            self.select_file_btn.show()
+        elif text == '显示内容':
+            # hide file
+            self.file_label.hide()
+            self.file_edit.clear()
+            self.file_edit.hide()
+            self.select_file_btn.hide()
+            # hide url link
+            self.url_label.hide()
+            self.url_edit.clear()
+            self.url_edit.hide()
+            # show content
+            self.content_label.show()
+            self.content_edit.show()
+        elif text == '链接网址':
+            # hide file
+            self.file_label.hide()
+            self.file_edit.clear()
+            self.file_edit.hide()
+            self.select_file_btn.hide()
+            # hide content
+            self.content_label.hide()
+            self.content_edit.clear()
+            self.content_edit.hide()
+            # show url link
+            self.url_label.show()
+            self.url_edit.show()
+        else:
+            pass
+
+
+
+
+
+

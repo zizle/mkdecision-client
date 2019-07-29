@@ -10,7 +10,8 @@ import json
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
-from frame.maintain import NoDataWindow, BulletinInfo, ClientInfo, UserInfo
+from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
+from frame.maintain.home import BulletinInfo, CarouselInfo
 from threads import RequestThread
 import config
 
@@ -76,6 +77,8 @@ class Maintenance(QWidget):
                 tab = UserInfo()
             elif text == '公告栏':
                 tab = BulletinInfo()
+            elif text == '轮播广告':
+                tab = CarouselInfo()
             else:
                 tab = NoDataWindow(name=text)
             self.right_tab.addTab(tab, text)

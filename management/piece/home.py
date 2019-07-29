@@ -6,11 +6,56 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import QTableWidget, QPushButton, QTableWidgetItem, QHeaderView, QAbstractItemView, QTreeWidget, QTreeWidgetItem
+from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QFont, QColor, QBrush
 
 import config
 from threads import RequestThread
+
+
+class Carousel(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(Carousel, self).__init__(*args, **kwargs)
+        self.message_btn = QPushButton('刷新中...', self)
+        self.message_btn.resize(100, 20)
+        self.message_btn.move(80, 50)
+        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
+        self.message_btn.clicked.connect(self.get_carousel)
+        self.message_btn.hide()
+        layout = QHBoxLayout()
+        self.setLayout(layout)
+        self.get_carousel()
+
+    def carousel_thread_back(self, content):
+        # set advertisement carousel
+        print('piece.home.py {} 轮播数据: '.format(str(sys._getframe().f_lineno)), content)
+        if content['error']:
+            self.message_btn.setText('失败,请重试!')
+            self.message_btn.setEnabled(True)
+        else:
+            if not content['data']:
+                self.message_btn.setText('完成,无数据.')
+                return  # function finished
+            else:
+                self.message_btn.setText('刷新完成!')
+                self.message_btn.hide()
+        # fill tree menu
+
+    def get_carousel(self):
+        # get advertisement carousel data
+        self.message_btn.setText('刷新中...')
+        self.message_btn.show()
+        self.message_btn.setEnabled(False)
+        self.carousel_thread = RequestThread(
+            url=config.SERVER_ADDR + 'homepage/carousel/',
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.carousel_thread.finished.connect(self.carousel_thread.deleteLater)
+        self.carousel_thread.response_signal.connect(self.carousel_thread_back)
+        self.carousel_thread.start()
 
 
 class MenuTree(QTreeWidget):

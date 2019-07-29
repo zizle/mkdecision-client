@@ -11,7 +11,8 @@ from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import *
 
 import config
-from popup.maintain import CreateNewBulletin
+from popup.maintain import CreateNewBulletin, CreateNewCarousel
+
 
 class BulletinInfo(QWidget):
     def __init__(self):
@@ -72,5 +73,35 @@ class BulletinInfo(QWidget):
                     popup.close()  # close the dialog
         popup = CreateNewBulletin()
         popup.new_data_signal.connect(update_bulletin)
+        if not popup.exec():
+            del popup
+
+
+class CarouselInfo(QWidget):
+    def __init__(self):
+        super(CarouselInfo, self).__init__()
+        layout = QVBoxLayout()
+        action_layout = QHBoxLayout()
+        create_btn = QPushButton("+新增")
+        refresh_btn = QPushButton('刷新')
+        create_btn.clicked.connect(self.create_new_carousel)
+        self.show_carousel_table = QTableWidget()
+        action_layout.addWidget(create_btn)
+        action_layout.addWidget(refresh_btn)
+        action_layout.addStretch()
+        layout.addLayout(action_layout)
+        layout.addWidget(self.show_carousel_table)
+        self.setLayout(layout)
+
+    def create_new_carousel(self):
+        # dialog for add new carousel
+        def update_carousel():
+            pass
+        try:
+            popup = CreateNewCarousel()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+
         if not popup.exec():
             del popup
