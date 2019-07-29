@@ -15,93 +15,6 @@ import config
 from threads import RequestThread
 
 
-class CarouselA(QWidget):
-    carousel_list = list()
-
-    def __init__(self, *args, **kwargs):
-        super(Carousel, self).__init__(*args, **kwargs)
-        self.message_btn = QPushButton('刷新中...', self)
-        self.message_btn.resize(100, 20)
-        self.message_btn.move(80, 50)
-        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
-        self.message_btn.clicked.connect(self.get_carousel)
-        self.message_btn.hide()
-        self.show_label = QLabel()
-        self.get_carousel()
-
-    def animation_group_finished(self):
-        """动画组一次播放结束"""
-        print('动画一次结束')
-        for carousel in self.carousel_list:
-            cur_pos_x = carousel[1].pos().x()
-            if cur_pos_x == self.width():
-                target_pos_x = cur_pos_x - self.count * self.width()
-                carousel[1].move(target_pos_x, 0)
-                carousel[0].setStartValue(QPoint(target_pos_x, 0))
-                carousel[0].setEndValue(QPoint(target_pos_x + self.width(), 0))
-            else:
-                # 重新设置动画的起始结束位置
-                carousel[0].setStartValue(QPoint(cur_pos_x, 0))
-                carousel[0].setEndValue(QPoint(cur_pos_x + self.width(), 0))
-
-    def carousel_thread_back(self, content):
-        # set advertisement carousel
-        print('piece.home.py {} 轮播数据: '.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
-        # create advertisements carousel
-        for index, item in enumerate(content['data']):
-            rep = requests.get(config.SERVER_ADDR + item['image'])
-            pixmap = QPixmap()
-            pixmap.loadFromData(rep.content)
-            self.show_label.setPixmap(pixmap)
-            return
-            # label.move(-self.width() * index, 0)
-        #     animation = QPropertyAnimation(label, b'pos')
-        #     label_x = label.pos().x()
-        #     animation.setStartValue(QPoint(label_x, 0))  # 起始位置
-        #     animation.setEndValue(QPoint(label_x + self.width(), 0))  # 结束位置
-        #     animation.setDuration(300)
-        #     self.carousel_list.append((animation, label))
-        #     self.animation_group.addAnimation(animation)  # 加入组
-        #
-        # print(len(content['data']))
-        # if len(content['data']) > 1:
-        #     # 计时器
-        #     timer = QTimer(self)
-        #     timer.start(5000)
-        #     timer.timeout.connect(self.time_record)
-        #     # 动画组结束连接处理事件
-        #     self.animation_group.finished.connect(self.animation_group_finished)
-        #
-        # print('piece.home.py {} 轮播列表:'.format(str(sys._getframe().f_lineno)), self.carousel_list)
-
-
-    def get_carousel(self):
-        # get advertisement carousel data
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        self.carousel_thread = RequestThread(
-            url=config.SERVER_ADDR + 'homepage/carousel/',
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.carousel_thread.finished.connect(self.carousel_thread.deleteLater)
-        self.carousel_thread.response_signal.connect(self.carousel_thread_back)
-        self.carousel_thread.start()
-
-
 class Carousel(QLabel):
     pixmap_list = list()
 
@@ -414,6 +327,7 @@ class ShowReport(QTableWidget):
         self.message_btn.move(100, 50)
         self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
         self.message_btn.clicked.connect(self.get_report)
+        self.verticalHeader().setVisible(False)
         # get report 获取数据在其父窗口调用,传入url,方便按钮点击的逻辑
 
     def get_report(self, url):
@@ -434,9 +348,12 @@ class ShowReport(QTableWidget):
 
     def report_thread_back(self, content):
         print('piece.home.py {} 常规报告: '.format(str(sys._getframe().f_lineno)), content)
+        self.clear()
+        self.horizontalHeader().setVisible(False)
         if content['error']:
             self.message_btn.setText('失败,请重试!')
             self.message_btn.setEnabled(True)
+            return
         else:
             if not content['data']:
                 self.message_btn.setText('完成,无数据.')
@@ -445,6 +362,38 @@ class ShowReport(QTableWidget):
                 self.message_btn.setText('刷新完成!')
                 self.message_btn.hide()
         # fill table
+        self.horizontalHeader().setVisible(True)
+        keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '时间')]
+        reports = content['data']
+        row = len(reports)
+        self.setRowCount(row)
+        self.setColumnCount(len(keys) + 1)  # 列数
+        labels = []
+        set_keys = []
+        for key_label in keys:
+            set_keys.append(key_label[0])
+            labels.append(key_label[1])
+        labels.append(' ')
+        self.setHorizontalHeaderLabels(labels)
+        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+        self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
+        self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, QHeaderView.ResizeToContents)  # 第2列随文字宽度
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
+                if col == self.columnCount() - 1:
+                    item = QTableWidgetItem('查看')
+                else:
+                    item = QTableWidgetItem(str(reports[row][set_keys[col]]))
+                # font = QFont()
+                # if col == self.columnCount() - 1:
+                #     size = 8
+                    # item.setFont(QFont(font))
+                # else:
+                #     size = 10
+                # font.setPointSize(size)
+                # item.setFont(QFont(font))
+                item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, item)
 
 
 

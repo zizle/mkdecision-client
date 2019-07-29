@@ -36,4 +36,17 @@ class Report(QWidget):
 
     def menu_clicked(self, menu):
         print('frame.home.py {} 点击类别:'.format(str(sys._getframe().f_lineno)), menu.text())
-        self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/?category=')
+        type_dict = {
+            "日报": "daily",
+            "周报": "weekly",
+            "月报": "monthly",
+            "年报": "annual",
+            "专题": "special",
+            "投资报告": "invest",
+            "其他": "others"
+        }
+        type_en = type_dict.get(menu.text())
+        url = config.SERVER_ADDR + 'homepage/report/'
+        if type_en:
+            url += '?category=' + type_en
+        self.show_table.get_report(url=url)
