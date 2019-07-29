@@ -153,8 +153,11 @@ class CreateNewBulletin(QDialog):
 
 
 class CreateNewCarousel(QDialog):
+    new_data_signal = pyqtSignal(dict)
+
     def __init__(self):
         super(CreateNewCarousel, self).__init__()
+        self.setFixedSize(430, 220)
         layout = QGridLayout()
         # labels
         name_label = QLabel('名称：')
@@ -174,13 +177,19 @@ class CreateNewCarousel(QDialog):
         self.content_edit.hide()
         self.url_edit.hide()
         # combos
-        show_combo = QComboBox()
-        show_combo.addItems(['文件展示', '显示内容', '链接网址'])
-        show_combo.currentTextChanged.connect(self.change_show_style)
+        self.show_combo = QComboBox()
+        self.show_combo.addItems(['文件展示', '显示内容', '链接网址'])
+        self.show_combo.currentTextChanged.connect(self.change_show_style)
         # buttons
         self.select_file_btn = QPushButton('选择')
         select_img_btn = QPushButton('图片')
         submit_btn = QPushButton('提交')
+        self.select_file_btn.setMaximumWidth(30)
+        select_img_btn.setMaximumWidth(30)
+        # select button signal
+        self.select_file_btn.clicked.connect(self.select_file_clicked)
+        select_img_btn.clicked.connect(self.select_img_clicked)
+        submit_btn.clicked.connect(self.submit_carousel)
         # add layout
         # named
         layout.addWidget(name_label, 0, 0)
@@ -191,7 +200,7 @@ class CreateNewCarousel(QDialog):
         layout.addWidget(select_img_btn, 1, 2)
         # show style
         layout.addWidget(style_label, 2, 0)
-        layout.addWidget(show_combo, 2, 1, 1, 2)
+        layout.addWidget(self.show_combo, 2, 1, 1, 2)
         # select file
         layout.addWidget(self.file_label, 3, 0)
         layout.addWidget(self.file_edit, 3, 1)
@@ -249,8 +258,64 @@ class CreateNewCarousel(QDialog):
         else:
             pass
 
+    def select_file_clicked(self):
+        # select file
+        desktop_path = get_desktop_path()
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.pdf)")
+        if not file_path:
+            return
+        self.file_edit.setText(file_path)
 
+    def select_img_clicked(self):
+        # select image
+        desktop_path = get_desktop_path()
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "Image files (*.png *.jpg)")
+        if not file_path:
+            return
+        self.image_edit.setText(file_path)
 
-
-
-
+    def submit_carousel(self):
+        # submit carousel data
+        data = dict()
+        show_dict = {
+            "文件展示": "show_file",
+            "显示内容": "show_text",
+            "链接网址": "redirect"
+        }
+        name = self.name_edit.text().strip(' ')
+        if not name:
+            QMessageBox.warning(self, "错误", "请起一个名字!", QMessageBox.Yes)
+            return
+        image_path = self.image_edit.text()
+        if not image_path:
+            QMessageBox.warning(self, "错误", "请上传展示的图片!", QMessageBox.Yes)
+            return
+        show_style = show_dict.get(self.show_combo.currentText(), None)
+        if not show_style:
+            QMessageBox.warning(self, "错误", "没有选择展示方式!", QMessageBox.Yes)
+            return
+        if show_style == "show_file" and not self.file_edit.text():
+            QMessageBox.warning(self, "错误", "要显示文件需上传pdf文件!", QMessageBox.Yes)
+            return
+        if show_style == "redirect" and not self.url_edit.text().strip(' '):
+            QMessageBox.warning(self, "错误", "跳转网址需填写网址.", QMessageBox.Yes)
+            return
+        if show_style == 'show_text' and not self.content_edit.toPlainText().strip(' '):
+            QMessageBox.warning(self, '错误', '显示内容需填写内容.')
+            return
+        file_path = self.file_edit.text()
+        content_list = self.content_edit.toPlainText().split('\n')
+        # 处理文本内容
+        text_content = ""
+        if content_list[0]:
+            for p in content_list:
+                text_content += "<p style='margin:0;'><span>&nbsp;&nbsp;</span>" + p + "</p>"
+        redirect_url = self.url_edit.text().strip(' ')
+        data["name"] = name
+        data["image"] = image_path
+        data["file"] = file_path
+        data["content"] = text_content
+        data["redirect"] = redirect_url
+        # signal upload
+        print('popup.maintain.home.py {} : 上传轮播：'.format(str(sys._getframe().f_lineno)), data )
+        self.new_data_signal.emit(data)

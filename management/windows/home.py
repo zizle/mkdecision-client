@@ -28,11 +28,7 @@ class HomePage(QScrollArea):
         lmn_frame_layout = QHBoxLayout()  # left list menu and middle frame window layout
         bull_table = ShowBulletin()  # bulletin table
         bull_table.setMaximumWidth(400)
-        try:
-            caro_show = Carousel()  # advertisement carousel widget
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+        caro_show = Carousel()  # advertisement carousel widget
         # add bulletin widget and advertisement widget to layout
         ble_crl_layout.addWidget(bull_table)
         ble_crl_layout.addWidget(caro_show)

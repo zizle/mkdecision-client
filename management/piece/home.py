@@ -6,14 +6,18 @@ Author: zizle
 """
 import sys
 import json
+import requests
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QFont, QColor, QBrush
+from PyQt5.QtGui import QFont, QColor, QBrush, QPixmap
+from PyQt5.QtCore import QTimer, Qt, QPoint, QPropertyAnimation, QVariant, QEasingCurve
 
 import config
 from threads import RequestThread
 
 
-class Carousel(QWidget):
+class CarouselA(QWidget):
+    carousel_list = list()
+
     def __init__(self, *args, **kwargs):
         super(Carousel, self).__init__(*args, **kwargs)
         self.message_btn = QPushButton('刷新中...', self)
@@ -22,9 +26,23 @@ class Carousel(QWidget):
         self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
         self.message_btn.clicked.connect(self.get_carousel)
         self.message_btn.hide()
-        layout = QHBoxLayout()
-        self.setLayout(layout)
+        self.show_label = QLabel()
         self.get_carousel()
+
+    def animation_group_finished(self):
+        """动画组一次播放结束"""
+        print('动画一次结束')
+        for carousel in self.carousel_list:
+            cur_pos_x = carousel[1].pos().x()
+            if cur_pos_x == self.width():
+                target_pos_x = cur_pos_x - self.count * self.width()
+                carousel[1].move(target_pos_x, 0)
+                carousel[0].setStartValue(QPoint(target_pos_x, 0))
+                carousel[0].setEndValue(QPoint(target_pos_x + self.width(), 0))
+            else:
+                # 重新设置动画的起始结束位置
+                carousel[0].setStartValue(QPoint(cur_pos_x, 0))
+                carousel[0].setEndValue(QPoint(cur_pos_x + self.width(), 0))
 
     def carousel_thread_back(self, content):
         # set advertisement carousel
@@ -39,7 +57,33 @@ class Carousel(QWidget):
             else:
                 self.message_btn.setText('刷新完成!')
                 self.message_btn.hide()
-        # fill tree menu
+        # create advertisements carousel
+        for index, item in enumerate(content['data']):
+            rep = requests.get(config.SERVER_ADDR + item['image'])
+            pixmap = QPixmap()
+            pixmap.loadFromData(rep.content)
+            self.show_label.setPixmap(pixmap)
+            return
+            # label.move(-self.width() * index, 0)
+        #     animation = QPropertyAnimation(label, b'pos')
+        #     label_x = label.pos().x()
+        #     animation.setStartValue(QPoint(label_x, 0))  # 起始位置
+        #     animation.setEndValue(QPoint(label_x + self.width(), 0))  # 结束位置
+        #     animation.setDuration(300)
+        #     self.carousel_list.append((animation, label))
+        #     self.animation_group.addAnimation(animation)  # 加入组
+        #
+        # print(len(content['data']))
+        # if len(content['data']) > 1:
+        #     # 计时器
+        #     timer = QTimer(self)
+        #     timer.start(5000)
+        #     timer.timeout.connect(self.time_record)
+        #     # 动画组结束连接处理事件
+        #     self.animation_group.finished.connect(self.animation_group_finished)
+        #
+        # print('piece.home.py {} 轮播列表:'.format(str(sys._getframe().f_lineno)), self.carousel_list)
+
 
     def get_carousel(self):
         # get advertisement carousel data
@@ -56,6 +100,76 @@ class Carousel(QWidget):
         self.carousel_thread.finished.connect(self.carousel_thread.deleteLater)
         self.carousel_thread.response_signal.connect(self.carousel_thread_back)
         self.carousel_thread.start()
+
+
+class Carousel(QLabel):
+    pixmap_list = list()
+
+    def __init__(self):
+        super(Carousel, self).__init__()
+        self.message_btn = QPushButton('刷新中...', self)
+        self.message_btn.resize(100, 20)
+        self.message_btn.move(80, 50)
+        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
+        self.message_btn.clicked.connect(self.get_carousel)
+        self.message_btn.hide()
+        self.pixmap_flag = 0
+        self.setMaximumHeight(350)
+        self.setScaledContents(True)
+        self.get_carousel()
+
+    def carousel_thread_back(self, content):
+        # set advertisement carousel
+        print('piece.home.py {} 轮播数据: '.format(str(sys._getframe().f_lineno)), content)
+        if content['error']:
+            self.message_btn.setText('失败,请重试!')
+            self.message_btn.setEnabled(True)
+        else:
+            if not content['data']:
+                self.message_btn.setText('完成,无数据.')
+                return  # function finished
+            else:
+                self.message_btn.setText('刷新完成!')
+                self.message_btn.hide()
+        # create advertisements carousel
+        for index, item in enumerate(content['data']):
+            rep = requests.get(config.SERVER_ADDR + item['image'])
+            pixmap = QPixmap()
+            pixmap.loadFromData(rep.content)
+            self.pixmap_list.append(pixmap)
+        # set pixmap
+        self.setPixmap(self.pixmap_list[self.pixmap_flag])
+        # change pixmap
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.change_carousel_pixmap)
+        self.timer.start(5000)
+
+    def change_carousel_pixmap(self):
+        # self.animation.start()
+        self.pixmap_flag += 1
+        if self.pixmap_flag >= len(self.pixmap_list):
+            self.pixmap_flag=0
+        self.setPixmap(self.pixmap_list[self.pixmap_flag])
+
+    def get_carousel(self):
+        # get advertisement carousel data
+        self.message_btn.setText('刷新中...')
+        self.message_btn.show()
+        self.message_btn.setEnabled(False)
+        self.carousel_thread = RequestThread(
+            url=config.SERVER_ADDR + 'homepage/carousel/',
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.carousel_thread.finished.connect(self.carousel_thread.deleteLater)
+        self.carousel_thread.response_signal.connect(self.carousel_thread_back)
+        self.carousel_thread.start()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            print(self.pixmap())
 
 
 class MenuTree(QTreeWidget):
@@ -111,6 +225,7 @@ class MenuTree(QTreeWidget):
             # menu.setTextAlignment(0, Qt.AlignCenter)
             menu_item.id = menu['id']
 
+
 class ShowBulletin(QTableWidget):
     def __init__(self, *args, **kwargs):
         super(ShowBulletin, self).__init__(*args)
@@ -122,7 +237,7 @@ class ShowBulletin(QTableWidget):
         self.message_btn.clicked.connect(self.get_bulletin)
         self.message_btn.hide()
         # table style
-        self.setMaximumWidth(300)
+        self.setFixedSize(300,350)
         self.setMouseTracking(True)
         self.setShowGrid(False)  # no grid
         self.setFocusPolicy(0)  # No empty box appears in the selection
@@ -288,6 +403,7 @@ class ShowBulletin(QTableWidget):
                 for other_item in [self.item(other_row, col) for col in range(self.columnCount())]:
                     # other_item.setBackground(QBrush(QColor(240, 240, 240)))  # 改变了其他的item背景色
                     other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+
 
 class ShowReport(QTableWidget):
     def __init__(self, *args, **kwargs):
