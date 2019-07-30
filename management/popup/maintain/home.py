@@ -5,9 +5,11 @@ Update: 2019-07-25
 Author: zizle
 """
 import sys
+import xlrd
+import datetime
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtGui import QIcon, QFont
 
 from utils import get_desktop_path
 
@@ -319,6 +321,97 @@ class CreateNewCarousel(QDialog):
         # signal upload
         print('popup.maintain.home.py {} : 上传轮播：'.format(str(sys._getframe().f_lineno)), data )
         self.new_data_signal.emit(data)
+
+
+class CreateNewCommodity(QDialog):
+    new_data_signal = pyqtSignal(list)
+    def __init__(self):
+        super(CreateNewCommodity, self).__init__()
+        self.resize(850,550)
+        layout = QVBoxLayout()
+        load_file_btn = QPushButton('+数据')
+        self.review_table = QTableWidget()
+        tip_label = QLabel('*请检查无误上传,提交后将不可更改.')
+        submit_btn = QPushButton("提交")
+        # widget style
+        tip_label.setStyleSheet('font-size:12px; color:rgb(255,10,10)')
+        self.review_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.review_table.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # button signal
+        load_file_btn.clicked.connect(self.read_new_commodity)
+        submit_btn.clicked.connect(self.submit_commodity)
+        # add layout
+        layout.addWidget(load_file_btn, alignment=Qt.AlignLeft)
+        layout.addWidget(self.review_table)
+        layout.addWidget(tip_label)
+        layout.addWidget(submit_btn, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+
+    def read_new_commodity(self):
+        # upload data to review table
+        desktop_path = get_desktop_path()
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.xlsx *.xls)")
+        if not file_path:
+            return
+        rf = xlrd.open_workbook(filename=file_path)
+        sheet1 = rf.sheet_by_index(0)
+        row_header = sheet1.row_values(0)
+        # excel file header match
+        header_labels = ["品种", "地区", "等级", "报价", "日期", "备注"]
+        if row_header != header_labels:
+            return
+        # table initial
+        self.review_table.setRowCount(sheet1.nrows - 1)
+        self.review_table.setColumnCount(len(header_labels))
+        self.review_table.setHorizontalHeaderLabels(header_labels)
+        for row in range(1, sheet1.nrows):  # skip header
+            row_content = sheet1.row_values(row)
+            row_content[4] = datetime.datetime.strftime(xlrd.xldate_as_datetime(row_content[4], rf.datemode), "%Y-%m-%d")
+            # data to review table
+            for col, col_data in enumerate(row_content):
+                item = QTableWidgetItem(str(col_data))
+                item.setTextAlignment(132)
+                self.review_table.setItem(row - 1, col, item)
+
+    def submit_commodity(self):
+        # submit commodity
+        data = []
+        header_labels = ["variety", "area", "level", "price", "date", "note"]
+        for row in range(self.review_table.rowCount()):
+            item = dict()
+            for col in range(len(header_labels)):
+                col_item = self.review_table.item(row, col)
+                if not col_item or not col_item.text():
+                    continue
+                item[header_labels[col]] = col_item.text()
+            # 验证信息
+            for key in header_labels:
+                if key == "note":
+                    continue
+                if len(item) > 1 and not item.get(key):
+                    QMessageBox.warning(self, "错误", "请将信息填写完整!", QMessageBox.Yes)
+                    return
+            if len(item) >= 5:
+                data.append(item)
+        if not data:
+            QMessageBox.warning(self, "错误", "您未填写任何信息!", QMessageBox.Yes)
+            return
+        self.review_table.clear()
+        self.review_table.setRowCount(0)
+        self.review_table.setHorizontalHeaderLabels(["品种", "地区", "等级", "报价", "时间", "备注"])
+
+
+        # # 上传数据
+        # headers = config.CLIENT_HEADERS
+        # headers["Content-Type"] = "application/json"
+        # response = requests.post(url=config.SERVER_ADDRESS + "homepage/stock/", headers=headers, data=data)
+        # response_data = json.loads(response.content.decode("utf-8"))
+        # if response_data["status"] == 200:
+        #     QMessageBox.information(self, "成功", response_data["message"] + "\n返回查看数据。", QMessageBox.Yes)
+        # if response_data["status"] == 400:
+        #     QMessageBox.information(self, "成功", response_data["message"], QMessageBox.Yes)
+        self.new_data_signal.emit(data)
+
 
 class CreateNewNotice(QDialog):
     new_data_signal = pyqtSignal(dict)

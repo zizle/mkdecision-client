@@ -8,7 +8,7 @@ Author: zizle
 import os
 from PyQt5.QtCore import QSettings
 SERVER_ADDR = "http://127.0.0.1:8008/"
-VERSION = '2019.1'
+VERSION = '0.19.7'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_HEADERS = {"User-Agent": "DAssistant-Client/" + VERSION}
 # app设置

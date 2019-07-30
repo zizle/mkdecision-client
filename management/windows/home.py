@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import *
 
 from piece.home import ShowBulletin, MenuTree, Carousel
 from frame.base import NoDataWindow
-from frame.home import Report, Notice
+from frame.home import Report, Notice, Commodity
 
 
 class HomePage(QScrollArea):
@@ -51,6 +51,8 @@ class HomePage(QScrollArea):
             tab = Report()
         elif text == '交易通知':
             tab = Notice()
+        elif text == '现货报表':
+            tab = Commodity()
         else:
             tab = NoDataWindow(name=text)
         self.show_tab.clear()

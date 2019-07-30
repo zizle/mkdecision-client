@@ -6,10 +6,32 @@ Author: zizle
 """
 import sys
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import QDate, Qt
+from PyQt5.QtGui import QCursor
 
 import config
 from piece.base import MenuBar
-from piece.home import ShowReport, ShowNotice
+from piece.home import ShowReport, ShowNotice, ShowCommodity
+
+class Commodity(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(Commodity, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        # date edit
+        current_date = QDate.currentDate()
+        date_selected = QDateEdit(current_date)
+        # show table
+        self.show_table = ShowCommodity()
+        # style
+        date_selected.setDisplayFormat("yyyy年MM月dd日")  # 时间选择
+        date_selected.setCalendarPopup(True)
+        date_selected.setCursor(QCursor(Qt.PointingHandCursor))
+        # add layout
+        layout.addWidget(date_selected, alignment=Qt.AlignLeft)
+        layout.addWidget(self.show_table)
+        self.setLayout(layout)
+        # get commodity
+        self.show_table.get_commodity(url=config.SERVER_ADDR + 'homepage/commodity/')  # query param date=None
 
 
 class Report(QWidget):

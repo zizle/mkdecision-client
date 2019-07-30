@@ -1,7 +1,7 @@
 # _*_ coding:utf-8 _*_
 """
 all customer-widget in home page
-Update: 2019-07-26
+Create: 2019-07-25
 Author: zizle
 """
 import sys
@@ -318,6 +318,72 @@ class ShowBulletin(QTableWidget):
                     other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
 
 
+class ShowCommodity(QTableWidget):
+    def __init__(self, *args):
+        super(ShowCommodity, self).__init__(*args)
+        # button to show request message and fail retry
+        self.message_btn = QPushButton('刷新中...', self)
+        self.message_btn.resize(100, 20)
+        self.message_btn.move(100, 50)
+        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
+        self.verticalHeader().setVisible(False)
+        # get commodity 获取数据在其父窗口调用,传入url,方便按钮点击的逻辑
+
+    def commodity_thread_back(self, content):
+        print('piece.home.py {} 现货报表: '.format(str(sys._getframe().f_lineno)), content)
+        self.clear()
+        self.setRowCount(0)
+        self.horizontalHeader().setVisible(False)
+        if content['error']:
+            self.message_btn.setText('失败,请重试!')
+            self.message_btn.setEnabled(True)
+            return
+        else:
+            if not content['data']:
+                self.message_btn.setText('完成,无数据.')
+                return  # function finished
+            else:
+                self.message_btn.setText('刷新完成!')
+                self.message_btn.hide()
+        # fill table
+        self.horizontalHeader().setVisible(True)
+        keys = [('serial_num', '序号'), ("variety", "品种"), ("area", "地区"), ('level', '等级'), ('price', '报价'), ('date', '日期'), ('note', '备注')]
+        commodities = content['data']
+        row = len(commodities)
+        self.setRowCount(row)
+        self.setColumnCount(len(keys))  # 列数
+        labels = []
+        set_keys = []
+        for key_label in keys:
+            set_keys.append(key_label[0])
+            labels.append(key_label[1])
+        self.setHorizontalHeaderLabels(labels)
+        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+        self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
+                item = QTableWidgetItem(str(commodities[row][set_keys[col]]))
+                item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, item)
+
+
+    def get_commodity(self, url):
+        self.message_btn.setText('刷新中...')
+        self.message_btn.show()
+        self.message_btn.setEnabled(False)
+        headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
+        self.commodity_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=headers,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.commodity_thread.response_signal.connect(self.commodity_thread_back)
+        self.commodity_thread.finished.connect(self.commodity_thread.deleteLater)
+        self.commodity_thread.start()
+
+
 class ShowNotice(QTableWidget):
     def __init__(self, *args):
         super(ShowNotice, self).__init__(*args)
@@ -348,6 +414,7 @@ class ShowNotice(QTableWidget):
     def notice_thread_back(self, content):
         print('piece.home.py {} 交易通知: '.format(str(sys._getframe().f_lineno)), content)
         self.clear()
+        self.setRowCount(0)
         self.horizontalHeader().setVisible(False)
         if content['error']:
             self.message_btn.setText('失败,请重试!')
@@ -383,17 +450,8 @@ class ShowNotice(QTableWidget):
                     item = QTableWidgetItem('查看')
                 else:
                     item = QTableWidgetItem(str(reports[row][set_keys[col]]))
-                # font = QFont()
-                # if col == self.columnCount() - 1:
-                #     size = 8
-                    # item.setFont(QFont(font))
-                # else:
-                #     size = 10
-                # font.setPointSize(size)
-                # item.setFont(QFont(font))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
-
 
 
 class ShowReport(QTableWidget):
@@ -427,6 +485,7 @@ class ShowReport(QTableWidget):
     def report_thread_back(self, content):
         print('piece.home.py {} 常规报告: '.format(str(sys._getframe().f_lineno)), content)
         self.clear()
+        self.setRowCount(0)
         self.horizontalHeader().setVisible(False)
         if content['error']:
             self.message_btn.setText('失败,请重试!')
