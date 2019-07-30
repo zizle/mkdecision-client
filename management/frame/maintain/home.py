@@ -11,7 +11,7 @@ from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import *
 
 import config
-from popup.maintain import CreateNewBulletin, CreateNewCarousel, CreateNewReport, CreateNewNotice, CreateNewCommodity
+from popup.maintain import CreateNewBulletin, CreateNewCarousel, CreateNewReport, CreateNewNotice, CreateNewCommodity, CreateNewFinance
 
 
 class BulletinInfo(QWidget):
@@ -141,9 +141,9 @@ class CarouselInfo(QWidget):
             del popup
 
 
-class Commodity(QWidget):
+class CommodityInfo(QWidget):
     def __init__(self):
-        super(Commodity, self).__init__()
+        super(CommodityInfo, self).__init__()
         layout = QVBoxLayout()
         action_layout = QHBoxLayout()
         add_btn = QPushButton("+新增")
@@ -159,7 +159,7 @@ class Commodity(QWidget):
 
     def add_new_commodity(self):
         def upload_commodity(signal):
-            print('frame.home.py {} 新现货：'.format(sys._getframe().f_lineno), signal)
+            print('frame.maintain.home.py {} 新现货：'.format(sys._getframe().f_lineno), signal)
             data = dict()
             data['machine_code'] = config.app_dawn.value('machine')
             data['commodity_list'] = signal
@@ -180,10 +180,53 @@ class Commodity(QWidget):
             else:
                 QMessageBox.information(self, '成功', '添加成功, 赶紧刷新看看吧.', QMessageBox.Yes)
                 popup.close()  # close the dialog
-
-
         popup = CreateNewCommodity()
         popup.new_data_signal.connect(upload_commodity)
+        if not popup.exec():
+            del popup
+
+
+class FinanceInfo(QWidget):
+    def __init__(self):
+        super(FinanceInfo, self).__init__()
+        layout = QVBoxLayout()
+        action_layout = QHBoxLayout()
+        add_btn = QPushButton("+新增")
+        refresh_btn = QPushButton('刷新')
+        add_btn.clicked.connect(self.add_new_finance)
+        self.show_finance_table = QTableWidget()
+        action_layout.addWidget(add_btn)
+        action_layout.addWidget(refresh_btn)
+        action_layout.addStretch()
+        layout.addLayout(action_layout)
+        layout.addWidget(self.show_finance_table)
+        self.setLayout(layout)
+
+    def add_new_finance(self):
+        def upload_finance(signal):
+            print('frame.maintain.home.py {} 新财经：'.format(sys._getframe().f_lineno), signal)
+            data = dict()
+            data['machine_code'] = config.app_dawn.value('machine')
+            data['finance_list'] = signal
+            try:
+                response = requests.post(
+                    url=config.SERVER_ADDR + "homepage/finance/",
+                    headers=config.CLIENT_HEADERS,
+                    data=json.dumps(data),
+                    cookies=config.app_dawn.value('cookies')
+                )
+            except Exception as error:
+                QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
+                return
+            response_data = json.loads(response.content.decode('utf-8'))
+            if response.status_code != 201:
+                QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
+                return
+            else:
+                QMessageBox.information(self, '成功', '添加成功, 赶紧刷新看看吧.', QMessageBox.Yes)
+                popup.close()  # close the dialog
+        popup = CreateNewFinance()
+        popup.new_data_signal.connect(upload_finance)
         if not popup.exec():
             del popup
 
@@ -242,6 +285,7 @@ class NoticeInfo(QWidget):
         popup.new_data_signal.connect(upload_notice)
         if not popup.exec():
             del popup
+
 
 class ReportInfo(QWidget):
     def __init__(self):

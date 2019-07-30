@@ -413,6 +413,84 @@ class CreateNewCommodity(QDialog):
         self.new_data_signal.emit(data)
 
 
+class CreateNewFinance(QDialog):
+    new_data_signal = pyqtSignal(list)
+    def __init__(self):
+        super(CreateNewFinance, self).__init__()
+        self.resize(850, 550)
+        layout = QVBoxLayout()
+        load_file_btn = QPushButton('+数据')
+        self.review_table = QTableWidget()
+        tip_label = QLabel('*请检查无误上传,提交后将不可更改.')
+        submit_btn = QPushButton("提交")
+        # widget style
+        tip_label.setStyleSheet('font-size:12px; color:rgb(255,10,10)')
+        self.review_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.review_table.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # button signal
+        load_file_btn.clicked.connect(self.read_new_finance)
+        submit_btn.clicked.connect(self.submit_finance)
+        # add layout
+        layout.addWidget(load_file_btn, alignment=Qt.AlignLeft)
+        layout.addWidget(self.review_table)
+        layout.addWidget(tip_label)
+        layout.addWidget(submit_btn, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+
+    def read_new_finance(self):
+        # upload data to review table
+        desktop_path = get_desktop_path()
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.xlsx *.xls)")
+        if not file_path:
+            return
+        rf = xlrd.open_workbook(filename=file_path)
+        sheet1 = rf.sheet_by_index(0)
+        row_header = sheet1.row_values(0)
+        # excel file header match
+        header_labels = ["日期", "时间", "地区", "事件描述", "预期值"]
+        if row_header != header_labels:
+            return
+        # table initial
+        self.review_table.setRowCount(sheet1.nrows - 1)
+        self.review_table.setColumnCount(len(header_labels))
+        self.review_table.setHorizontalHeaderLabels(header_labels)
+        for row in range(1, sheet1.nrows):  # skip header
+            row_content = sheet1.row_values(row)
+            row_content[0] = datetime.datetime.strftime(xlrd.xldate_as_datetime(row_content[0], rf.datemode), "%Y-%m-%d")
+            row_content[1] = datetime.datetime.strftime(xlrd.xldate_as_datetime(row_content[1], rf.datemode), "%H:%M")
+            # data to review table
+            for col, col_data in enumerate(row_content):
+                item = QTableWidgetItem(str(col_data))
+                item.setTextAlignment(132)
+                self.review_table.setItem(row - 1, col, item)
+
+    def submit_finance(self):
+        # submit commodity
+        data = []
+        header_labels = ["date", "time", "country", "event", "expected"]
+        for row in range(self.review_table.rowCount()):
+            item = dict()
+            for col in range(len(header_labels)):
+                col_item = self.review_table.item(row, col)
+                if not col_item or not col_item.text():
+                    continue
+                item[header_labels[col]] = col_item.text()
+            # 验证信息
+            for key in header_labels:
+                if len(item) > 1 and not item.get(key):
+                    QMessageBox.warning(self, "错误", "请将信息填写完整!", QMessageBox.Yes)
+                    return
+            if len(item) >= 5:
+                data.append(item)
+        if not data:
+            QMessageBox.warning(self, "错误", "您未填写任何信息!", QMessageBox.Yes)
+            return
+        self.review_table.clear()
+        self.review_table.setRowCount(0)
+        self.review_table.setHorizontalHeaderLabels(["品种", "地区", "等级", "报价", "时间", "备注"])
+        self.new_data_signal.emit(data)
+
+
 class CreateNewNotice(QDialog):
     new_data_signal = pyqtSignal(dict)
     def __init__(self):

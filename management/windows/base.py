@@ -288,7 +288,6 @@ class Base(QWidget):
     def showMaximized(self):
         """最大化,要去除上下左右边界,如果不去除则边框地方会有空隙"""
         super(Base, self).showMaximized()
-        print(self.layout())
         self.layout().setContentsMargins(0, 0, 0, 0)
 
     def showNormal(self):

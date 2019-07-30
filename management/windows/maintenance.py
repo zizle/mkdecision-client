@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
-from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo, NoticeInfo, Commodity
+from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo, NoticeInfo, CommodityInfo, FinanceInfo
 from threads import RequestThread
 import config
 
@@ -23,7 +23,7 @@ class Maintenance(QWidget):
         self.left_tree = QTreeWidget()
         self.left_tree.setExpandsOnDoubleClick(False)
         self.left_tree.clicked.connect(self.left_tree_clicked)
-        self.left_tree.setRootIsDecorated(False)  # remove root icon
+        # self.left_tree.setRootIsDecorated(False)  # remove root icon
         self.left_tree.setHeaderHidden(True)
         # a tab show windows
         self.right_tab = QTabWidget()
@@ -34,7 +34,6 @@ class Maintenance(QWidget):
         hor_layout.addWidget(self.right_tab)
         layout = QVBoxLayout()
         layout.addLayout(hor_layout)
-
         self.setLayout(layout)
         # 线程请求菜单
         self.get_list_menu()
@@ -84,7 +83,9 @@ class Maintenance(QWidget):
             elif text == '交易通知':
                 tab = NoticeInfo()
             elif text == '现货报表':
-                tab = Commodity()
+                tab = CommodityInfo()
+            elif text == '财经日历':
+                tab = FinanceInfo()
             else:
                 tab = NoDataWindow(name=text)
             self.right_tab.addTab(tab, text)

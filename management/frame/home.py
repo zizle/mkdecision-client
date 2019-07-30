@@ -11,7 +11,7 @@ from PyQt5.QtGui import QCursor
 
 import config
 from piece.base import MenuBar
-from piece.home import ShowReport, ShowNotice, ShowCommodity
+from piece.home import ShowReport, ShowNotice, ShowCommodity, Calendar, ShowFinance
 
 class Commodity(QWidget):
     def __init__(self, *args, **kwargs):
@@ -19,19 +19,43 @@ class Commodity(QWidget):
         layout = QVBoxLayout()
         # date edit
         current_date = QDate.currentDate()
-        date_selected = QDateEdit(current_date)
+        self.date_selection = QDateEdit(current_date)
         # show table
         self.show_table = ShowCommodity()
         # style
-        date_selected.setDisplayFormat("yyyy年MM月dd日")  # 时间选择
-        date_selected.setCalendarPopup(True)
-        date_selected.setCursor(QCursor(Qt.PointingHandCursor))
+        self.date_selection.setDisplayFormat("yyyy年MM月dd日")  # 时间选择
+        self.date_selection.setCalendarPopup(True)
+        self.date_selection.setCursor(QCursor(Qt.PointingHandCursor))
+        # signal
+        self.date_selection.dateChanged.connect(self.new_date_selected)
         # add layout
-        layout.addWidget(date_selected, alignment=Qt.AlignLeft)
+        layout.addWidget(self.date_selection, alignment=Qt.AlignLeft)
         layout.addWidget(self.show_table)
         self.setLayout(layout)
         # get commodity
         self.show_table.get_commodity(url=config.SERVER_ADDR + 'homepage/commodity/')  # query param date=None
+
+    def new_date_selected(self):
+        date = self.date_selection.date().toPyDate()
+        self.show_table.get_commodity(url=config.SERVER_ADDR + 'homepage/commodity/?date=' + str(date))
+
+
+class Finance(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(Finance, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(spacing=5)
+        # calendar
+        calendar_selection = Calendar()
+        self.show_table = ShowFinance()
+        # signal
+        calendar_selection.click_date.connect(self.date_selected)
+        layout.addWidget(calendar_selection)
+        layout.addWidget(self.show_table)
+        self.setLayout(layout)
+        self.show_table.get_finance(url=config.SERVER_ADDR + 'homepage/finance/')  # query param date=None
+
+    def date_selected(self, date):
+        self.show_table.get_finance(url=config.SERVER_ADDR + 'homepage/finance/?date=' + str(date.toPyDate()))
 
 
 class Report(QWidget):
