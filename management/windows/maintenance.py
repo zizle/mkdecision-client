@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
-from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo
+from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo, NoticeInfo
 from threads import RequestThread
 import config
 
@@ -81,6 +81,8 @@ class Maintenance(QWidget):
                 tab = CarouselInfo()
             elif text == '常规报告':
                 tab = ReportInfo()
+            elif text == '交易通知':
+                tab = NoticeInfo()
             else:
                 tab = NoDataWindow(name=text)
             self.right_tab.addTab(tab, text)

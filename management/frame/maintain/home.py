@@ -1,7 +1,7 @@
 # _*_ coding:utf-8 _*_
 """
 all tabs of data-maintenance module, in the home page
-Update: 2019-07-25
+Create: 2019-07-25
 Author: zizle
 """
 import sys
@@ -11,7 +11,7 @@ from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import *
 
 import config
-from popup.maintain import CreateNewBulletin, CreateNewCarousel, CreateNewReport
+from popup.maintain import CreateNewBulletin, CreateNewCarousel, CreateNewReport, CreateNewNotice
 
 
 class BulletinInfo(QWidget):
@@ -140,6 +140,65 @@ class CarouselInfo(QWidget):
         if not popup.exec():
             del popup
 
+
+class NoticeInfo(QWidget):
+    def __init__(self):
+        super(NoticeInfo, self).__init__()
+        layout = QVBoxLayout()
+        action_layout = QHBoxLayout()
+        create_btn = QPushButton("+新增")
+        refresh_btn = QPushButton('刷新')
+        create_btn.clicked.connect(self.create_new_notice)
+        self.show_notice_table = QTableWidget()
+        action_layout.addWidget(create_btn)
+        action_layout.addWidget(refresh_btn)
+        action_layout.addStretch()
+        layout.addLayout(action_layout)
+        layout.addWidget(self.show_notice_table)
+        self.setLayout(layout)
+
+    def create_new_notice(self):
+        def upload_notice(signal):
+            print('frame.maintain.home.py {} 新通知:'.format(str(sys._getframe().f_lineno)), signal)
+            try:
+                data = dict()
+                data['machine_code'] = config.app_dawn.value('machine')
+                data['type_en'] = signal['type_en']
+                data['type_zh'] = signal['type_zh']
+                data['name'] = signal['name']
+                file_raw_name = signal["file_path"].rsplit("/", 1)
+                file = open(signal["file_path"], "rb")
+                file_content = file.read()
+                file.close()
+                data["file"] = (file_raw_name[1], file_content)
+                encode_data = encode_multipart_formdata(data)
+                data = encode_data[0]
+                headers = config.CLIENT_HEADERS
+                headers['Content-Type'] = encode_data[1]
+                try:
+                    response = requests.post(
+                        url=config.SERVER_ADDR + "homepage/notice/",
+                        headers=headers,
+                        data=data,
+                        cookies=config.app_dawn.value('cookies')
+                    )
+                except Exception as error:
+                    QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
+                    return
+                response_data = json.loads(response.content.decode('utf-8'))
+                if response.status_code != 201:
+                    QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
+                    return
+                else:
+                    QMessageBox.information(self, '成功', '添加成功, 赶紧刷新看看吧.', QMessageBox.Yes)
+                    popup.close()  # close the dialog
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+        popup = CreateNewNotice()
+        popup.new_data_signal.connect(upload_notice)
+        if not popup.exec():
+            del popup
 
 class ReportInfo(QWidget):
     def __init__(self):

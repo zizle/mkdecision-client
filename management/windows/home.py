@@ -6,11 +6,10 @@ Author: zizle
 """
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
 
 from piece.home import ShowBulletin, MenuTree, Carousel
 from frame.base import NoDataWindow
-from frame.home import Report
+from frame.home import Report, Notice
 
 
 class HomePage(QScrollArea):
@@ -50,6 +49,8 @@ class HomePage(QScrollArea):
         text = menu.text(0)
         if text == '常规报告':
             tab = Report()
+        elif text == '交易通知':
+            tab = Notice()
         else:
             tab = NoDataWindow(name=text)
         self.show_tab.clear()

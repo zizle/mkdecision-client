@@ -320,6 +320,78 @@ class CreateNewCarousel(QDialog):
         print('popup.maintain.home.py {} : 上传轮播：'.format(str(sys._getframe().f_lineno)), data )
         self.new_data_signal.emit(data)
 
+class CreateNewNotice(QDialog):
+    new_data_signal = pyqtSignal(dict)
+    def __init__(self):
+        super(CreateNewNotice, self).__init__()
+        layout = QGridLayout()
+        # labels
+        name_label = QLabel("名称：")
+        type_label = QLabel("类型：")
+        file_label = QLabel("文件：")
+        # edits
+        self.name_edit = QLineEdit()
+        self.file_edit = QLineEdit()
+        # combo
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["交易所", "公司", "系统", "其他"])
+        # buttons
+        select_file_btn = QPushButton('选择')
+        submit_btn = QPushButton('提交')
+        # styles
+        select_file_btn.setMaximumWidth(30)
+        # signal
+        select_file_btn.clicked.connect(self.select_file_clicked)
+        submit_btn.clicked.connect(self.submit_notice)
+        # add layout
+        layout.addWidget(name_label, 0, 0)
+        layout.addWidget(self.name_edit, 0, 1, 1, 2)
+        layout.addWidget(type_label, 1, 0)
+        layout.addWidget(self.type_combo, 1, 1, 1, 2)
+        layout.addWidget(file_label, 2, 0)
+        layout.addWidget(self.file_edit, 2, 1)
+        layout.addWidget(select_file_btn, 2, 2)
+        layout.addWidget(submit_btn, 3, 1, 1, 2)
+        self.setLayout(layout)
+
+    def select_file_clicked(self):
+        # select file
+        desktop_path = get_desktop_path()
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.pdf)")
+        if not file_path:
+            return
+        file_name_list = file_path.rsplit('/', 1)
+        if not self.name_edit.text().strip(' '):
+            self.name_edit.setText((file_name_list[1].rsplit('.', 1))[0])
+        self.file_edit.setText(file_path)
+
+    def submit_notice(self):
+        type_dict = {
+            "公司": "company",
+            "交易所": "change",
+            "系统": "system",
+            "其他":"others"
+        }
+        # collect data
+        name = self.name_edit.text().strip(' ')
+        type_text = self.type_combo.currentText()
+        file_path = self.file_edit.text()
+        if not name:
+            QMessageBox.warning(self, "错误", "请起一个名字!", QMessageBox.Yes)
+            return
+        if not type_text:
+            QMessageBox.warning(self, "错误", "请选择报告类型!", QMessageBox.Yes)
+            return
+        if not file_path:
+            QMessageBox.warning(self, "错误", "请选择报告文件!", QMessageBox.Yes)
+            return
+        self.new_data_signal.emit({
+            'name': name,
+            'type_zh': type_text,
+            'type_en': type_dict.get(type_text, None),
+            'file_path': file_path
+        })
+
 
 class CreateNewReport(QDialog):
     new_data_signal = pyqtSignal(dict)

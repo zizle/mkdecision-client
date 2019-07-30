@@ -4,6 +4,6 @@ all dialog of data-maintenance module
 Update: 2019-07-24
 Author: zizle
 """
-from .home import CreateNewBulletin, CreateNewCarousel, CreateNewReport
+from .home import CreateNewBulletin, CreateNewCarousel, CreateNewReport, CreateNewNotice
 from .basic import CreateNewClient
 
