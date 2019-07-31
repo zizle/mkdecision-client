@@ -685,7 +685,10 @@ class ShowCommodity(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
-                item = QTableWidgetItem(str(commodities[row][set_keys[col]]))
+                if col == 0:
+                    item = QTableWidgetItem(str(row+1))
+                else:
+                    item = QTableWidgetItem(str(commodities[row][set_keys[col]]))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
 
@@ -746,7 +749,7 @@ class ShowFinance(QTableWidget):
         for key_label in keys:
             set_keys.append(key_label[0])
             labels.append(key_label[1])
-        labels.append(' ')
+        # labels.append(' ')
         self.setHorizontalHeaderLabels(labels)
         self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
         self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
@@ -754,7 +757,10 @@ class ShowFinance(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(2, 3)  # 第1列随文字宽度
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
-                item = QTableWidgetItem(str(finance[row][set_keys[col]]))
+                if col == 0:
+                    item = QTableWidgetItem(str(row+1))
+                else:
+                    item = QTableWidgetItem(str(finance[row][set_keys[col]]))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
 
@@ -838,7 +844,7 @@ class ShowNotice(QTableWidget):
                 self.message_btn.hide()
         # fill table
         self.horizontalHeader().setVisible(True)
-        keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '时间')]
+        keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '创建时间')]
         notices = content['data']
         row = len(notices)
         self.setRowCount(row)
@@ -855,7 +861,9 @@ class ShowNotice(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, QHeaderView.ResizeToContents)  # 第2列随文字宽度
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
-                if col == self.columnCount() - 1:
+                if col == 0:
+                    item = QTableWidgetItem(str(row+1))
+                elif col == self.columnCount() - 1:
                     item = QTableWidgetItem('查看')
                     item.name = notices[row]['name']
                     item.file = notices[row]['file']
@@ -866,7 +874,7 @@ class ShowNotice(QTableWidget):
 
 
 class ShowReport(QTableWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args):
         super(ShowReport, self).__init__(*args)
         # button to show request message and fail retry
         self.message_btn = QPushButton('刷新中...', self)
@@ -943,7 +951,9 @@ class ShowReport(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, QHeaderView.ResizeToContents)  # 第2列随文字宽度
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
-                if col == self.columnCount() - 1:
+                if col == 0:
+                    item = QTableWidgetItem(str(row+1))
+                elif col == self.columnCount() - 1:
                     item = QTableWidgetItem('查看')
                     item.name = reports[row]['name']
                     item.file = reports[row]['file']

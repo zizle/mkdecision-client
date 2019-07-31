@@ -10,7 +10,7 @@ from PyQt5.QtCore import pyqtSignal, Qt
 
 class TableCheckBox(QWidget):
     """ checkbox in client info table """
-    check_change_signal = pyqtSignal(dict)
+    clicked_changed = pyqtSignal(dict)
 
     def __init__(self, row, col, option_label, *args):
         super(TableCheckBox, self).__init__(*args)
@@ -27,7 +27,8 @@ class TableCheckBox(QWidget):
         self.setLayout(v_layout)
 
     def check_state_changed(self):
-        self.check_change_signal.emit({'row': self.rowIndex, 'col': self.colIndex, 'checked': self.check_box.isChecked(), 'option_label': self.option_label})
+        # self.check_change_signal.emit({'row': self.rowIndex, 'col': self.colIndex, 'checked': self.check_box.isChecked(), 'option_label': self.option_label})
+        self.clicked_changed.emit({'row': self.rowIndex, 'col': self.colIndex, 'checked': self.check_box.isChecked(), 'option_label': self.option_label})
 
     def setChecked(self, tag):
         self.check_box.setChecked(tag)

@@ -4,7 +4,7 @@ clients and users info in project
 Update: 2019-07-25
 Author: zizle
 """
-import re
+import sys
 import json
 import requests
 from PyQt5.QtWidgets import *
@@ -92,7 +92,7 @@ class ClientInfo(QWidget):
                     if label_key == 'is_admin' or label_key == 'is_active':  # 是否启用选择框展示
                         checkbox = TableCheckBox(row=r, col=c, option_label=label_key)
                         checkbox.setChecked(int(data[r][label_key]))
-                        checkbox.check_change_signal.connect(self.update_client_info)
+                        checkbox.clicked_changed.connect(self.update_client_info)
                         self.show_clients_table.setCellWidget(r, c, checkbox)
                     item = QTableWidgetItem(str(data[r][label_key]))
                 item.setTextAlignment(132)
@@ -113,11 +113,9 @@ class ClientInfo(QWidget):
     def update_client_info(self, signal):
         """ checkbox in table has changed """
         # 获取机器码
-        print(signal)
         table_item = self.show_clients_table.item(signal['row'], 3)
         machine_code = table_item.text()
-        # 请求修改客户端信息
-        print(machine_code)
+        print('frame.maintain.base.py {} 修改客户端：'.format(sys._getframe().f_lineno), machine_code)
 
 
 class UserInfo(QWidget):
@@ -163,7 +161,7 @@ class UserInfo(QWidget):
                     if label_key == 'is_admin' or label_key == 'is_active':  # 是否启用选择框展示
                         checkbox = TableCheckBox(row=r, col=c, option_label=label_key)
                         checkbox.setChecked(int(data[r][label_key]))
-                        checkbox.check_change_signal.connect(self.update_user_info)
+                        checkbox.clicked_changed.connect(self.update_user_info)
                         self.show_users_table.setCellWidget(r, c, checkbox)
                     item = QTableWidgetItem(str(data[r][label_key]))
                 item.setTextAlignment(132)

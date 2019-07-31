@@ -143,7 +143,7 @@ class Base(QWidget):
         response_content = json.loads(response.content.decode("utf-8"))
         if response.status_code != 200:
             QMessageBox.information(self, "获取数据错误", response_content['message'], QMessageBox.Yes)
-            return
+            sys.exit()
         print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), "获取主菜单:", response_content)
         for item in response_content["data"]:
             menu_btn = QPushButton(item['name'])
