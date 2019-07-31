@@ -4,9 +4,10 @@ small control in base window
 Update: 2019-07-26
 Author: zizle
 """
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QTreeWidget
+import fitz
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer
-from PyQt5.QtGui import QFont,  QColor, QCursor
+from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap
 
 
 class MenuBar(QWidget):
@@ -55,18 +56,18 @@ class TitleBar(QWidget):
         StyleSheet = """
         /*标题栏*/
         TitleBar {
-            background-color: rgb(60,63,65);
+            background-color: rgb(85,88,91);
         }
 
         /*最小化最大化关闭按钮通用默认背景*/
         #buttonMinimum,#buttonMaximum,#buttonClose {
             border: none;
-            background-color: rgb(60,63,65);
+            background-color: rgb(85,88,91);
         }
 
         /*悬停*/
         #buttonMinimum:hover,#buttonMaximum:hover {
-            background-color: rgb(37,39,41);
+            background-color: rgb(72,75,78);
         }
         #buttonClose:hover {
             color: white;
@@ -181,15 +182,45 @@ class TitleBar(QWidget):
             self.windowNormaled.emit()
 
 
+class PDFReaderContent(QWidget):
+    """显示PDF内容控件"""
+    def __init__(self):
+        super(PDFReaderContent, self).__init__()
+        self.page_layout = QVBoxLayout()  # 每一页内容展示在一个竖向布局中
+        self.setLayout(self.page_layout)
+
+    def add_page(self, page):
+        """添加页码"""
+        page_label = QLabel()
+        page_label.setMinimumSize(self.width()+180, self.height())  # 设置label大小
+        # show PDF content
+        zoom_matrix = fitz.Matrix(1.58, 1.5)  # 图像缩放比例
+        pagePixmap = page.getPixmap(
+            matrix=zoom_matrix,
+            alpha=False)
+        imageFormat = QImage.Format_RGB888  # get image format
+        pageQImage = QImage(
+            pagePixmap.samples,
+            pagePixmap.width,
+            pagePixmap.height,
+            pagePixmap.stride,
+            imageFormat)  # init QImage
+        page_map = QPixmap()
+        page_map.convertFromImage(pageQImage)
+        page_label.setPixmap(page_map)
+        page_label.setScaledContents(True)  # pixmap resize with label
+        self.page_layout.addWidget(page_label, alignment=Qt.AlignRight)
+
+
 class PermitBar(QWidget):
     def __init__(self, *args, **kwargs):
         super(PermitBar, self).__init__(*args, **kwargs)
         styleSheet = """
         PermitBar {
-            background-color: rgb(60,63,65);
+            background-color: rgb(85,88,91);
         }
         QPushButton {
-            background-color: rgb(60,63,65);
+            background-color: rgb(85,88,91);
             border:none;
             padding-left: 4px;
             padding-right: 4px;
@@ -200,7 +231,7 @@ class PermitBar(QWidget):
             color: rgb(54,220,180);
         }
             QLabel {
-            background-color: rgb(60,63,65);
+            background-color: rgb(85,88,91);
             height:18px;
             color: rgb(210, 200, 205)
         }
@@ -226,11 +257,13 @@ class PermitBar(QWidget):
         self.login_message = QLabel("")
         self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.register_button.setCursor(QCursor(Qt.PointingHandCursor))
+        # hide message and exit button
+        self.login_message.hide()
         self.exit_button.hide()
         self.setStyleSheet(styleSheet)
         self.exit_button.setStyleSheet("""
         QPushButton {
-            background-color: rgb(60,63,65);
+            background-color: rgb(85,88,91);
             border:none;
             padding-left: 10px;
             padding-right: 8px;
@@ -285,8 +318,8 @@ class PermitBar(QWidget):
             del popup
 
     def register_button_clicked(self):
-        from popup.base import RegisterDialog
-        popup = RegisterDialog()
+        from popup.base import Register
+        popup = Register()
         if not popup.exec():
             del popup
 

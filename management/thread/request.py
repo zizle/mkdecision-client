@@ -1,9 +1,10 @@
 # _*_ coding:utf-8 _*_
 """
-Create: 2019-07-15
-Update: 2019-07-15
+request threading
+Create: 2019-07-31
 Author: zizle
 """
+
 import json
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal

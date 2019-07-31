@@ -6,13 +6,17 @@ Author: zizle
 """
 import sys
 import json
+# import fitz
 import requests
+import webbrowser
+from fitz.fitz import Document
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QFont, QColor, QBrush, QPixmap, QCursor
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QDate, QRect
 
 import config
-from threads import RequestThread
+from thread.request import RequestThread
+from popup.home import PDFReader, ContentReader
 
 class Calendar(QWidget):
     click_date = pyqtSignal(QDate)
@@ -303,6 +307,14 @@ class Carousel(QLabel):
         self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
         self.message_btn.clicked.connect(self.get_carousel)
         self.message_btn.hide()
+        # timer
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.change_carousel_pixmap)
+        # initial property
+        self.ad_name = None
+        self.ad_file = None
+        self.ad_content = None
+        self.ad_redirect = None
         self.pixmap_flag = 0
         self.setMaximumHeight(350)
         self.setScaledContents(True)
@@ -322,16 +334,27 @@ class Carousel(QLabel):
                 self.message_btn.setText('刷新完成!')
                 self.message_btn.hide()
         # create advertisements carousel
+        self.pixmap_list.clear()
         for index, item in enumerate(content['data']):
             rep = requests.get(config.SERVER_ADDR + item['image'])
             pixmap = QPixmap()
             pixmap.loadFromData(rep.content)
+            # add property
+            pixmap.index = index  # index in self.pixmap
+            pixmap.name = item['name']
+            pixmap.file = item['file']
+            pixmap.redirect = item['redirect']
+            pixmap.content = item['content']
+            # append list
             self.pixmap_list.append(pixmap)
         # set pixmap
-        self.setPixmap(self.pixmap_list[self.pixmap_flag])
-        # change pixmap
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.change_carousel_pixmap)
+        initial_pixmap = self.pixmap_list[self.pixmap_flag]
+        self.setPixmap(initial_pixmap)
+        self.ad_name = initial_pixmap.name
+        self.ad_file = initial_pixmap.file
+        self.ad_content = initial_pixmap.content
+        self.ad_redirect = initial_pixmap.redirect
+        # start timer change pixmap
         self.timer.start(5000)
 
     def change_carousel_pixmap(self):
@@ -339,6 +362,12 @@ class Carousel(QLabel):
         self.pixmap_flag += 1
         if self.pixmap_flag >= len(self.pixmap_list):
             self.pixmap_flag=0
+        pixmap = self.pixmap_list[self.pixmap_flag]
+        # change self property
+        self.ad_name = pixmap.name
+        self.ad_file = pixmap.file
+        self.ad_content = pixmap.content
+        self.ad_redirect = pixmap.redirect
         self.setPixmap(self.pixmap_list[self.pixmap_flag])
 
     def get_carousel(self):
@@ -359,7 +388,23 @@ class Carousel(QLabel):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            print('piece.home.py {} 广告图:'.format(str(sys._getframe().f_lineno)), self.pixmap())
+            if self.ad_file:
+                try:
+                    response = requests.get(url=config.SERVER_ADDR + self.ad_file, headers=config.CLIENT_HEADERS)
+                    doc = Document(filename=self.ad_name, stream=response.content)
+                    popup = PDFReader(doc=doc, title=self.ad_name)
+                except Exception as error:
+                    QMessageBox.information(self, "错误", '查看公告失败.\n{}'.format(error), QMessageBox.Yes)
+                    return
+            elif self.ad_content:
+                popup = ContentReader(content=self.ad_content, title=self.ad_name)
+            elif self.ad_redirect:
+                webbrowser.open(self.ad_redirect)
+                return
+            else:
+                return
+            if not popup.exec():
+                del popup
 
 
 class MenuTree(QTreeWidget):
@@ -417,7 +462,7 @@ class MenuTree(QTreeWidget):
 
 
 class ShowBulletin(QTableWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args):
         super(ShowBulletin, self).__init__(*args)
         # button to show request message and fail retry
         self.message_btn = QPushButton('刷新中...', self)
@@ -562,15 +607,19 @@ class ShowBulletin(QTableWidget):
             item = self.item(row, col)
             name_item = self.item(row, 0)
             if item.file:
-                from utils import get_server_file
-                get_server_file(url=config.SERVER_ADDR + item.file, file=item.file, title=name_item.text())
+                try:
+                    response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
+                    doc = Document(filename=name_item.text(), stream=response.content)
+                    popup = PDFReader(doc=doc, title=name_item.text())
+                except Exception as error:
+                    QMessageBox.information(self, "错误", '查看公告失败.\n{}'.format(error), QMessageBox.Yes)
+                    return
             elif item.content:
-                from widgets.dialog import ContentReadDialog
-                read_dialog = ContentReadDialog(content=item.content, title=name_item.text())
-                if not read_dialog.exec():
-                    del read_dialog  # 弹窗生命周期未结束,手动删除
+                popup = ContentReader(content=item.content, title=name_item.text())
             else:
-                pass
+                return
+            if not popup.exec():
+                del popup
 
     def leaveEvent(self, *args, **kwargs):
         """鼠标离开控件"""
@@ -738,7 +787,22 @@ class ShowNotice(QTableWidget):
         self.message_btn.move(100, 50)
         self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
         self.verticalHeader().setVisible(False)
+        self.cellClicked.connect(self.cell_clicked)
         # get notice 获取数据在其父窗口调用,传入url,方便按钮点击的逻辑
+
+    def cell_clicked(self, row, col):
+        print('piece.home.py {} 点击通知:'.format(str(sys._getframe().f_lineno)), row, col)
+        if col == 4:
+            item = self.item(row, col)
+            try:
+                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
+                doc = Document(filename=item.name, stream=response.content)
+                popup = PDFReader(doc=doc, title=item.name)
+            except Exception as error:
+                QMessageBox.information(self, "错误", '查看公告失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if not popup.exec():
+                del popup
 
     def get_notice(self, url):
         self.message_btn.setText('刷新中...')
@@ -775,8 +839,8 @@ class ShowNotice(QTableWidget):
         # fill table
         self.horizontalHeader().setVisible(True)
         keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '时间')]
-        reports = content['data']
-        row = len(reports)
+        notices = content['data']
+        row = len(notices)
         self.setRowCount(row)
         self.setColumnCount(len(keys) + 1)  # 列数
         labels = []
@@ -793,8 +857,10 @@ class ShowNotice(QTableWidget):
             for col in range(self.columnCount()):
                 if col == self.columnCount() - 1:
                     item = QTableWidgetItem('查看')
+                    item.name = notices[row]['name']
+                    item.file = notices[row]['file']
                 else:
-                    item = QTableWidgetItem(str(reports[row][set_keys[col]]))
+                    item = QTableWidgetItem(str(notices[row][set_keys[col]]))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
 
@@ -809,7 +875,22 @@ class ShowReport(QTableWidget):
         self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
         self.message_btn.clicked.connect(self.get_report)
         self.verticalHeader().setVisible(False)
+        self.cellClicked.connect(self.cell_clicked)
         # get report 获取数据在其父窗口调用,传入url,方便按钮点击的逻辑
+
+    def cell_clicked(self, row, col):
+        print('piece.home.py {} 点击报告:'.format(str(sys._getframe().f_lineno)), row, col)
+        if col == 4:
+            item = self.item(row, col)
+            try:
+                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
+                doc = Document(filename=item.name, stream=response.content)
+                popup = PDFReader(doc=doc, title=item.name)
+            except Exception as error:
+                QMessageBox.information(self, "错误", '查看公告失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if not popup.exec():
+                del popup
 
     def get_report(self, url):
         self.message_btn.setText('刷新中...')
@@ -864,19 +945,9 @@ class ShowReport(QTableWidget):
             for col in range(self.columnCount()):
                 if col == self.columnCount() - 1:
                     item = QTableWidgetItem('查看')
+                    item.name = reports[row]['name']
+                    item.file = reports[row]['file']
                 else:
                     item = QTableWidgetItem(str(reports[row][set_keys[col]]))
-                # font = QFont()
-                # if col == self.columnCount() - 1:
-                #     size = 8
-                    # item.setFont(QFont(font))
-                # else:
-                #     size = 10
-                # font.setPointSize(size)
-                # item.setFont(QFont(font))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
-
-
-
-

@@ -12,8 +12,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 import config
-from threads import RequestThread
-from widgets.maintain_widgets import TableCheckBox
+from thread.request import RequestThread
+from piece.maintain import TableCheckBox
 from popup.maintain import CreateNewClient
 
 

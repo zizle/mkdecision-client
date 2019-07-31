@@ -1,8 +1,7 @@
 # _*_ coding:utf-8 _*_
 """
-packages for all apps
-Create: 2019-07-
-Update: 2019-07-
+public popups in project
+Create: 2019-07-25
 Author: zizle
 """
 import json
@@ -158,17 +157,17 @@ class Login(QDialog):
     def to_register(self):
         # close self and to register dialog widget
         self.close()
-        popup = RegisterDialog()
+        popup = Register()
         if not popup.exec():
             del popup
 
 
-class RegisterDialog(QDialog):
+class Register(QDialog):
     """注册弹窗"""
     button_click_signal = pyqtSignal(str)
 
     def __init__(self):
-        super(RegisterDialog, self).__init__()
+        super(Register, self).__init__()
         self.__init_ui()
 
     def __init_ui(self):
@@ -184,7 +183,7 @@ class RegisterDialog(QDialog):
         title_bar.buttonMinimum.hide()
         title_bar.buttonMaximum.hide()
         title_bar.buttonClose.setCursor(QCursor(Qt.PointingHandCursor))
-        title_bar.windowClosed.connect(lambda: self.button_clicked("cancel"))
+        title_bar.windowClosed.connect(self.close)
         title_bar.windowMoved.connect(self.move)
         self.windowIconChanged.connect(title_bar.setIcon)
         self.setWindowIcon(QIcon("media/logo.png"))
@@ -193,6 +192,7 @@ class RegisterDialog(QDialog):
         self.machine_code = QLineEdit(self)
         get_machine.setGeometry(88, 45, 60, 35)
         self.machine_code.setGeometry(145, 50, 220, 25)
+        self.machine_code.setEnabled(False)
         # 手机号
         account_label = QLabel("手机：", self)
         account_label.setGeometry(75, 100, 60, 36)
@@ -235,13 +235,13 @@ class RegisterDialog(QDialog):
         agreement_button.setStyleSheet("font-size:11px;border:none; color:rgb(0,0,255)")
         agreement_button.setCursor(QCursor(Qt.PointingHandCursor))
         agreement_button.setGeometry(240, 295, 165, 25)
-        agreement_button.clicked.connect(lambda: self.button_clicked("agreement"))
+        # agreement_button.clicked.connect(lambda: self.button_clicked("agreement"))
         # 注册
         self.register_button = QPushButton("注册", self)
         self.register_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.register_button.setStyleSheet("color:#FFFFFF;font-size:15px;background-color:rgb(30,50,190);")
         self.register_button.setGeometry(145, 330, 220, 35)
-        self.register_button.clicked.connect(lambda: self.button_clicked("register"))
+        # self.register_button.clicked.connect(lambda: self.button_clicked("register"))
         # 已有账号
         has_account = QLabel("已有账号?", self)
         has_account.setStyleSheet("font-size:11px;")
@@ -280,10 +280,6 @@ class RegisterDialog(QDialog):
         else:
             self.register_button.setStyleSheet("color:#FFFFFF;font-size:15px;background-color:rgb(30,50,190);")
             self.register_button.setEnabled(True)
-
-    def button_clicked(self, signal):
-        """按钮点击"""
-        self.button_click_signal.emit(signal)
 
     def to_login(self):
         # close self and to show login dialog widget

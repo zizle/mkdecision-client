@@ -507,7 +507,7 @@ class PDFReaderDialog(QDialog):
         layout = QVBoxLayout()
         self.setWindowIcon(QIcon("media/reader.png"))
         self.download = QPushButton("下载PDF")
-        self.download.setIcon(QIcon("media/download.png"))
+        self.download.setIcon(QIcon("media/download-file.png"))
         self.download.clicked.connect(self.download_file)
         scroll_area = QScrollArea()
         self.content = PDFReaderContent()

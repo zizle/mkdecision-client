@@ -399,17 +399,6 @@ class CreateNewCommodity(QDialog):
         self.review_table.clear()
         self.review_table.setRowCount(0)
         self.review_table.setHorizontalHeaderLabels(["品种", "地区", "等级", "报价", "时间", "备注"])
-
-
-        # # 上传数据
-        # headers = config.CLIENT_HEADERS
-        # headers["Content-Type"] = "application/json"
-        # response = requests.post(url=config.SERVER_ADDRESS + "homepage/stock/", headers=headers, data=data)
-        # response_data = json.loads(response.content.decode("utf-8"))
-        # if response_data["status"] == 200:
-        #     QMessageBox.information(self, "成功", response_data["message"] + "\n返回查看数据。", QMessageBox.Yes)
-        # if response_data["status"] == 400:
-        #     QMessageBox.information(self, "成功", response_data["message"], QMessageBox.Yes)
         self.new_data_signal.emit(data)
 
 

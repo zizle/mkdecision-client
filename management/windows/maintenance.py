@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
 from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo, NoticeInfo, CommodityInfo, FinanceInfo
-from threads import RequestThread
+from thread.request import RequestThread
 import config
 
 

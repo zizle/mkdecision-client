@@ -7,6 +7,7 @@ Author: zizle
 import sys
 from PyQt5.QtWidgets import *
 
+import config
 from piece.home import ShowBulletin, MenuTree, Carousel
 from frame.base import NoDataWindow
 from frame.home import Report, Notice, Commodity, Finance
@@ -32,9 +33,10 @@ class HomePage(QScrollArea):
         ble_crl_layout.addWidget(bull_table)
         ble_crl_layout.addWidget(caro_show)
         self.menu_tree = MenuTree(menu_parent=self.menu_parent)  # left list menu
-        self.menu_tree.clicked.connect(self.tree_menu_clicked)
         self.show_tab = QTabWidget()  # middle frame window container (use QTabWidget)
         self.show_tab.setTabBarAutoHide(True)
+        # signal
+        self.menu_tree.clicked.connect(self.tree_menu_clicked)
         # add left tree menu widget and frame window container to layout
         lmn_frame_layout.addWidget(self.menu_tree)
         lmn_frame_layout.addWidget(self.show_tab)
@@ -45,7 +47,7 @@ class HomePage(QScrollArea):
 
     def tree_menu_clicked(self):
         menu = self.menu_tree.currentItem()
-        print('frame.home.py {} 左菜单点击 :'.format(str(sys._getframe().f_lineno)), menu.id, menu.text(0))
+        print('windows.home.py {} 左菜单点击 :'.format(str(sys._getframe().f_lineno)), menu.id, menu.text(0))
         text = menu.text(0)
         if text == '常规报告':
             tab = Report()

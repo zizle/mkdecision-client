@@ -1,7 +1,7 @@
 # _*_ coding:utf-8 _*_
 """
-all widgets in data-maintenance module
-Update: 2019-07-24
+base widgets in data-maintenance module
+Create: 2019-07-31
 Author: zizle
 """
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QCheckBox, QWidget
@@ -31,4 +31,3 @@ class TableCheckBox(QWidget):
 
     def setChecked(self, tag):
         self.check_box.setChecked(tag)
-

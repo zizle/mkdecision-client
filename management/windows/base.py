@@ -9,7 +9,7 @@ import sys
 import json
 import requests
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QCoreApplication
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
 
@@ -70,10 +70,10 @@ class Base(QWidget):
         self.menu_bar.setContentsMargins(10, 0, 0, 4)
         self.menu_bar.setStyleSheet("""
         MenuBar{
-            background-color:rgb(60,63,65);
+            background-color:rgb(85,88,91);
         }
         QPushButton{
-            background-color:rgb(60,63,65);
+            background-color:rgb(85,88,91);
             color: rgb(192,192,192);
             border: 0.5px solid rgb(170,170,170);
             padding:0 7px;
@@ -105,7 +105,7 @@ class Base(QWidget):
         layout.addWidget(self.tab)
         self.setLayout(layout)
         # set icon and title
-        self.setWindowIcon(QIcon(config.BASE_DIR + "/media/logo.png"))
+        self.setWindowIcon(QIcon("media/logo.png"))
         self.setWindowTitle("瑞达期货研究院分析决策系统-管理端 " + config.VERSION)
         # get menus in server
         self.get_menus()
