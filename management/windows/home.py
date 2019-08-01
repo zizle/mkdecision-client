@@ -19,7 +19,7 @@ class HomePage(QScrollArea):
         self.menu_parent = menu_parent
         self.home = QWidget()
         self.draw_home()
-        self.setWidgetResizable(True)
+        self.setWidgetResizable(True)  # resize to windows size
         self.setWidget(self.home)
 
     def draw_home(self):

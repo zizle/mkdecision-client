@@ -18,6 +18,7 @@ from windows.maintenance import Maintenance
 from piece.base import TitleBar, MenuBar, PermitBar
 from frame.base import NoDataWindow
 from .home import HomePage
+from .pservice import PService
 # 枚举左上右下以及四个定点
 Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
 
@@ -116,6 +117,8 @@ class Base(QWidget):
         text = menu.text()
         if text == '首页':
             tab = HomePage(menu_parent=menu.unum)
+        elif text == '产品服务':
+            tab = PService()
         elif text == '数据维护':
             tab = Maintenance()
         else:
