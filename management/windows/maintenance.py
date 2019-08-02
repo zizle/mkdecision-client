@@ -12,6 +12,7 @@ from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
 from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo, NoticeInfo, CommodityInfo, FinanceInfo
+from frame.maintain.pservice import PServiceMenuInfo
 from thread.request import RequestThread
 import config
 
@@ -70,22 +71,34 @@ class Maintenance(QWidget):
                 item.setExpanded(True)
         else:  # has parent to show frame window in tab
             text = item.text(0)
-            if text == '客户端':
-                tab = ClientInfo()
-            elif text == '用户':
-                tab = UserInfo()
-            elif text == '公告栏':
-                tab = BulletinInfo()
-            elif text == '轮播广告':
-                tab = CarouselInfo()
-            elif text == '常规报告':
-                tab = ReportInfo()
-            elif text == '交易通知':
-                tab = NoticeInfo()
-            elif text == '现货报表':
-                tab = CommodityInfo()
-            elif text == '财经日历':
-                tab = FinanceInfo()
+            parent_text = parent.text(0)
+            if  parent_text == '首页':
+                if text == '公告栏':
+                    tab = BulletinInfo()
+                elif text == '轮播广告':
+                    tab = CarouselInfo()
+                elif text == '常规报告':
+                    tab = ReportInfo()
+                elif text == '交易通知':
+                    tab = NoticeInfo()
+                elif text == '现货报表':
+                    tab = CommodityInfo()
+                elif text == '财经日历':
+                    tab = FinanceInfo()
+                else:
+                    tab = NoDataWindow(name=text)
+            elif parent_text == '产品服务':
+                if text == '菜单列表':
+                    tab = PServiceMenuInfo()
+                else:
+                    tab = NoDataWindow(name=text)
+            elif parent_text == '系统信息':
+                if text == '客户端':
+                    tab = ClientInfo()
+                elif text == '用户':
+                    tab = UserInfo()
+                else:
+                    tab = NoDataWindow(name=text)
             else:
                 tab = NoDataWindow(name=text)
             self.right_tab.addTab(tab, text)

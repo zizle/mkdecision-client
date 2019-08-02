@@ -7,12 +7,13 @@ Author: zizle
 
 from PyQt5.QtWidgets import QLabel, QWidget, QPushButton
 from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtGui import QCursor
 
 class LeaderLabel(QLabel):
     clicked = pyqtSignal(QLabel)
     def __init__(self, *args):
         super(LeaderLabel, self).__init__(*args)
-        self.setStyleSheet('padding:8px 0')
+        self.setStyleSheet('padding:8px 0; border:none')
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -20,16 +21,17 @@ class LeaderLabel(QLabel):
 
 
 class MenuWidget(QWidget):
-    def __init__(self,*args, **kwargs):
-        super(MenuWidget, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(MenuWidget, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_StyledBackground, True)
 
-    def enterEvent(self, QEvent):
-        self.setStyleSheet('background-color: rgb(200,200,200)')
-        super(MenuWidget, self).enterEvent(QEvent)
-
-    def leaveEvent(self, QEvent):
-        self.setStyleSheet('background-color: rgb(255,255,255)')
-        super(MenuWidget, self).leaveEvent(QEvent)
+    # def enterEvent(self, QEvent):
+    #     # self.setStyleSheet("background-color: rgb(200,200,200);border-bottom: 1px solid rgb(0,0,0)")
+    #     super(MenuWidget, self).enterEvent(QEvent)
+    #
+    # def leaveEvent(self, QEvent):
+    #     # self.setStyleSheet('background-color: rgb(255,255,255);border-bottom: 1px solid rgb(0,0,0)')
+    #     super(MenuWidget, self).leaveEvent(QEvent)
 
 
 class MenuButton(QPushButton):
@@ -38,6 +40,7 @@ class MenuButton(QPushButton):
     def __init__(self, *args, **kwargs):
         super(MenuButton, self).__init__(*args)
         self.clicked.connect(self.btn_clicked)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
 
     def btn_clicked(self):
         self.mouse_clicked.emit(self)

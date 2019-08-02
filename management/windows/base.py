@@ -85,6 +85,9 @@ class Base(QWidget):
         QPushButton:hover {
             background-color: #CD3333;
         }
+        MenuWidget{
+        
+        }
         """)
         self.menu_bar.menu_btn_clicked.connect(self.menu_clicked)
         # permit bar

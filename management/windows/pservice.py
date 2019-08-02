@@ -14,6 +14,7 @@ class PService(QWidget):
     def __init__(self, *args, **kwargs):
         super(PService, self).__init__(*args, **kwargs)
         layout = QHBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
         menu_list = MenuListWidget(column=3)
         menu_list.menu_clicked.connect(self.left_menu_clicked)
         # right tab
