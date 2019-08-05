@@ -682,6 +682,7 @@ class ShowCommodity(QTableWidget):
             labels.append(key_label[1])
         self.setHorizontalHeaderLabels(labels)
         self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+        self.verticalHeader().setSectionResizeMode(1)
         self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
@@ -691,6 +692,7 @@ class ShowCommodity(QTableWidget):
                     item = QTableWidgetItem(str(commodities[row][set_keys[col]]))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
+        self.setMinimumHeight(30 + self.rowCount() * 25)
 
 
     def get_commodity(self, url):
@@ -752,6 +754,7 @@ class ShowFinance(QTableWidget):
         # labels.append(' ')
         self.setHorizontalHeaderLabels(labels)
         self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+        self.verticalHeader().setSectionResizeMode(1)
         self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
         self.horizontalHeader().setSectionResizeMode(1, 3)  # 第1列随文字宽度
         self.horizontalHeader().setSectionResizeMode(2, 3)  # 第1列随文字宽度
@@ -763,6 +766,8 @@ class ShowFinance(QTableWidget):
                     item = QTableWidgetItem(str(finance[row][set_keys[col]]))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
+        self.setMinimumHeight(30 + self.rowCount() * 25)
+
 
     def get_finance(self, url):
         self.message_btn.setText('刷新中...')
@@ -785,6 +790,8 @@ class ShowFinance(QTableWidget):
 
 
 class ShowNotice(QTableWidget):
+    page_num = pyqtSignal(int)
+
     def __init__(self, *args):
         super(ShowNotice, self).__init__(*args)
         # button to show request message and fail retry
@@ -810,19 +817,24 @@ class ShowNotice(QTableWidget):
             if not popup.exec():
                 del popup
 
-    def get_notice(self, url):
+    def get_notice(self, url, page=1, page_size=config.HOMEPAGE_NOTICE_PAGESIZE):
         self.message_btn.setText('刷新中...')
         self.message_btn.show()
         self.message_btn.setEnabled(False)
         self.clear()
         self.setRowCount(0)
         self.horizontalHeader().setVisible(False)
+        self.setMinimumHeight(300)
         headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
         self.notice_thread = RequestThread(
             url=url,
             method='get',
             headers=headers,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            data=json.dumps({
+                "machine_code": config.app_dawn.value("machine"),
+                'page': page,
+                'page_size': page_size
+            }),
             cookies=config.app_dawn.value('cookies')
         )
         self.notice_thread.response_signal.connect(self.notice_thread_back)
@@ -842,6 +854,8 @@ class ShowNotice(QTableWidget):
             else:
                 self.message_btn.setText('刷新完成!')
                 self.message_btn.hide()
+        # set total page
+        self.page_num.emit(content['page_num'])
         # fill table
         self.horizontalHeader().setVisible(True)
         keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '创建时间')]
@@ -857,6 +871,7 @@ class ShowNotice(QTableWidget):
         labels.append(' ')
         self.setHorizontalHeaderLabels(labels)
         self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+        self.verticalHeader().setSectionResizeMode(1)
         self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
         self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, QHeaderView.ResizeToContents)  # 第2列随文字宽度
         for row in range(self.rowCount()):
@@ -871,9 +886,12 @@ class ShowNotice(QTableWidget):
                     item = QTableWidgetItem(str(notices[row][set_keys[col]]))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
+        self.setMinimumHeight(30 + self.rowCount() * 25)
 
 
 class ShowReport(QTableWidget):
+    page_num = pyqtSignal(int)
+
     def __init__(self, *args):
         super(ShowReport, self).__init__(*args)
         # button to show request message and fail retry
@@ -900,19 +918,24 @@ class ShowReport(QTableWidget):
             if not popup.exec():
                 del popup
 
-    def get_report(self, url):
+    def get_report(self, url, page=1, page_size=config.HOMEPAGE_REPORT_PAGESIZE):
         self.message_btn.setText('刷新中...')
         self.message_btn.show()
         self.message_btn.setEnabled(False)
         self.clear()
         self.setRowCount(0)
         self.horizontalHeader().setVisible(False)
+        self.setMinimumHeight(300)
         headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
         self.report_thread = RequestThread(
             url=url,
             method='get',
             headers=headers,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            data=json.dumps({
+                "machine_code": config.app_dawn.value("machine"),
+                'page': page,
+                'page_size': page_size
+            }),
             cookies=config.app_dawn.value('cookies')
         )
         self.report_thread.response_signal.connect(self.report_thread_back)
@@ -932,6 +955,8 @@ class ShowReport(QTableWidget):
             else:
                 self.message_btn.setText('刷新完成!')
                 self.message_btn.hide()
+        # set total page
+        self.page_num.emit(content['page_num'])
         # fill table
         self.horizontalHeader().setVisible(True)
         keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '时间')]
@@ -945,8 +970,10 @@ class ShowReport(QTableWidget):
             set_keys.append(key_label[0])
             labels.append(key_label[1])
         labels.append(' ')
+        # table style
         self.setHorizontalHeaderLabels(labels)
-        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+        self.horizontalHeader().setSectionResizeMode(1)  # auto resize
+        self.verticalHeader().setSectionResizeMode(1)
         self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
         self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, QHeaderView.ResizeToContents)  # 第2列随文字宽度
         for row in range(self.rowCount()):
@@ -961,3 +988,5 @@ class ShowReport(QTableWidget):
                     item = QTableWidgetItem(str(reports[row][set_keys[col]]))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
+        # resize
+        self.setMinimumHeight(30 + self.rowCount() * 25)

@@ -10,7 +10,7 @@ from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QCursor
 
 import config
-from piece.base import MenuBar
+from piece.base import MenuBar, PageController
 from piece.home import ShowReport, ShowNotice, ShowCommodity, Calendar, ShowFinance
 
 class Commodity(QWidget):
@@ -69,8 +69,14 @@ class Report(QWidget):
         menu_bar.menu_btn_clicked.connect(self.menu_clicked)
         # report table
         self.show_table = ShowReport()
+        # page controller
+        self.page_controller = PageController()
+        # signal
+        self.page_controller.clicked.connect(self.page_number_changed)
+        self.show_table.page_num.connect(self.set_total_page)
         layout.addWidget(menu_bar)
         layout.addWidget(self.show_table)
+        layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
         self.setStyleSheet("""
         MenuBar {
             background-color:rgb(255,255,255);
@@ -97,6 +103,13 @@ class Report(QWidget):
             url += '?category=' + type_en
         self.show_table.get_report(url=url)
 
+    def page_number_changed(self, page):
+        self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/', page=page)  # query param type=None
+
+    def set_total_page(self, pages_num):
+        print('frame.home.py {} 总页码信号:'.format(sys._getframe().f_lineno), pages_num)
+        self.page_controller.set_total_page(pages_num)
+
 
 class Notice(QWidget):
     def __init__(self, *args, **kwargs):
@@ -109,8 +122,14 @@ class Notice(QWidget):
         menu_bar.menu_btn_clicked.connect(self.menu_clicked)
         # report table
         self.show_table = ShowNotice()
+        # page controller
+        self.page_controller = PageController()
+        # signal
+        self.page_controller.clicked.connect(self.page_number_changed)
+        self.show_table.page_num.connect(self.set_total_page)
         layout.addWidget(menu_bar)
         layout.addWidget(self.show_table)
+        layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
         self.setStyleSheet("""
         MenuBar {
             background-color:rgb(255,255,255);
@@ -132,3 +151,10 @@ class Notice(QWidget):
         if type_en:
             url += '?category=' + type_en
         self.show_table.get_notice(url=url)
+
+    def page_number_changed(self, page):
+        self.show_table.get_notice(url=config.SERVER_ADDR + 'homepage/notice/', page=page)  # query param type=None
+
+    def set_total_page(self, pages_num):
+        print('frame.home.py {} 总页码信号:'.format(sys._getframe().f_lineno), pages_num)
+        self.page_controller.set_total_page(pages_num)

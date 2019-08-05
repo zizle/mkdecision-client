@@ -28,11 +28,12 @@ class MenuListWidget(QScrollArea):
         # self size style
         self.setFixedWidth(70 * column + (column+1)*10)
         self.column = column
-        # self.horizontalScrollBar().setVisible(False)
+        self.horizontalScrollBar().setVisible(False)
         # self.verticalScrollBar().setVisible(True)
         # widget and layout
         self.menu_container = QWidget()  # main widget
-        container_layout = QVBoxLayout()  # main layout
+        self.menu_container.setFixedWidth(70 * column + (column + 1) * 10)
+        container_layout = QVBoxLayout(spacing=0)  # main layout
         container_layout.setContentsMargins(0,0,0,0)
         # widgets add layout
         self.menu_container.setLayout(container_layout)
@@ -40,19 +41,22 @@ class MenuListWidget(QScrollArea):
         # self.setWidget(self.menu_container)  # main widget add scroll area (must be add after drawing)
         self.setStyleSheet("""
         QPushButton{
-            background-color:rgb(255,255,255);
-            color: rgb(192,192,192);
-            border: 0.5px solid rgb(170,170,170);
+            color: rgb(50,50,50);
+            border: none;
             padding:0 4px;
             margin-left:5px;
             height:18px;
-            color: #000
         }
         QPushButton:hover {
             background-color: rgb(224,255,255);
+            border: 0.5px solid rgb(170,170,170);
+        }
+        QLabel{
+            font-weight:bold;
+            font-size:13px;
         }
         MenuWidget{
-            border-bottom: 1px solid rgb(0,0,0);
+            border-bottom: 1px solid rgb(170,170,170);
         }
         MenuWidget:hover{
             background-color: rgb(210,210,210);
@@ -203,7 +207,7 @@ class MenuListWidget(QScrollArea):
             row_index = 0  # control rows
             column_index = 0  # control columns
 
-            menu_data['subs'] = []
+
 
             for child in menu_data['subs']:
                 # a child widget

@@ -5,7 +5,7 @@ Update: 2019-07-26
 Author: zizle
 """
 import fitz
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer
 from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap
 
@@ -211,6 +211,131 @@ class PDFReaderContent(QWidget):
         page_label.setScaledContents(True)  # pixmap resize with label
         self.page_layout.addWidget(page_label, alignment=Qt.AlignRight)
 
+
+class PageController(QWidget):
+    clicked = pyqtSignal(int)
+
+    def __init__(self, *args, **kwargs):
+        super(PageController, self).__init__(*args, **kwargs)
+        # total page
+        self.total_page = 1
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        homePage = QPushButton("首页")
+        prePage = QPushButton("<上一页")
+        self.curPage = QLabel("1")
+        nextPage = QPushButton("下一页>")
+        finalPage = QPushButton("尾页")
+        self.totalPage = QLabel("共1页")
+        skipLabel_0 = QLabel("跳到")
+        self.skipPage = QLineEdit()
+        skipLabel_1 = QLabel("页")
+        confirmSkip = QPushButton("确定")
+        # signal
+        homePage.clicked.connect(self.click_home_page)
+        prePage.clicked.connect(self.click_pre_page)
+        nextPage.clicked.connect(self.click_next_page)
+        finalPage.clicked.connect(self.click_final_page)
+        confirmSkip.clicked.connect(self.click_confirm_skip)
+        layout.addWidget(homePage)
+        layout.addWidget(prePage)
+        layout.addWidget(self.curPage)
+        layout.addWidget(nextPage)
+        layout.addWidget(finalPage)
+        layout.addWidget(self.totalPage)
+        layout.addWidget(skipLabel_0)
+        layout.addWidget(self.skipPage)
+        layout.addWidget(skipLabel_1)
+        layout.addWidget(confirmSkip)
+        self.setStyleSheet("""
+        QLineEdit{
+            max-width:25px;
+            min-width:25px;
+        }
+        QPushButton{
+            border: 1px solid rgb(180,180,180);
+            font-size:11px;
+            padding: 2px 4px
+        }
+        QPushButton:hover{
+            color: rgb(50,50,230);
+        }
+        """)
+        self.setLayout(layout)
+
+    def set_total_page(self, total):
+        try:
+            self.total_page = int(total)
+        except Exception:
+            return
+        self.totalPage.setText("共" + str(total) + "页")
+
+    def click_home_page(self):
+        # get current page number
+        try:
+            current_page = int(self.curPage.text())
+        except Exception:
+            return
+        if current_page == 1:
+            QMessageBox.information(self, '错误', '已经是首页', QMessageBox.Yes)
+            return
+        self.curPage.setText(str(1))
+        # emit signal
+        self.clicked.emit(1)
+
+    def click_pre_page(self):
+        # get current page number
+        try:
+            current_page = int(self.curPage.text())
+        except Exception:
+            return
+        if current_page <= 1:
+            QMessageBox.information(self, '错误', '当前是第一页', QMessageBox.Yes)
+            return
+        request_page = current_page - 1
+        self.curPage.setText(str(request_page))
+        # emit signal
+        self.clicked.emit(request_page)
+
+    def click_next_page(self):
+        # get current page number and total page
+        try:
+            current_page = int(self.curPage.text())
+        except Exception:
+            return
+        if current_page == self.total_page:
+            QMessageBox.information(self, '错误', '当前是最后一页', QMessageBox.Yes)
+            return
+        request_page = current_page + 1
+        self.curPage.setText(str(request_page))
+        # emit signal
+        self.clicked.emit(request_page)
+
+    def click_final_page(self):
+        # get current page number and total page
+        try:
+            current_page = int(self.curPage.text())
+        except Exception:
+            return
+        if current_page == self.total_page:
+            QMessageBox.information(self, '错误', '已经是尾页', QMessageBox.Yes)
+            return
+        self.curPage.setText(str(self.total_page))
+        # emit signal
+        self.clicked.emit(self.total_page)
+
+    def click_confirm_skip(self):
+        # get skip page number
+        try:
+            skip_page = int(self.skipPage.text().strip(' '))
+        except Exception as error:
+            QMessageBox.warning(self, '错误', '请输入正确的页码.', QMessageBox.Yes)
+            return
+        if skip_page < 1 or skip_page > self.total_page:
+            QMessageBox.warning(self, '错误', '超出范围.', QMessageBox.Yes)
+            return
+        self.curPage.setText(str(skip_page))
+        self.clicked.emit(skip_page)
 
 class PermitBar(QWidget):
     def __init__(self, *args, **kwargs):

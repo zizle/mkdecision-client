@@ -23,6 +23,7 @@ class CreateNewMenu(QDialog):
         self.name_edit = QLineEdit()
         # combo
         self.parent_combo = QComboBox()
+        self.parent_combo.addItem('')
         # submit
         submit_btn = QPushButton('提交')
         # signal

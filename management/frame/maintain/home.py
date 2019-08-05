@@ -647,7 +647,7 @@ class NoticeInfo(QWidget):
         self.show_table.setRowCount(0)
         self.show_table.horizontalHeader().setVisible(False)
         self.notice_thread = RequestThread(
-            url=config.SERVER_ADDR + 'homepage/report/',
+            url=config.SERVER_ADDR + 'homepage/notice/',
             method='get',
             headers=config.CLIENT_HEADERS,
             data=json.dumps({"machine_code": config.app_dawn.value('machine'), "maintain": True}),
