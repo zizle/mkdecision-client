@@ -8,6 +8,8 @@ import sys
 from PyQt5.QtWidgets import *
 
 from piece.pservice import MenuListWidget
+from frame.base import NoDataWindow
+from frame.pservice import MsgCommunication, MarketAnalysis, PersonTrain
 
 
 class PService(QWidget):
@@ -19,6 +21,7 @@ class PService(QWidget):
         menu_list.menu_clicked.connect(self.left_menu_clicked)
         # right tab
         self.show_tab = QTabWidget()
+        self.show_tab.setTabBarAutoHide(True)
         # add layout
         layout.addWidget(menu_list)
         layout.addWidget(self.show_tab)
@@ -26,6 +29,25 @@ class PService(QWidget):
 
     def left_menu_clicked(self, menu):
         print('windows.pservice.py {} 选择菜单：'.format(sys._getframe().f_lineno), menu.parent_name, menu.text())
+        main_text = menu.parent_name
+        text = menu.text()
+        if main_text == '咨询服务':
+            if text == '短信通':
+                tab = MsgCommunication()
+            elif text == '市场分析':
+                tab = MarketAnalysis()
+            else:
+                tab = NoDataWindow(name=main_text + "·" +text)
+        elif main_text == '顾问服务':
+            if text == '人才培养':
+                tab = PersonTrain()
+            else:
+                tab = NoDataWindow(name=main_text + "·" + text)
+        else:
+            tab = NoDataWindow(name=main_text + "·" +text)
+
+        self.show_tab.clear()
+        self.show_tab.addTab(tab, main_text + "·" +text)
 
 
 

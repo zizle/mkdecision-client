@@ -147,7 +147,6 @@ class MenuListWidget(QScrollArea):
                 self.message_btn.setText('刷新完成!')
                 self.message_btn.hide()
         # fill table
-
         # menu_list = [
         #     {
         #         'name': '主菜单1',
@@ -206,9 +205,6 @@ class MenuListWidget(QScrollArea):
             menu_label.child_widget.setLayout(child_layout)
             row_index = 0  # control rows
             column_index = 0  # control columns
-
-
-
             for child in menu_data['subs']:
                 # a child widget
                 button = MenuButton(child['name'])

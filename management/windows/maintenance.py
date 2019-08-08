@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
 from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo, NoticeInfo, CommodityInfo, FinanceInfo
-from frame.maintain.pservice import PServiceMenuInfo
+from frame.maintain.pservice import PServiceMenuInfo, PersonTrain
 from thread.request import RequestThread
 import config
 
@@ -63,15 +63,15 @@ class Maintenance(QWidget):
     def left_tree_clicked(self):
         """ click action """
         item = self.left_tree.currentItem()
-        parent = item.parent()
-        if parent is None:  # has not parent open the root
+        if item.childCount():  # has children open the root
             if item.isExpanded():
                 item.setExpanded(False)
             else:
                 item.setExpanded(True)
-        else:  # has parent to show frame window in tab
+        else:
+            parent = item.parent()
             text = item.text(0)
-            parent_text = parent.text(0)
+            parent_text = parent.parent().text(0) if parent.parent() else parent.text(0)  # has grandpa parent text is grandpa
             if  parent_text == '首页':
                 if text == '公告栏':
                     tab = BulletinInfo()
@@ -90,6 +90,8 @@ class Maintenance(QWidget):
             elif parent_text == '产品服务':
                 if text == '菜单列表':
                     tab = PServiceMenuInfo()
+                elif text == '人才培养':
+                    tab = PersonTrain()
                 else:
                     tab = NoDataWindow(name=text)
             elif parent_text == '系统信息':
@@ -121,6 +123,13 @@ class Maintenance(QWidget):
                 child.id = sub_module['id']
                 child.setText(0, sub_module['name'])
                 menu.addChild(child)
+                # 添加孙节点
+                grandson_menus = sub_module['subs']
+                for grand_module in grandson_menus:
+                    grand_son = QTreeWidgetItem()
+                    grand_son.id = grand_module['id']
+                    grand_son.setText(0, grand_module['name'])
+                    child.addChild(grand_son)
 
 
 
