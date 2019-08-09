@@ -4,6 +4,7 @@ product service frame
 Create: 2019-08-07
 Author: zizle
 """
+import sys
 import json
 import requests
 from lxml import etree
@@ -12,7 +13,8 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 
 import config
-from widgets.base import Loading, TableShow
+from thread.request import RequestThread
+from widgets.base import Loading, FileShowTable
 
 
 class MarketAnalysis(QWidget):
@@ -20,7 +22,7 @@ class MarketAnalysis(QWidget):
         super(MarketAnalysis, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
         self.loading = Loading()
-        self.table = TableShow()
+        self.table = FileShowTable()
         layout.addWidget(self.loading)
         layout.addWidget(self.table)
         self.setLayout(layout)
@@ -40,51 +42,63 @@ class MarketAnalysis(QWidget):
         self.loading.hide()
 
 
-class MsgCommunication(QWidget):
+class MsgCommunication(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(MsgCommunication, self).__init__(*args, **kwargs)
+        self.setWidgetResizable(True)
+        self.container = QWidget()
         layout = QVBoxLayout()
+        # show data loading
         self.loading = Loading()
-        layout.addWidget(self.loading)
-        self.setLayout(layout)
+        self.loading.clicked.connect(self.get_message_communication)
+        loading_layout = QVBoxLayout(self)
+        loading_layout.addWidget(self.loading)
+        self.container.setLayout(layout)
         self.setStyleSheet("""
-        QTextEdit{
+        QTextBrowser{
             border: none;
             border-bottom: 1px solid rgb(200,200,200)
         }
-        QTextEdit:hover{
+        QTextBrowser:hover{
             background:rgb(220,220,220);   
         }
         """)
         self.get_message_communication()
 
+
     def get_message_communication(self):
         self.loading.show()
-        data = [
-            {'id':1, 'title':'信息1', 'content':'<p>数据1数据1数据1数据1</p>' *3, 'create_time': '2019-08-07 12:30:20'},
-            {'id':2, 'title':'信息2', 'content':'<p>数据2数据2数据2数据2</p><image src="https://gss0.baidu.com/9vo3dSag_xI4khGko9WTAnF6hhy/zhidao/wh%3D600%2C800/sign=30e5d2f6d354564ee530ec3f83eeb0ba/342ac65c10385343824369c49d13b07ecb808843.jpg"></image>', 'create_time': '2019-08-07 12:30:20'},
-            {'id':3, 'title':'信息3', 'content':'数据3数据3数据3数据3', 'create_time': '2019-08-07 12:30:20'},
-            {'id':4, 'title':'信息4', 'content':'数据4数据4数据4数据4', 'create_time': '2019-08-07 12:30:20'},
-        ]
-        for item in data:
-            content = "<h2 style='display:inline-block'>"+item['title']+"</h2>" + \
-                      "<span style='display:inline-block'>" + item['create_time'] + "</span>" + \
-                      item['content']
-            print(content)
-            l = QTextEdit(content)
-            self.layout().addWidget(l)
+        self.msg_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/msg/',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.msg_thread.response_signal.connect(self.msg_thread_back)
+        self.msg_thread.finished.connect(self.msg_thread.deleteLater)
+        self.msg_thread.start()
+
+    def msg_thread_back(self, content):
+        print('frame.pservice.py {} 短信通数据: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            return
         self.loading.hide()
-        
-        
-# class PersonTrain(QWidget):
-#     def __init__(self):
-#         super(PersonTrain, self).__init__()
-#         layout = QVBoxLayout()
-#         e = QTextEdit()
-#         e.setAcceptRichText(True)
-#         layout.addWidget(e)
-#
-#         self.setLayout(layout)
+        # show content
+        for item in content['data']:
+            content = "<h2 style='display:inline-block'>" + item['title'] + "</h2>" + \
+                              "<span style='display:inline-block'>" + item['create_time'] + "</span>" + \
+                          item['content']
+            text_browser = QTextBrowser()
+            text_browser.setText(content)
+            text_browser.setMinimumHeight(text_browser.document().lineCount() * 30)
+            self.container.layout().addWidget(text_browser)
+
+        self.setWidget(self.container)
+
 
 class PersonTrain(QScrollArea):
     def __init__(self):

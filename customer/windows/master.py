@@ -13,7 +13,7 @@ from windows import ProductServiceWindow, FundamentalWindow, TechnicalAnalysisWi
 
 import config
 # from settings import BASE_DIR, VERSION, SERVER_ADDR, app_conf, CLIENT_HEADERS
-from utils import user_login, user_logout
+from utilss import user_login, user_logout
 
 
 class MasterWindow(FrameLessWindow):

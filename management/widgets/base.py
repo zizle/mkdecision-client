@@ -5,11 +5,14 @@ Create: 2019-08-07
 Author: zizle
 """
 from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 
 class Loading(QLabel):
+    clicked = pyqtSignal(bool)
+
     def __init__(self, *args):
         super(Loading, self).__init__()
+        self.click_able = False
         self.loading_text = '数据请求中···'
         self.setText(self.loading_text)
         self.setAlignment(Qt.AlignCenter)
@@ -24,25 +27,35 @@ class Loading(QLabel):
         if self.timeout_count >= 3:
             self.timeout_count = -1
 
-
-    def start(self):
-        self.timer.start(500)
-
-    def stop(self):
-        self.timer.stop()
-
     def hide(self):
-        self.stop()
+        self.timer.stop()
         super().hide()
+        self.click_able = False
 
     def show(self):
-        self.start()
+        self.setText(self.loading_text)
+        self.timer.start(500)
         super().show()
+        self.click_able = False
+
+    def no_data(self):
+        self.timer.stop()
+        self.setText('没有数据.')
+        self.click_able = False
+
+    def retry(self):
+        self.timer.stop()
+        self.setText('请求失败.请重试!')
+        self.click_able = True
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.click_able:
+            self.clicked.emit(True)
 
 
-class TableShow(QTableWidget):
-    def __init__(self, *args, **kwargs):
-        super(TableShow, self).__init__(*args)
+class FileShowTable(QTableWidget):
+    def __init__(self, *args):
+        super(FileShowTable, self).__init__(*args)
         self.verticalHeader().setVisible(False)
 
     def show_content(self, content, keys):

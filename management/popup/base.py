@@ -12,7 +12,7 @@ from PyQt5.QtGui import QCursor, QIcon
 from PyQt5.QtCore import Qt, pyqtSignal
 
 import config
-from utils.machine import machine
+from utils import machine
 from piece.base import TitleBar
 
 class Login(QDialog):

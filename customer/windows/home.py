@@ -20,7 +20,7 @@ from widgets.public import ListWidget
 from widgets.dialog import PDFReaderDialog, ContentReadDialog, ExportEconomicDialog, AddReportDialog,\
     AddNoticeDialog, SetBulletinDialog, SetCarouselDialog, LoadingDialog
 from widgets.carousel import CarouselWidget
-from utils import get_desktop_path
+from utilss import get_desktop_path
 from threads import RequestThread
 import config
 

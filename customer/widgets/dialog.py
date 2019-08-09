@@ -9,9 +9,9 @@ from PyQt5.QtGui import QIcon, QCursor, QPixmap
 from PyQt5.QtCore import pyqtSignal, QDate, Qt, QSettings
 from widgets.frame_less_window import TitleBar
 from widgets.public import TableWidget
-from utils import get_desktop_path
-from utils.machine import machine
-from utils.pdf_page import render_pdf_page
+from utilss import get_desktop_path
+from utilss.machine import machine
+from utilss.pdf_page import render_pdf_page
 
 import config
 

@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel,\
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 
-from utils.machine import machine
+from utilss.machine import machine
 from config import SERVER_ADDR, CLIENT_HEADERS
 from widgets.dialog import SelectParentModuleDialog
 

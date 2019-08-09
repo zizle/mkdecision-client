@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QApplication
 
 from windows.master import MasterWindow
 from widgets import StartScreen
-from utils import auto_login
+from utilss import auto_login
 
 app = QApplication(sys.argv)
 splash = StartScreen()  # 软件启动页

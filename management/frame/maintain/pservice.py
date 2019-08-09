@@ -16,8 +16,128 @@ import config
 from utils import get_desktop_path
 from thread.request import RequestThread
 from piece.maintain import TableCheckBox
-from popup.maintain.pservice import CreateNewMenu
+from popup.maintain.pservice import CreateNewMenu, CreateMessage
 from piece.maintain.pservice import ArticleEditTools
+from widgets.maintain.base import ContentShowTable
+from widgets.base import Loading
+
+class MSGCommunication(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(MSGCommunication, self).__init__(*args, **kwargs)
+        self.popup = None
+        self.setWidgetResizable(True)
+        # show loading data
+        loading_layout = QHBoxLayout(self)
+        self.loading = Loading()
+        loading_layout.addWidget(self.loading)
+        # content widget
+        self.container = QWidget()
+        layout = QVBoxLayout()
+        option_layout = QHBoxLayout()
+        create_btn = QPushButton('新增')
+        refresh_btn = QPushButton('刷新')
+        option_layout.addWidget(create_btn)
+        option_layout.addWidget(refresh_btn)
+        option_layout.addStretch()
+        # a table to show message content
+        self.show_table = ContentShowTable()
+        # signal
+        create_btn.clicked.connect(self.create_new_message)
+        refresh_btn.clicked.connect(self.get_all_message)
+        self.show_table.cellClicked.connect(self.show_table_clicked)
+        layout.addLayout(option_layout)
+        layout.addWidget(self.show_table)
+        self.container.setLayout(layout)
+        self.get_all_message()
+
+    def create_new_message(self):
+        self.popup = CreateMessage()
+        self.popup.new_data_signal.connect(self.create_message)
+        if not self.popup.exec():
+            self.popup = None
+
+    def create_message(self, signal):
+        if not self.popup:
+            return
+        if signal[0] == 'put':
+            try:
+                response = requests.put(
+                    url=config.SERVER_ADDR + 'pservice/consult/msg/',
+                    data=json.dumps(signal[1]),
+                    cookies=config.app_dawn.value('cookies')
+                )
+                response_data = json.loads(response.content.decode('utf-8'))
+            except Exception as error:
+                QMessageBox.information(self.popup, '错误', '更新失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if response.status_code != 205:
+                QMessageBox.information(self.popup, '错误', response_data['message'], QMessageBox.Yes)
+                return
+            QMessageBox.information(self.popup, '成功', '修改成功.', QMessageBox.Yes)
+            self.popup.close()
+        if signal[0] == 'post':
+            try:
+                response = requests.post(
+                    url=config.SERVER_ADDR + 'pservice/consult/msg/',
+                    data=json.dumps(signal[1]),
+                    cookies=config.app_dawn.value('cookies')
+                )
+                response_data = json.loads(response.content.decode('utf-8'))
+            except Exception as error:
+                QMessageBox.information(self.popup, '错误', '创建失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if response.status_code != 201:
+                QMessageBox.information(self.popup, '错误', response_data['message'], QMessageBox.Yes)
+                return
+            QMessageBox.information(self.popup, '成功', '创建成功.', QMessageBox.Yes)
+            self.popup.close()
+
+    def get_all_message(self):
+        self.loading.show()
+        self.show_table.clear()
+        self.msg_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/msg/',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine'), 'maintain': True}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.msg_thread.response_signal.connect(self.msg_thread_back)
+        self.msg_thread.finished.connect(self.msg_thread.deleteLater)
+        self.msg_thread.start()
+
+    def msg_thread_back(self, content):
+        print('frame.pservice.py {} 短信通数据: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            return
+        self.loading.hide()
+        # fill show table
+        header_couple = [
+            ('serial_num', '序号'),
+            ('create_time', '上传时间'),
+            ('title', '名称'),
+            ('author', '作者'),
+            ('is_active', '显示'),
+            ('to_look', ' ')
+        ]
+        self.show_table.set_contents(contents=content['data'], header_couple=header_couple)
+        self.setWidget(self.container)
+
+    def show_table_clicked(self, row, col):
+        if col == 5:
+            item = self.show_table.item(row, col)
+            title_item = self.show_table.item(row, 2)
+            author_item = self.show_table.item(row, 3)
+            self.popup = CreateMessage()
+            self.popup.message_id = item.content_id
+            self.popup.modify(title=title_item.text(), author=author_item.text(), content=item.content)
+            self.popup.new_data_signal.connect(self.create_message)
+            if not self.popup.exec():
+                self.popup = None
+
 
 class PServiceMenuInfo(QWidget):
     def __init__(self, *args, **kwargs):
