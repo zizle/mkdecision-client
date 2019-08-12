@@ -174,6 +174,13 @@ class CreateMLSFile(QDialog):
         self.new_data_signal.emit(data)
 
 
+class CreateTPSFile(CreateMLSFile):
+    pass
+
+class CreateRSRFile(CreateMLSFile):
+    pass
+
+
 
 
 

@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import *
 
 from piece.pservice import MenuListWidget
 from frame.base import NoDataWindow
-from frame.pservice import MsgCommunication, MarketAnalysis, PersonTrain
+from frame.pservice import MsgCommunication, MarketAnalysis, PersonTrain, TopicalStudy, ResearchReport
 
 
 class PService(QWidget):
@@ -36,6 +36,10 @@ class PService(QWidget):
                 tab = MsgCommunication()
             elif text == '市场分析':
                 tab = MarketAnalysis()
+            elif text == '专题研究':
+                tab = TopicalStudy()
+            elif text == '调研报告':
+                tab = ResearchReport()
             else:
                 tab = NoDataWindow(name=main_text + "·" +text)
         elif main_text == '顾问服务':

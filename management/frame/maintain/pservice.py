@@ -19,7 +19,7 @@ from thread.request import RequestThread
 from piece.base import PageController
 from piece.maintain import TableCheckBox
 from popup.base import PDFReader
-from popup.maintain.pservice import CreateNewMenu, CreateMessage, CreateMLSFile
+from popup.maintain.pservice import CreateNewMenu, CreateMessage, CreateMLSFile, CreateTPSFile, CreateRSRFile
 from piece.maintain.pservice import ArticleEditTools
 from widgets.maintain.base import ContentShowTable, TableShow
 from widgets.base import Loading
@@ -510,6 +510,161 @@ class PersonTrain(QScrollArea):
         else:
             QMessageBox.information(self, '成功', '新建文章成功.', QMessageBox.Yes)
             self.submit_btn.setEnabled(True)
+
+
+class ResearchReport(MarketAnalysis):
+    def get_content_to_show(self):
+        self.loading.show()
+        self.show_table.clear()
+        self.rsr_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=rsr',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine'), 'maintain': True}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.rsr_thread.response_signal.connect(self.rsr_thread_back)
+        self.rsr_thread.finished.connect(self.rsr_thread.deleteLater)
+        self.rsr_thread.start()
+
+    def rsr_thread_back(self, content):
+        print('frame.pservice.py {} 调研报告文件: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            self.setWidget(self.container)
+            return
+        self.loading.hide()
+        # fill show table
+        header_couple = [
+            ('serial_num', '序号'),
+            ('create_time', '上传时间'),
+            ('title', '标题'),
+            ('is_active', '显示'),
+            ('to_look', ' ')
+        ]
+        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
+        self.setWidget(self.container)
+
+    def create_new_rsr(self):
+        self.popup = CreateRSRFile()
+        self.popup.new_data_signal.connect(self.create_a_rsr)
+        if not self.popup.exec():
+            self.popup = None
+
+    def create_a_rsr(self, signal):
+        if not self.popup:
+            return
+        data = dict()
+        # get file upload
+        data['title'] = signal['title']
+        data['mark'] = 'rsr'
+        data['machine_code'] = config.app_dawn.value('machine')
+        file_raw_name = signal["file_path"].rsplit("/", 1)
+        file = open(signal["file_path"], "rb")
+        file_content = file.read()
+        file.close()
+        data["file"] = (file_raw_name[1], file_content)
+        encode_data = encode_multipart_formdata(data)
+        data = encode_data[0]
+        headers = config.CLIENT_HEADERS
+        headers['Content-Type'] = encode_data[1]
+        try:
+            response = requests.post(
+                url=config.SERVER_ADDR + "pservice/consult/file/",
+                headers=headers,
+                data=data,
+                cookies=config.app_dawn.value('cookies')
+            )
+            response_data = json.loads(response.content.decode('utf-8'))
+        except Exception as error:
+            QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
+            return
+        if response.status_code != 201:
+            QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
+            return
+        else:
+            QMessageBox.information(self, '成功', '创建成功, 赶紧刷新看看吧.', QMessageBox.Yes)
+            self.popup.close()  # close the dialog
+
+
+class TopicalStudy(MarketAnalysis):
+
+    def get_content_to_show(self):
+        self.loading.show()
+        self.show_table.clear()
+        self.tps_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=tps',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine'), 'maintain': True}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.tps_thread.response_signal.connect(self.tps_thread_back)
+        self.tps_thread.finished.connect(self.tps_thread.deleteLater)
+        self.tps_thread.start()
+
+    def tps_thread_back(self, content):
+        print('frame.pservice.py {} 市场分析文件: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            self.setWidget(self.container)
+            return
+        self.loading.hide()
+        # fill show table
+        header_couple = [
+            ('serial_num', '序号'),
+            ('create_time', '上传时间'),
+            ('title', '标题'),
+            ('is_active', '显示'),
+            ('to_look', ' ')
+        ]
+        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
+        self.setWidget(self.container)
+
+    def create_new_tps(self):
+        self.popup = CreateTPSFile()
+        self.popup.new_data_signal.connect(self.create_a_tps)
+        if not self.popup.exec():
+            self.popup = None
+
+    def create_a_tps(self, signal):
+        if not self.popup:
+            return
+        data = dict()
+        # get file upload
+        data['title'] = signal['title']
+        data['mark'] = 'tps'
+        data['machine_code'] = config.app_dawn.value('machine')
+        file_raw_name = signal["file_path"].rsplit("/", 1)
+        file = open(signal["file_path"], "rb")
+        file_content = file.read()
+        file.close()
+        data["file"] = (file_raw_name[1], file_content)
+        encode_data = encode_multipart_formdata(data)
+        data = encode_data[0]
+        headers = config.CLIENT_HEADERS
+        headers['Content-Type'] = encode_data[1]
+        try:
+            response = requests.post(
+                url=config.SERVER_ADDR + "pservice/consult/file/",
+                headers=headers,
+                data=data,
+                cookies=config.app_dawn.value('cookies')
+            )
+            response_data = json.loads(response.content.decode('utf-8'))
+        except Exception as error:
+            QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
+            return
+        if response.status_code != 201:
+            QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
+            return
+        else:
+            QMessageBox.information(self, '成功', '创建成功, 赶紧刷新看看吧.', QMessageBox.Yes)
+            self.popup.close()  # close the dialog
 
 
 

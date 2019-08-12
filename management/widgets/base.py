@@ -19,6 +19,9 @@ class Loading(QLabel):
         self.timer = QTimer()
         self.timeout_count = -1
         self.timer.timeout.connect(self.time_out)
+        self.hide_timer = QTimer()
+        self.hide_timer.timeout.connect(self.hide_timer_out)
+        self.count_hide = 5
         super().hide()
 
     def time_out(self):
@@ -40,8 +43,17 @@ class Loading(QLabel):
 
     def no_data(self):
         self.timer.stop()
-        self.setText('没有数据.')
+        self.setText('没有数据.{}秒后可新增'.format(self.count_hide))
+        self.hide_timer.start(1000)
         self.click_able = False
+
+    def hide_timer_out(self):
+        self.count_hide -= 1
+        self.setText('没有数据.{}秒后可新增'.format(self.count_hide))
+        if self.count_hide <= 0:
+            self.hide_timer.stop()
+            self.hide()
+            self.count_hide = 5
 
     def retry(self):
         self.timer.stop()

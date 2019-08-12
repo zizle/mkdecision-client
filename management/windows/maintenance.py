@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
 from frame.maintain.home import BulletinInfo, CarouselInfo, ReportInfo, NoticeInfo, CommodityInfo, FinanceInfo
-from frame.maintain.pservice import PServiceMenuInfo, PersonTrain, MSGCommunication, MarketAnalysis
+from frame.maintain.pservice import PServiceMenuInfo, PersonTrain, MSGCommunication, MarketAnalysis, TopicalStudy, ResearchReport
 from thread.request import RequestThread
 import config
 
@@ -94,6 +94,10 @@ class Maintenance(QWidget):
                     tab = MSGCommunication()
                 elif text == '市场分析':
                     tab = MarketAnalysis()
+                elif text == '专题研究':
+                    tab = TopicalStudy()
+                elif text == '调研报告':
+                    tab = ResearchReport()
                 elif text == '人才培养':
                     tab = PersonTrain()
 

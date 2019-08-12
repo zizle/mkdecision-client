@@ -81,6 +81,7 @@ class MarketAnalysis(QScrollArea):
             if not popup.exec():
                 del popup
 
+
 class MsgCommunication(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(MsgCommunication, self).__init__(*args, **kwargs)
@@ -215,4 +216,101 @@ class PersonTrain(QScrollArea):
             text = ''
         self.window.layout().addStretch()
         self.loading.hide()
+
+class ResearchReport(MarketAnalysis):
+    def get_content_to_show(self):
+        self.loading.show()
+        self.show_table.clear()
+        self.rsr_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=rsr',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.rsr_thread.response_signal.connect(self.rsr_thread_back)
+        self.rsr_thread.finished.connect(self.rsr_thread.deleteLater)
+        self.rsr_thread.start()
+
+    def rsr_thread_back(self, content):
+        print('frame.pservice.py {} 市场分析文件: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            return
+        self.loading.hide()
+        # fill show table
+        header_couple = [
+            ('serial_num', '序号'),
+            ('title', '标题'),
+            ('create_time', '上传时间'),
+            ('to_look', ' ')
+        ]
+        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
+        self.setWidget(self.container)
+
+
+
+class TopicalStudy(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(TopicalStudy, self).__init__(*args, **kwargs)
+        self.setWidgetResizable(True)
+        layout = QVBoxLayout()
+        loading_layout = QHBoxLayout(self)
+        self.loading = Loading()
+        self.show_table = TableShow()
+        self.container = QWidget()
+        # signal
+        self.show_table.cellClicked.connect(self.show_table_clicked)
+        loading_layout.addWidget(self.loading)
+        layout.addWidget(self.show_table)
+        self.container.setLayout(layout)
+        self.get_content_to_show()
+
+    def get_content_to_show(self):
+        self.loading.show()
+        self.show_table.clear()
+        self.tps_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=tps',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.tps_thread.response_signal.connect(self.tps_thread_back)
+        self.tps_thread.finished.connect(self.tps_thread.deleteLater)
+        self.tps_thread.start()
+
+    def tps_thread_back(self, content):
+        print('frame.pservice.py {} 专题研究文件: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            return
+        self.loading.hide()
+        # fill show table
+        header_couple = [
+            ('serial_num', '序号'),
+            ('title', '标题'),
+            ('create_time', '上传时间'),
+            ('to_look', ' ')
+        ]
+        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
+        self.setWidget(self.container)
+
+    def show_table_clicked(self, row, col):
+        print('frame.pservice.py {} 点击专题研究:'.format(str(sys._getframe().f_lineno)), row, col)
+        if col == 3:
+            item = self.show_table.item(row, col)
+            try:
+                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
+                doc = Document(filename=item.title, stream=response.content)
+                popup = PDFReader(doc=doc, title=item.title)
+            except Exception as error:
+                QMessageBox.information(self, "错误", '查看文件失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if not popup.exec():
+                del popup
 
