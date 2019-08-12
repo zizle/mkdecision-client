@@ -8,39 +8,78 @@ import sys
 import json
 import requests
 from lxml import etree
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QScrollArea, QTextBrowser, QLabel, QMessageBox
+from fitz.fitz import Document
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QTextBrowser, QLabel, QMessageBox
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 
 import config
 from thread.request import RequestThread
-from widgets.base import Loading, FileShowTable
+from widgets.base import Loading, TableShow
+from popup.base import PDFReader
 
 
-class MarketAnalysis(QWidget):
+class MarketAnalysis(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(MarketAnalysis, self).__init__(*args, **kwargs)
+        self.setWidgetResizable(True)
         layout = QVBoxLayout()
+        loading_layout = QHBoxLayout(self)
         self.loading = Loading()
-        self.table = FileShowTable()
-        layout.addWidget(self.loading)
-        layout.addWidget(self.table)
-        self.setLayout(layout)
-        self.get_contents()
+        self.show_table = TableShow()
+        self.container = QWidget()
+        # signal
+        self.show_table.cellClicked.connect(self.show_table_clicked)
+        loading_layout.addWidget(self.loading)
+        layout.addWidget(self.show_table)
+        self.container.setLayout(layout)
+        self.get_content_to_show()
 
-    def get_contents(self):
+    def get_content_to_show(self):
         self.loading.show()
-        data = [
-            {'id':1, 'name': '市场分析1', 'create_time':'2019-08-07 13:12:47', 'to_look': '唯一请求字段1'},
-            {'id':2, 'name': '市场分析2', 'create_time':'2019-08-07 13:13:47', 'to_look': '唯一请求字段2'},
-            {'id':3, 'name': '市场分析3', 'create_time':'2019-08-07 13:14:47', 'to_look': '唯一请求字段3'},
-            {'id':4, 'name': '市场分析4', 'create_time':'2019-08-07 13:15:47', 'to_look': '唯一请求字段4'},
-            {'id':5, 'name': '市场分析5', 'create_time':'2019-08-07 13:16:47', 'to_look': '唯一请求字段5'},
-        ]
-        keys=[('id','序号'),('name', '标题'), ('create_time', '创建时间'), ('to_look', '')]
-        self.table.show_content(content=data, keys=keys)
-        self.loading.hide()
+        self.show_table.clear()
+        self.mls_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=mls',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.mls_thread.response_signal.connect(self.mls_thread_back)
+        self.mls_thread.finished.connect(self.mls_thread.deleteLater)
+        self.mls_thread.start()
 
+    def mls_thread_back(self, content):
+        print('frame.pservice.py {} 市场分析文件: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            return
+        self.loading.hide()
+        # fill show table
+        header_couple = [
+            ('serial_num', '序号'),
+            ('title', '标题'),
+            ('create_time', '上传时间'),
+            ('to_look', ' ')
+        ]
+        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
+        self.setWidget(self.container)
+
+    def show_table_clicked(self, row, col):
+        print('frame.pservice.py {} 点击市场分析:'.format(str(sys._getframe().f_lineno)), row, col)
+        if col == 3:
+            item = self.show_table.item(row, col)
+            try:
+                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
+                doc = Document(filename=item.title, stream=response.content)
+                popup = PDFReader(doc=doc, title=item.title)
+            except Exception as error:
+                QMessageBox.information(self, "错误", '查看文件失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if not popup.exec():
+                del popup
 
 class MsgCommunication(QScrollArea):
     def __init__(self, *args, **kwargs):

@@ -53,37 +53,50 @@ class Loading(QLabel):
             self.clicked.emit(True)
 
 
-class FileShowTable(QTableWidget):
+class TableShow(QTableWidget):
     def __init__(self, *args):
-        super(FileShowTable, self).__init__(*args)
+        super(TableShow, self).__init__(*args)
         self.verticalHeader().setVisible(False)
 
-    def show_content(self, content, keys):
-        if not isinstance(content, list):
+    def show_content(self, contents, header_couple, show='file'):
+        if show not in ['file', 'content']:
+            raise ValueError('table can not show this content.')
+        if not isinstance(contents, list):
             raise ValueError('content must be a list.')
-        for item in content:
-            if not isinstance(item, dict):
-                raise ValueError('the item in content must be a dict.')
-            row = len(content)
-            self.setRowCount(row)
-            self.setColumnCount(len(keys))  # 列数
-            labels = []
-            set_keys = []
-            for key_label in keys:
-                set_keys.append(key_label[0])
-                labels.append(key_label[1])
-            self.setHorizontalHeaderLabels(labels)
-            self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
-            self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
-            self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, 3)  # 最后1列随文字宽度
-            for row in range(self.rowCount()):
-                for col in range(self.columnCount()):
+        row = len(contents)
+        self.setRowCount(row)
+        self.setColumnCount(len(header_couple))  # 列数
+        labels = []
+        set_keys = []
+        for key_label in header_couple:
+            set_keys.append(key_label[0])
+            labels.append(key_label[1])
+        self.setHorizontalHeaderLabels(labels)
+        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+        self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
+        self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, 3)  # 最后1列随文字宽度
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
+                if col == 0:
+                    item = QTableWidgetItem(str(row + 1))
+                else:
                     label_key = set_keys[col]
                     if label_key == 'to_look':
                         item = QTableWidgetItem('查看')
-                        item.unum = content[row]['id']
-                        item.unique = content[row]['to_look']
+                        item.title = contents[row]['title']
+                        if show == 'file':
+                            item.file = contents[row]['file']
+                        elif show == 'content':
+                            item.content = contents[row]['content']
+                        else:
+                            pass
                     else:
-                        item = QTableWidgetItem(str(content[row][label_key]))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.setItem(row, col, item)
+                        item = QTableWidgetItem(str(contents[row][label_key]))
+                item.setTextAlignment(Qt.AlignCenter)
+                item.content_id = contents[row]['id']
+                self.setItem(row, col, item)
+
+    def clear(self):
+        super().clear()
+        self.setRowCount(0)
+        self.setColumnCount(0)

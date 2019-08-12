@@ -7,6 +7,7 @@ Author: zizle
 import sys
 import json
 import requests
+from fitz.fitz import Document
 from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
@@ -15,11 +16,133 @@ from PyQt5.QtGui import QTextCursor
 import config
 from utils import get_desktop_path
 from thread.request import RequestThread
+from piece.base import PageController
 from piece.maintain import TableCheckBox
-from popup.maintain.pservice import CreateNewMenu, CreateMessage
+from popup.base import PDFReader
+from popup.maintain.pservice import CreateNewMenu, CreateMessage, CreateMLSFile
 from piece.maintain.pservice import ArticleEditTools
-from widgets.maintain.base import ContentShowTable
+from widgets.maintain.base import ContentShowTable, TableShow
 from widgets.base import Loading
+
+class MarketAnalysis(QScrollArea):
+    def __init__(self):
+        super(MarketAnalysis, self).__init__()
+        self.popup = None
+        self.setWidgetResizable(True)
+        loading_layout = QHBoxLayout(self)
+        self.loading = Loading()
+        loading_layout.addWidget(self.loading)
+        self.container = QWidget()
+        layout = QVBoxLayout()
+        option_layout = QHBoxLayout()
+        create_btn = QPushButton('新增')
+        refresh_btn = QPushButton('刷新')
+        # show table
+        self.show_table = TableShow()
+        # paginator
+        page_controller = PageController()
+        option_layout.addWidget(create_btn)
+        option_layout.addWidget(refresh_btn)
+        option_layout.addStretch()
+        # signal
+        self.loading.clicked.connect(self.get_content_to_show)
+        create_btn.clicked.connect(self.create_new_mls)
+        refresh_btn.clicked.connect(self.get_content_to_show)
+        self.show_table.cellClicked.connect(self.show_table_clicked)
+        layout.addLayout(option_layout)
+        layout.addWidget(self.show_table)
+        layout.addWidget(page_controller, alignment=Qt.AlignCenter)
+        self.container.setLayout(layout)
+        self.get_content_to_show()
+
+    def get_content_to_show(self):
+        self.loading.show()
+        self.show_table.clear()
+        self.mls_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=mls',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine'), 'maintain': True}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.mls_thread.response_signal.connect(self.mls_thread_back)
+        self.mls_thread.finished.connect(self.mls_thread.deleteLater)
+        self.mls_thread.start()
+
+    def mls_thread_back(self, content):
+        print('frame.pservice.py {} 市场分析文件: '.format(sys._getframe().f_lineno), content)
+        if content['error']:
+            self.loading.retry()
+            return
+        if not content['data']:
+            self.loading.no_data()
+            return
+        self.loading.hide()
+        # fill show table
+        header_couple = [
+            ('serial_num', '序号'),
+            ('create_time', '上传时间'),
+            ('title', '标题'),
+            ('is_active', '显示'),
+            ('to_look', ' ')
+        ]
+        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
+        self.setWidget(self.container)
+
+    def create_new_mls(self):
+        self.popup = CreateMLSFile()
+        self.popup.new_data_signal.connect(self.create_a_mls)
+        if not self.popup.exec():
+            self.popup = None
+
+    def create_a_mls(self, signal):
+        if not self.popup:
+            return
+        data = dict()
+        # get file upload
+        data['title'] = signal['title']
+        data['mark'] = 'mls'
+        data['machine_code'] = config.app_dawn.value('machine')
+        file_raw_name = signal["file_path"].rsplit("/", 1)
+        file = open(signal["file_path"], "rb")
+        file_content = file.read()
+        file.close()
+        data["file"] = (file_raw_name[1], file_content)
+        encode_data = encode_multipart_formdata(data)
+        data = encode_data[0]
+        headers = config.CLIENT_HEADERS
+        headers['Content-Type'] = encode_data[1]
+        try:
+            response = requests.post(
+                url=config.SERVER_ADDR + "pservice/consult/file/",
+                headers=headers,
+                data=data,
+                cookies=config.app_dawn.value('cookies')
+            )
+            response_data = json.loads(response.content.decode('utf-8'))
+        except Exception as error:
+            QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
+            return
+        if response.status_code != 201:
+            QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
+            return
+        else:
+            QMessageBox.information(self, '成功', '创建成功, 赶紧刷新看看吧.', QMessageBox.Yes)
+            self.popup.close()  # close the dialog
+
+    def show_table_clicked(self, row, col):
+        print('piece.home.py {} 点击市场分析:'.format(str(sys._getframe().f_lineno)), row, col)
+        if col == 4:
+            item = self.show_table.item(row, col)
+            try:
+                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
+                doc = Document(filename=item.title, stream=response.content)
+                popup = PDFReader(doc=doc, title=item.title)
+            except Exception as error:
+                QMessageBox.information(self, "错误", '查看文件失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if not popup.exec():
+                del popup
+
 
 class MSGCommunication(QScrollArea):
     def __init__(self, *args, **kwargs):
@@ -272,6 +395,7 @@ class PServiceMenuInfo(QWidget):
         item = self.show_table.item(signal['row'], signal['col'])
         show = '显示' if signal['checked'] else '不显示'
         print('frame.maintain.base.py {} 修改服务菜单：'.format(sys._getframe().f_lineno), item.menu_id, show)
+
 
 class PersonTrain(QScrollArea):
     def __init__(self):
