@@ -14,9 +14,8 @@ from frame.home import Report, Notice, Commodity, Finance
 
 
 class HomePage(QScrollArea):
-    def __init__(self, menu_parent, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(HomePage, self).__init__(*args, **kwargs)
-        self.menu_parent = menu_parent
         self.home = QWidget()
         self.draw_home()
         self.setWidgetResizable(True)  # resize to windows size
@@ -32,7 +31,7 @@ class HomePage(QScrollArea):
         # add bulletin widget and advertisement widget to layout
         ble_crl_layout.addWidget(bull_table)
         ble_crl_layout.addWidget(caro_show)
-        self.menu_tree = MenuTree(menu_parent=self.menu_parent)  # left list menu
+        self.menu_tree = MenuTree()  # left list menu
         self.show_tab = QTabWidget()  # middle frame window container (use QTabWidget)
         self.show_tab.setTabBarAutoHide(True)
         # signal

@@ -8,7 +8,7 @@ import fitz
 import json
 import hashlib
 import requests
-from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox, QScrollArea, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox, QScrollArea, QVBoxLayout, QWidget, QHBoxLayout
 from PyQt5.QtGui import QCursor, QIcon, QImage, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -341,3 +341,54 @@ class PDFReader(QDialog):
             page_label.setPixmap(page_map)
             page_label.setScaledContents(True)  # pixmap resize with label
             self.page_container.layout().addWidget(page_label)
+
+class TipShow(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(TipShow, self).__init__(*args, **kwargs)
+        self.setMinimumSize(300,200)
+        self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
+        layout = QVBoxLayout(spacing=12)
+        action_layout = QHBoxLayout()
+        # widgets
+        title_bar = TitleBar()
+        self.tips_label = QLabel()
+        self.cancel_btn = QPushButton('取消')
+        self.confirm_btn = QPushButton('确定')
+        # signal
+        self.windowIconChanged.connect(title_bar.setIcon)
+        self.windowTitleChanged.connect(title_bar.setTitle)
+        title_bar.windowClosed.connect(self.close)  # close dialog
+        # style
+        layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.setContentsMargins(0,0,0,0)
+        title_bar.setMaximumHeight(30)
+        title_bar.setMinimumHeight(30)
+        title_bar.buttonMinimum.hide()
+        title_bar.buttonMaximum.hide()
+        title_bar.setIconSize(20)
+        self.tips_label.setAlignment(Qt.AlignCenter)
+        self.setWindowIcon(QIcon('media/logo.png'))
+        self.cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self.confirm_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self.cancel_btn.setStyleSheet('border:none;background-color:rgb(110,140,220);color:rgb(255,255,255);margin:0 0 10px 0;padding:5px 10px')
+        self.confirm_btn.setStyleSheet('border:none;background-color:rgb(110,140,220);color:rgb(255,255,255);margin:0 10px 10px 0;padding:5px 10px')
+        self.tips_label.setStyleSheet('font-size:15px; padding:2px 10px 2px 10px')
+        self.setStyleSheet("TipShow{border: 1px solid rgb(185,188,191)}")
+        layout.addWidget(title_bar)
+        layout.addWidget(self.tips_label)
+        action_layout.addStretch()
+        action_layout.addWidget(self.cancel_btn)
+        action_layout.addWidget(self.confirm_btn)
+        layout.addLayout(action_layout)
+        self.setLayout(layout)
+
+    def information(self, title, message):
+        self.cancel_btn.hide()
+        self.setWindowTitle(title)
+        self.tips_label.setText(message)
+
+
+    def choose(self, title, message):
+        self.setWindowTitle(title)
+        self.tips_label.setText(message)
+

@@ -4,8 +4,9 @@ base widget in project
 Create: 2019-08-07
 Author: zizle
 """
-from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QWidget, QPushButton
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
+from PyQt5.QtGui import QCursor
 
 class Loading(QLabel):
     clicked = pyqtSignal(bool)
@@ -112,3 +113,34 @@ class TableShow(QTableWidget):
         super().clear()
         self.setRowCount(0)
         self.setColumnCount(0)
+
+
+class LeaderLabel(QLabel):
+    # 菜单的展开与关闭label
+    clicked = pyqtSignal(QLabel)
+    def __init__(self, *args):
+        super(LeaderLabel, self).__init__(*args)
+        self.setStyleSheet('padding:8px 0; border:none')
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self)
+
+
+class MenuWidget(QWidget):
+    # 每个菜单块容器
+    def __init__(self, *args, **kwargs):
+        super(MenuWidget, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+
+class MenuButton(QPushButton):
+    # 菜单
+    mouse_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(MenuButton, self).__init__(*args)
+        self.clicked.connect(self.btn_clicked)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
+
+    def btn_clicked(self):
+        self.mouse_clicked.emit(self)

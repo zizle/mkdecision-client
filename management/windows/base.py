@@ -16,7 +16,7 @@ from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 import config
 from windows.maintenance import Maintenance
 from piece.base import TitleBar, MenuBar, PermitBar
-from frame.base import NoDataWindow
+from frame.base import NoDataWindow, RegisterClient
 from .home import HomePage
 from .pservice import PService
 # 枚举左上右下以及四个定点
@@ -113,21 +113,6 @@ class Base(QWidget):
         self.setWindowTitle("瑞达期货研究院分析决策系统-管理端 " + config.VERSION)
         # get menus in server
         self.get_menus()
-        self.count = 0
-
-    def menu_clicked(self, menu):
-        print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), menu.unum, menu.text())
-        text = menu.text()
-        if text == '首页':
-            tab = HomePage(menu_parent=menu.unum)
-        elif text == '产品服务':
-            tab = PService()
-        elif text == '数据维护':
-            tab = Maintenance()
-        else:
-            tab = NoDataWindow(name=text)
-        self.tab.clear()
-        self.tab.addTab(tab, text)
 
     def eventFilter(self, obj, event):
         """事件过滤器,用于解决鼠标进入其它控件后还原为标准鼠标样式"""
@@ -139,9 +124,9 @@ class Base(QWidget):
         try:
             # 请求主菜单数据
             response = requests.get(
-                url=config.SERVER_ADDR + "basic/module/",  # query param: parent=None
+                url=config.SERVER_ADDR + "basic/module/",
                 headers=config.CLIENT_HEADERS,
-                data=json.dumps({"machine_code": config.app_dawn.value('machine')})
+                data=json.dumps({"machine_code": config.app_dawn.value('machine'), 'is_admin': True})
             )
         except Exception as e:
             QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
@@ -154,8 +139,26 @@ class Base(QWidget):
         for item in response_content["data"]:
             menu_btn = QPushButton(item['name'])
             menu_btn.unum = item['id']
+            menu_btn.name_en = item['name_en']
             self.menu_bar.addMenuButton(menu_btn)
         self.menu_bar.addStretch()
+
+    def menu_clicked(self, menu):
+        print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), menu.name_en, menu.text())
+        name_en = menu.name_en
+        name = menu.text()
+        if name_en == 'machine_code':
+            tab = RegisterClient()
+        elif name_en == 'home_page':
+            tab = HomePage()
+        # elif text == '产品服务':
+        #     tab = PService()
+        # elif text == '数据维护':
+        #     tab = Maintenance()
+        else:
+            tab = NoDataWindow(name=name)
+        self.tab.clear()
+        self.tab.addTab(tab, name)
 
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
