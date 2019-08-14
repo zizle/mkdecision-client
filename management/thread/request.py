@@ -31,7 +31,6 @@ class RequestThread(QThread):
                     cookies=self.cookies,
                 )
                 response_content = json.loads(response.content.decode('utf-8'))
-                response_content["error"] = False
                 self.response_signal.emit(response_content)
             else:
                 self.response_signal.emit({"error": True, "message": "不支持的方法!", "data":[]})

@@ -324,6 +324,7 @@ class Carousel(QLabel):
     def carousel_thread_back(self, content):
         # set advertisement carousel
         print('piece.home.py {} 轮播数据: '.format(str(sys._getframe().f_lineno)), content)
+        return
         if content['error']:
             self.message_btn.setText('失败,请重试!')
             self.message_btn.setEnabled(True)
@@ -644,13 +645,6 @@ class MenuListWidget(QScrollArea):
 class MenuTree(QTreeWidget):
     def __init__(self, *args, **kwargs):
         super(MenuTree, self).__init__(*args, **kwargs)
-        # button to show request message and fail retry
-        self.message_btn = QPushButton('刷新中...', self)
-        self.message_btn.resize(100, 20)
-        self.message_btn.move(80, 50)
-        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
-        self.message_btn.clicked.connect(self.get_menus)
-        self.message_btn.hide()
         # menu tree style
         self.setMaximumWidth(300)
         self.setExpandsOnDoubleClick(False)
@@ -659,14 +653,10 @@ class MenuTree(QTreeWidget):
         self.get_menus()
 
     def get_menus(self):
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        headers = config.CLIENT_HEADERS
         self.menu_thread = RequestThread(
             url=config.SERVER_ADDR + 'homepage/module/',
             method='get',
-            headers=headers,
+            headers=config.CLIENT_HEADERS,
             data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
             cookies=config.app_dawn.value('cookies')
         )
@@ -677,15 +667,7 @@ class MenuTree(QTreeWidget):
     def menu_thread_back(self, content):
         print('piece.home.py {} 主页左菜单：'.format(str(sys._getframe().f_lineno)), content)
         if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
+            return
         # fill tree menu
         for menu in content['data']:
             menu_item = QTreeWidgetItem(self)
@@ -785,12 +767,11 @@ class ShowBulletin(QTableWidget):
         self.message_btn.show()
         self.message_btn.setEnabled(False)
         headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
-        print('不同之处3：piece.home.py {} 需修改【客户端】与【管理端】不同的请求参数！！！'.format(sys._getframe().f_lineno))
         self.ble_thread = RequestThread(
             url=config.SERVER_ADDR + "homepage/bulletin/",
             method='get',
             headers=headers,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine"), 'is_admin': True}),
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
             cookies=config.app_dawn.value('cookies')
         )
         self.ble_thread.response_signal.connect(self.ble_thread_back)
@@ -799,6 +780,7 @@ class ShowBulletin(QTableWidget):
 
     def ble_thread_back(self, content):
         print('piece.home.py {} 公告: '.format(str(sys._getframe().f_lineno)), content)
+        return
         if content['error']:
             self.message_btn.setText('失败,请重试!')
             self.message_btn.setEnabled(True)

@@ -5,11 +5,14 @@ Update: 2019-07-25
 Author: zizle
 """
 import sys
+import json
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QCursor
 
 import config
+from thread.request import RequestThread
+from widgets.base import TableShow
 from piece.base import MenuBar, PageController
 from piece.home import ShowReport, ShowNotice, ShowCommodity, Calendar, ShowFinance
 
@@ -59,14 +62,58 @@ class Finance(QWidget):
 
 
 class Report(QWidget):
+    def __init__(self, category=None, *args, **kwargs):
+        super(Report, self).__init__(*args, **kwargs)
+        self.category=category
+        layout = QVBoxLayout()
+        self.show_message = QLabel('请求中...')
+        self.table = TableShow()
+        layout.addWidget(self.show_message)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+        self.get_reports()
+
+    def get_reports(self, page=1, page_size=20):
+        self.show_message.setText('请求中...')
+        if self.category == 'all':
+            url = config.SERVER_ADDR + 'homepage/report/'
+        else:
+            url = config.SERVER_ADDR + 'homepage/report/?category=' + self.category
+        self.report_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({
+                "machine_code": config.app_dawn.value("machine"),
+                'page': page,
+                'page_size': page_size
+            }),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.report_thread.response_signal.connect(self.report_thread_back)
+        self.report_thread.finished.connect(self.report_thread.deleteLater)
+        self.report_thread.start()
+
+    def report_thread_back(self, signal):
+        if signal['error']:
+            self.show_message.setText('出错.\n{}'.format(signal['error']))
+            return
+        self.show_message.hide()
+        if signal['page_num'] > 1:  # 数据大于1页添加页码控制器
+            self.page_controller = PageController()
+            self.page_controller.set_total_page(signal['page_num'])
+            self.layout().addWidget(self.page_controller, alignment=Qt.AlignCenter)
+        # 展示数据
+
+
+
+
+
+
+class Report1(QWidget):
     def __init__(self, *args, **kwargs):
         super(Report, self).__init__(*args, *kwargs)
         layout = QVBoxLayout(spacing=5)
-        menu_bar = MenuBar()
-        menu_bar.setContentsMargins(0,0,0,0)
-        menu_bar.addMenuButtons(["全部", "日报", "周报", "月报", "年报", "专题", "投资报告", "其他"])
-        menu_bar.addStretch()
-        menu_bar.menu_btn_clicked.connect(self.menu_clicked)
         # report table
         self.show_table = ShowReport()
         # page controller
@@ -74,7 +121,6 @@ class Report(QWidget):
         # signal
         self.page_controller.clicked.connect(self.page_number_changed)
         self.show_table.page_num.connect(self.set_total_page)
-        layout.addWidget(menu_bar)
         layout.addWidget(self.show_table)
         layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
         self.setStyleSheet("""

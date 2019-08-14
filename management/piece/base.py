@@ -9,7 +9,6 @@ import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox, QCheckBox
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer
 from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap
-
 import config
 
 class MenuBar(QWidget):
@@ -38,6 +37,7 @@ class MenuBar(QWidget):
 
     def addStretch(self):
         self.layout().addStretch()
+
 
 class PDFReaderContent(QWidget):
     """显示PDF内容控件"""

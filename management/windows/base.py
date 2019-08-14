@@ -164,8 +164,8 @@ class Base(QWidget):
             tab = RegisterClient()
         elif name_en == 'home_page':
             tab = HomePage()
-        # elif text == '产品服务':
-        #     tab = PService()
+        elif name_en == 'product_service':
+            tab = PService()
         elif name_en == 'maintenance':
             tab = Maintenance()
         else:
