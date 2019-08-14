@@ -4,16 +4,15 @@ public popups in project
 Create: 2019-07-25
 Author: zizle
 """
+import re
 import fitz
 import json
-import hashlib
 import requests
 from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox, QScrollArea, QVBoxLayout, QWidget, QHBoxLayout
 from PyQt5.QtGui import QCursor, QIcon, QImage, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
 
 import config
-from utils import machine
 from piece.base import TitleBar
 
 class Login(QDialog):
@@ -49,7 +48,7 @@ class Login(QDialog):
         # deal with window signal
         self.windowIconChanged.connect(title_bar.setIcon)
         self.windowTitleChanged.connect(title_bar.setTitle)
-        self.setWindowTitle('登录瑞达期货分析决策系统 {}'.format(config.VERSION))
+        self.setWindowTitle('登录')
         self.setWindowIcon(QIcon("media/logo.png"))
         # 按钮处理
         title_bar.buttonMinimum.hide()
@@ -89,7 +88,7 @@ class Login(QDialog):
         self.remember_check.setGeometry(75, 190, 80, 30)
         # 自动登录
         self.auto_login = QCheckBox("自动登录", self)
-        self.auto_login.setGeometry(155, 190, 80, 30)
+        self.auto_login.setGeometry(155, 190, 120, 30)
         self.auto_login.stateChanged.connect(self.auto_login_checked_change)
         # 登录
         login_button = QPushButton("登录", self)
@@ -98,16 +97,31 @@ class Login(QDialog):
         login_button.setCursor(QCursor(Qt.PointingHandCursor))
         login_button.clicked.connect(self.submit_login)
         self.setStyleSheet(style_sheet)
+        # 获取是否记住了用户名和密码
+        self.remember_username()
+
+    def remember_username(self):
+        username = config.app_dawn.value('username')
+        password = config.app_dawn.value('password')
+        if not all([username, password]):
+            return
+        self.account_edit.setText(username)
+        self.password_edit.setText(password)
+        self.remember_check.setChecked(True)
 
     def auto_login_checked_change(self):
         # auto login or not
         if self.auto_login.isChecked():
             self.remember_check.setChecked(True)
 
-
     def forget_psd_clicked(self):
         # forget password button clicked signal slot function
-        QMessageBox.information(self, '忘记密码', '联系管理员修改密码!', QMessageBox.Yes)
+        popup = TipShow()
+        popup.information('忘记密码', '请联系管理员修改密码.')
+        popup.confirm_btn.clicked.connect(popup.close)
+        popup.deleteLater()
+        popup.exec()
+        del popup
 
     def submit_login(self):
         # collect login information
@@ -116,10 +130,20 @@ class Login(QDialog):
         remember = 1 if self.remember_check.isChecked() else 0
         auto_login = 1 if self.auto_login.isChecked() else 0
         if not account or not password:
-            QMessageBox.information(self, '错误', '请输入用户名或密码.', QMessageBox.Yes)
+            popup = TipShow()
+            popup.information('错误', '请输入用户名或密码.')
+            popup.confirm_btn.clicked.connect(popup.close)
+            popup.exec()
+            popup.deleteLater()
+            del popup
             return
         if auto_login and not remember:
-            QMessageBox.information(self, '提示', '自动登录请记住密码.', QMessageBox.Yes)
+            popup = TipShow()
+            popup.information('提示', '自动登录请记住密码.')
+            popup.confirm_btn.clicked.connect(popup.close)
+            popup.exec()
+            popup.deleteLater()
+            del popup
             return
         # login
         try:
@@ -129,22 +153,32 @@ class Login(QDialog):
                 data=json.dumps({
                     "username": account,
                     "password": password,
-                    'machine_code': config.app_dawn.value('machine')
+                    'machine_code': config.app_dawn.value('machine'),
                 }),
                 cookies=config.app_dawn.value('cookies')
             )
         except Exception as error:
-            QMessageBox.warning(self, "错误", '登录错误!\n请检查网络设置.{}'.format(error), QMessageBox.Yes)
+            popup = TipShow()
+            popup.information('错误', str(error))
+            popup.confirm_btn.clicked.connect(popup.close)
+            popup.deleteLater()
+            popup.exec()
+            del popup
             return
         response_data = json.loads(response.content.decode('utf-8'))
         if response.status_code != 200:
-            QMessageBox.warning(self, "错误", response_data['message'], QMessageBox.Yes)
+            popup = TipShow()
+            popup.information('错误', response_data['message'])
+            popup.confirm_btn.clicked.connect(popup.close)
+            popup.deleteLater()
+            popup.exec()
+            del popup
             return
         # login successfully
         user_data = response_data['data']
         config.app_dawn.setValue('cookies', response.cookies)  # save cookies
         config.app_dawn.setValue('auto_login', auto_login)  # save auto login option
-        config.app_dawn.setValue('capsules', user_data['capsules'])
+        config.app_dawn.setValue('access_main_module', user_data['access_main_module'])
         if remember:
             config.app_dawn.setValue('username', user_data['username'])
             config.app_dawn.setValue('password', password)
@@ -159,8 +193,9 @@ class Login(QDialog):
         # close self and to register dialog widget
         self.close()
         popup = Register()
-        if not popup.exec():
-            del popup
+        popup.deleteLater()
+        popup.exec()
+        del popup
 
 
 class Register(QDialog):
@@ -169,9 +204,6 @@ class Register(QDialog):
 
     def __init__(self):
         super(Register, self).__init__()
-        self.__init_ui()
-
-    def __init_ui(self):
         self.resize(490, 400)
         # 设置无边框
         self.setWindowFlags(Qt.FramelessWindowHint)
@@ -188,12 +220,6 @@ class Register(QDialog):
         title_bar.windowMoved.connect(self.move)
         self.windowIconChanged.connect(title_bar.setIcon)
         self.setWindowIcon(QIcon("media/logo.png"))
-        # 获取机器码
-        get_machine = QLabel('机器码：', self)
-        self.machine_code = QLineEdit(self)
-        get_machine.setGeometry(88, 45, 60, 35)
-        self.machine_code.setGeometry(145, 50, 220, 25)
-        self.machine_code.setEnabled(False)
         # 手机号
         account_label = QLabel("手机：", self)
         account_label.setGeometry(75, 100, 60, 36)
@@ -242,7 +268,7 @@ class Register(QDialog):
         self.register_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.register_button.setStyleSheet("color:#FFFFFF;font-size:15px;background-color:rgb(30,50,190);")
         self.register_button.setGeometry(145, 330, 220, 35)
-        # self.register_button.clicked.connect(lambda: self.button_clicked("register"))
+        self.register_button.clicked.connect(self.register_account)
         # 已有账号
         has_account = QLabel("已有账号?", self)
         has_account.setStyleSheet("font-size:11px;")
@@ -254,24 +280,6 @@ class Register(QDialog):
         self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.login_button.clicked.connect(self.to_login)
         self.setStyleSheet("RegisterDialog {border:1px solid rgb(54, 157, 180)}")
-        conf_machine = config.app_dawn.value("machine")
-        # 没有机器码再获取
-        if conf_machine is None:
-            self.get_machine_code()
-        else:
-            self.machine_code.setText(conf_machine)
-
-    def get_machine_code(self):
-        """获取机器码"""
-        md = hashlib.md5()
-        main_board = machine.main_board()
-        disk = machine.disk()
-        md.update(main_board.encode('utf-8'))
-        md.update(disk.encode('utf-8'))
-        machine_code = md.hexdigest()
-        # 在配置里保存
-        config.app_dawn.setValue("machine", machine_code)
-        self.machine_code.setText(machine_code)
 
     def agreement_state_changed(self):
         """同意协议状态发生改变"""
@@ -286,8 +294,67 @@ class Register(QDialog):
         # close self and to show login dialog widget
         self.close()
         popup = Login()
-        if not popup.exec():
+        popup.deleteLater()
+        popup.exec()
+        del popup
+
+    def register_account(self):
+        # 上传信息,注册账号
+        phone = self.account_edit.text().strip(' ')
+        nick_name = self.nick_edit.text().strip(' ')
+        password = self.password_edit.text().strip(' ')
+        confirm_psd = self.confirm_edit.text().strip(' ')
+        if password != confirm_psd:
+            popup = TipShow()
+            popup.information('错误', '两次密码输入不一致.')
+            popup.deleteLater()
+            popup.exec()
             del popup
+            return
+        # 验证手机号
+        if not re.match(r'^[1]([3-9])[0-9]{9}$', phone):
+            popup = TipShow()
+            popup.information('错误', '请输入正确的手机号.')
+            popup.deleteLater()
+            popup.exec()
+            del popup
+            return
+        # 注册
+        try:
+            response = requests.post(
+                url=config.SERVER_ADDR + 'user/register/',
+                data=json.dumps({
+                    'phone':phone,
+                    'nick_name': nick_name,
+                    'password': password,
+                    'machine_code': config.app_dawn.value('machine'),
+                    'is_admin': True
+                })
+            )
+            response_data = json.loads(response.content.decode('utf-8'))
+        except Exception as error:
+            popup = TipShow()
+            popup.information('错误', '注册失败.\n{}'.format(error))
+            popup.confirm_btn.clicked.connect(popup.close)
+            popup.deleteLater()
+            popup.exec()
+            del popup
+            return
+        if response.status_code != 201:
+            popup = TipShow()
+            popup.information('错误', response_data['message'])
+            popup.confirm_btn.clicked.connect(popup.close)
+            popup.deleteLater()
+            popup.exec()
+            del popup
+            return
+        popup = TipShow()
+        popup.information('成功', '恭喜!注册成功.返回登录.')
+        popup.confirm_btn.clicked.connect(popup.close)
+        popup.deleteLater()
+        popup.exec()
+        del popup
+        self.to_login()
 
 
 class PDFReader(QDialog):
@@ -341,6 +408,7 @@ class PDFReader(QDialog):
             page_label.setPixmap(page_map)
             page_label.setScaledContents(True)  # pixmap resize with label
             self.page_container.layout().addWidget(page_label)
+
 
 class TipShow(QDialog):
     def __init__(self, *args, **kwargs):

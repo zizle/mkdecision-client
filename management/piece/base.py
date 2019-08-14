@@ -5,10 +5,12 @@ Update: 2019-07-26
 Author: zizle
 """
 import fitz
+import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox, QCheckBox
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer
 from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap
 
+import config
 
 class MenuBar(QWidget):
     menu_btn_clicked = pyqtSignal(QPushButton)
@@ -211,7 +213,7 @@ class PermitBar(QWidget):
             QPushButton:hover {
             color: rgb(54,220,180);
         }
-            QLabel {
+        QLabel {
             background-color: rgb(85,88,91);
             height:18px;
             color: rgb(210, 200, 205)
@@ -262,6 +264,29 @@ class PermitBar(QWidget):
         layout.addWidget(self.login_message)
         layout.addWidget(self.exit_button)
         self.setLayout(layout)
+        # 自动登录
+        self.auto_login()
+
+    def auto_login(self):
+        # 获取用户名获取密码
+        username = config.app_dawn.value('username')
+        password = config.app_dawn.value('password')
+        auto_login = int(config.app_dawn.value('auto_login'))
+        if not all([username, password]):
+            return
+        # 登录
+        if not auto_login:
+            return
+        from popup.base import Login  # import when required because import with file top will make a circle import
+        popup = Login()
+        popup.successful_login.connect(self.has_login)
+        popup.account_edit.setText(username)
+        popup.password_edit.setText(password)
+        popup.remember_check.setChecked(True)
+        popup.auto_login.setChecked(True)
+        popup.submit_login()
+        popup.close()
+        del popup
 
     def dynamic_user_info(self):
         # show username dynamic
@@ -273,39 +298,54 @@ class PermitBar(QWidget):
             self.timer_finished_count += 1
 
     def login_button_clicked(self):
-        # dialog for user login
+        # dialog for user login]
         from popup.base import Login  # import when required because import with file top will make a circle import
-        def has_login(text):
-            self.username = text
-            self.timer_finished_count = 0
-            self.login_button.hide()
-            self.register_button.hide()
-            self.exit_button.show()
-            self.login_message.setText(self.username)
-            self.timer = QTimer()  # timer would be bind to self
-            self.timer.start(500)
-            self.timer.timeout.connect(self.dynamic_user_info)
-            # self.login_message.setText(message)
-            # self.message = self.login_message.text()
-            # # 动态展示登录信息
-            # self.finish_count = 0
-            # self.timer = QTimer()
-            # self.timer.start(500)
-            # self.timer.timeout.connect(self._time_record)
-
         popup = Login()
-        popup.successful_login.connect(has_login)
-        if not popup.exec():
-            del popup
+        popup.successful_login.connect(self.has_login)
+        popup.deleteLater()
+        popup.exec()
+        del popup
+
+    def has_login(self, text):
+        self.username = text
+        self.timer_finished_count = 0
+        self.login_button.hide()
+        self.register_button.hide()
+        self.exit_button.show()
+        self.login_message.setText(self.username)
+        self.login_message.show()
+        self.timer = QTimer()  # timer would be bind to self
+        self.timer.start(500)
+        self.timer.timeout.connect(self.dynamic_user_info)
 
     def register_button_clicked(self):
         from popup.base import Register
         popup = Register()
-        if not popup.exec():
-            del popup
+        popup.deleteLater()
+        popup.exec()
+        del popup
 
     def exit_button_clicked(self):
-        pass
+        # 注销
+        try:
+            response = requests.post(
+                url=config.SERVER_ADDR + "user/passport/?option=logout",
+                headers=config.CLIENT_HEADERS,
+                cookies=config.app_dawn.value('cookies')
+            )
+        except Exception:
+            pass
+        # 移除cookie
+        config.app_dawn.remove('cookies')
+        config.app_dawn.remove('access_main_module')
+        # 不能再自动登录
+        config.app_dawn.setValue('auto_login', 0)
+        self.login_button.show()
+        self.register_button.show()
+        self.exit_button.hide()
+        self.login_message.setText("")
+        self.login_message.hide()
+        self.timer.stop()
 
 
 class TableCheckBox(QWidget):

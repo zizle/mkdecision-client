@@ -125,6 +125,7 @@ class Maintenance(QWidget):
             menu.setText(0, module['name'])
             # menu.setTextAlignment(0, Qt.AlignCenter)
             menu.id = module['id']
+            menu.name_en = module['name_en']
             sub_menus = module['subs']
             # 添加子节点
             for sub_module in sub_menus:

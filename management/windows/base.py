@@ -114,6 +114,21 @@ class Base(QWidget):
         # get menus in server
         self.get_menus()
 
+    def close(self):
+        # 注销
+        try:
+            response = requests.post(
+                url=config.SERVER_ADDR + "user/passport/?option=logout",
+                headers=config.CLIENT_HEADERS,
+                cookies=config.app_dawn.value('cookies')
+            )
+        except Exception:
+            pass
+        # 移除cookie和权限
+        config.app_dawn.remove('cookies')
+        config.app_dawn.remove('access_main_module')
+        super().close()
+
     def eventFilter(self, obj, event):
         """事件过滤器,用于解决鼠标进入其它控件后还原为标准鼠标样式"""
         if isinstance(event, QEnterEvent):
@@ -126,7 +141,7 @@ class Base(QWidget):
             response = requests.get(
                 url=config.SERVER_ADDR + "basic/module/",
                 headers=config.CLIENT_HEADERS,
-                data=json.dumps({"machine_code": config.app_dawn.value('machine'), 'is_admin': True})
+                data=json.dumps({"machine_code": config.app_dawn.value('machine')})
             )
         except Exception as e:
             QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
@@ -135,7 +150,6 @@ class Base(QWidget):
         if response.status_code != 200:
             QMessageBox.information(self, "获取数据错误", response_content['message'], QMessageBox.Yes)
             sys.exit()
-        print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), "获取主菜单:", response_content)
         for item in response_content["data"]:
             menu_btn = QPushButton(item['name'])
             menu_btn.unum = item['id']
@@ -144,7 +158,6 @@ class Base(QWidget):
         self.menu_bar.addStretch()
 
     def menu_clicked(self, menu):
-        print('windows.base.py {} : '.format(str(sys._getframe().f_lineno)), menu.name_en, menu.text())
         name_en = menu.name_en
         name = menu.text()
         if name_en == 'machine_code':
@@ -153,8 +166,8 @@ class Base(QWidget):
             tab = HomePage()
         # elif text == '产品服务':
         #     tab = PService()
-        # elif text == '数据维护':
-        #     tab = Maintenance()
+        elif name_en == 'maintenance':
+            tab = Maintenance()
         else:
             tab = NoDataWindow(name=name)
         self.tab.clear()

@@ -3,6 +3,7 @@
 Update: 2019-07-25
 Author: zizle
 """
+import sys
 import json
 import hashlib
 import requests

@@ -785,11 +785,12 @@ class ShowBulletin(QTableWidget):
         self.message_btn.show()
         self.message_btn.setEnabled(False)
         headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
+        print('不同之处3：piece.home.py {} 需修改【客户端】与【管理端】不同的请求参数！！！'.format(sys._getframe().f_lineno))
         self.ble_thread = RequestThread(
             url=config.SERVER_ADDR + "homepage/bulletin/",
             method='get',
             headers=headers,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            data=json.dumps({"machine_code": config.app_dawn.value("machine"), 'is_admin': True}),
             cookies=config.app_dawn.value('cookies')
         )
         self.ble_thread.response_signal.connect(self.ble_thread_back)

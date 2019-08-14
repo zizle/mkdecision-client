@@ -145,7 +145,7 @@ class BulletinInfo(QWidget):
             url=config.SERVER_ADDR + 'homepage/bulletin/',
             method='get',
             headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value('machine'), "maintain": True}),
+            data=json.dumps({"machine_code": config.app_dawn.value('machine'), "maintain": True, 'is_admin': True}),
             cookies=config.app_dawn.value('cookies'),
         )
         self.bulletin_thread.finished.connect(self.bulletin_thread.deleteLater)
