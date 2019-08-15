@@ -53,6 +53,8 @@ class HomePage(QScrollArea):
         print('windows.home.py {} 左菜单点击 :'.format(str(sys._getframe().f_lineno)), menu.parent_en, menu.name_en)
         if parent_en == 'routine_report':
             tab = Report(category=name_en)
+        elif parent_en == 'transact_notice':
+            tab = Notice(category=name_en)
         else:
             tab = NoDataWindow(name=parent + '·' + menu.text())
 

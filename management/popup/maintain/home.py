@@ -528,15 +528,15 @@ class CreateNewNotice(QDialog):
     def submit_notice(self):
         type_dict = {
             "公司": "company",
-            "交易所": "change",
+            "交易所": "changelib",
             "系统": "system",
             "其他":"others"
         }
         # collect data
-        name = self.name_edit.text().strip(' ')
+        title = self.name_edit.text().strip(' ')
         type_text = self.type_combo.currentText()
         file_path = self.file_edit.text()
-        if not name:
+        if not title:
             QMessageBox.warning(self, "错误", "请起一个名字!", QMessageBox.Yes)
             return
         if not type_text:
@@ -546,7 +546,7 @@ class CreateNewNotice(QDialog):
             QMessageBox.warning(self, "错误", "请选择报告文件!", QMessageBox.Yes)
             return
         self.new_data_signal.emit({
-            'name': name,
+            'title': title,
             'type_zh': type_text,
             'type_en': type_dict.get(type_text, None),
             'file_path': file_path

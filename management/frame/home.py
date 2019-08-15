@@ -61,6 +61,69 @@ class Finance(QWidget):
         self.show_table.get_finance(url=config.SERVER_ADDR + 'homepage/finance/?date=' + str(date.toPyDate()))
 
 
+class Notice(QWidget):
+    def __init__(self, category='all', *args, **kwargs):
+        super(Notice, self).__init__(*args, *kwargs)
+        self.category = category
+        layout = QVBoxLayout()
+        # widgets
+        self.show_message = QLabel('请求中...')
+        self.table = TableShow()
+        self.page_controller = PageController()
+        # signal
+        self.page_controller.clicked.connect(self.page_number_changed)
+        # add layout
+        layout.addWidget(self.show_message)
+        layout.addWidget(self.table)
+        layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
+        # style
+        self.page_controller.hide()
+        self.setLayout(layout)
+        # initial data
+        self.notice_thread = None
+        self.get_notices()
+
+    def get_notices(self, page=1, page_size=1):
+        self.show_message.setText('请求中...')
+        if self.category == 'all':
+            url = config.SERVER_ADDR + 'homepage/notice/'
+        else:
+            url = config.SERVER_ADDR + 'homepage/notice/?category=' + self.category
+        print('frame.home.py {} 请求通知：'.format(sys._getframe().f_lineno), url)
+        if self.notice_thread:
+            del self.notice_thread
+        self.notice_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({
+                "machine_code": config.app_dawn.value("machine"),
+                'page': page,
+                'page_size': page_size
+            }),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.notice_thread.response_signal.connect(self.notice_thread_back)
+        self.notice_thread.finished.connect(self.notice_thread.deleteLater)
+        self.notice_thread.start()
+
+    def notice_thread_back(self, signal):
+        print('frame.home.py {} 通知数据：'.format(sys._getframe().f_lineno), signal)
+        if signal['error']:
+            self.show_message.setText('出错.\n{}'.format(signal['message']))
+            return
+        self.show_message.hide()
+        if signal['page_num'] > 1:  # 数据大于1页设置页码控制器
+            self.page_controller.set_total_page(signal['page_num'])
+            self.page_controller.show()
+        # 展示数据
+        header_couple = [('serial_num', '序号'), ('title','标题'), ('type_zh', '类型'), ('create_time', '上传时间'), ('to_look', '')]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
+
+    def page_number_changed(self, page):
+        self.get_notices(page=page)
+
+
 class Report(QWidget):
     def __init__(self, category='all', *args, **kwargs):
         super(Report, self).__init__(*args, **kwargs)
@@ -110,7 +173,7 @@ class Report(QWidget):
     def report_thread_back(self, signal):
         print('frame.home.py {} 报告数据：'.format(sys._getframe().f_lineno), signal)
         if signal['error']:
-            self.show_message.setText('出错.\n{}'.format(signal['error']))
+            self.show_message.setText('出错.{}'.format(signal['message']))
             return
         self.show_message.hide()
         if signal['page_num'] > 1:  # 数据大于1页设置页码控制器
@@ -122,52 +185,3 @@ class Report(QWidget):
 
     def page_number_changed(self, page):
         self.get_reports(page=page)
-
-
-class Notice(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(Notice, self).__init__(*args, *kwargs)
-        layout = QVBoxLayout(spacing=5)
-        menu_bar = MenuBar()
-        menu_bar.setContentsMargins(0, 0, 0, 0)
-        menu_bar.addMenuButtons(["全部", "交易所", "公司", "系统", "其他"])
-        menu_bar.addStretch()
-        menu_bar.menu_btn_clicked.connect(self.menu_clicked)
-        # report table
-        self.show_table = ShowNotice()
-        # page controller
-        self.page_controller = PageController()
-        # signal
-        self.page_controller.clicked.connect(self.page_number_changed)
-        self.show_table.page_num.connect(self.set_total_page)
-        layout.addWidget(menu_bar)
-        layout.addWidget(self.show_table)
-        layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
-        self.setStyleSheet("""
-        MenuBar {
-            background-color:rgb(255,255,255);
-        }
-        """)
-        self.setLayout(layout)
-        self.show_table.get_notice(url=config.SERVER_ADDR + 'homepage/notice/')  # query param type=None
-
-    def menu_clicked(self, menu):
-        print('frame.home.py {} 点击类别:'.format(str(sys._getframe().f_lineno)), menu.text())
-        type_dict = {
-            "公司": "company",
-            "交易所": "change",
-            "系统": "system",
-            "其他": "others"
-        }
-        type_en = type_dict.get(menu.text())
-        url = config.SERVER_ADDR + 'homepage/notice/'
-        if type_en:
-            url += '?category=' + type_en
-        self.show_table.get_notice(url=url)
-
-    def page_number_changed(self, page):
-        self.show_table.get_notice(url=config.SERVER_ADDR + 'homepage/notice/', page=page)  # query param type=None
-
-    def set_total_page(self, pages_num):
-        print('frame.home.py {} 总页码信号:'.format(sys._getframe().f_lineno), pages_num)
-        self.page_controller.set_total_page(pages_num)
