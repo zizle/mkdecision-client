@@ -20,26 +20,25 @@ class HomePage(QScrollArea):
         self.home = QWidget()
         self.setWidgetResizable(True)  # resize to windows size
         self.setWidget(self.home)
-        layout = QVBoxLayout()
-        ble_crl_layout = QHBoxLayout() # bulletin and carousel layout
-        lmn_frame_layout = QHBoxLayout()  # left list menu and middle frame window layout
+        layout = QGridLayout()
+        # widgets
         show_bulletin = HomeBulletin()  # bulletin table
-        show_bulletin.setMaximumWidth(330)
+        show_bulletin.setFixedWidth(330)
+        show_bulletin.setFixedHeight(350)
         caro_show = Carousel()  # advertisement carousel widget
-        # add bulletin widget and advertisement widget to layout
-        ble_crl_layout.addWidget(show_bulletin)
-        ble_crl_layout.addWidget(caro_show)
+        caro_show.setFixedHeight(350)
         self.left_menu = MenuScrollContainer(column=4)  # left list menu
         self.show_tab = QTabWidget()  # middle frame window container (use QTabWidget)
         self.show_tab.setTabBarAutoHide(True)
         # signal
         self.left_menu.menu_clicked.connect(self.tree_menu_clicked)
-        # add left tree menu widget and frame window container to layout
-        lmn_frame_layout.addWidget(self.left_menu)
-        lmn_frame_layout.addWidget(self.show_tab)
-        # add child layout to main layout
-        layout.addLayout(ble_crl_layout)
-        layout.addLayout(lmn_frame_layout)
+        # style
+        layout.setContentsMargins(0,0,0,0)
+        # add to layout
+        layout.addWidget(show_bulletin, 0, 0)
+        layout.addWidget(caro_show, 0, 1)
+        layout.addWidget(self.left_menu, 1, 0)
+        layout.addWidget(self.show_tab, 1, 1)
         self.home.setLayout(layout)  # add layout to home widget
         # request menu
         self.left_menu.get_menu(url=config.SERVER_ADDR + 'homepage/module/')
