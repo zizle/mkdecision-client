@@ -14,7 +14,8 @@ import config
 from thread.request import RequestThread
 from widgets.base import TableShow
 from piece.base import MenuBar, PageController
-from piece.home import ShowReport, ShowNotice, ShowCommodity, Calendar, ShowFinance
+from piece.home import ShowCommodity, Calendar, ShowFinance
+from popup.base import ShowServerPDF
 
 class Commodity(QWidget):
     def __init__(self, *args, **kwargs):
@@ -72,6 +73,7 @@ class Notice(QWidget):
         self.page_controller = PageController()
         # signal
         self.page_controller.clicked.connect(self.page_number_changed)
+        self.table.cellClicked.connect(self.show_notice_detail)
         # add layout
         layout.addWidget(self.show_message)
         layout.addWidget(self.table)
@@ -83,7 +85,7 @@ class Notice(QWidget):
         self.notice_thread = None
         self.get_notices()
 
-    def get_notices(self, page=1, page_size=1):
+    def get_notices(self, page=1, page_size=20):
         self.show_message.setText('请求中...')
         if self.category == 'all':
             url = config.SERVER_ADDR + 'homepage/notice/'
@@ -123,6 +125,15 @@ class Notice(QWidget):
     def page_number_changed(self, page):
         self.get_notices(page=page)
 
+    def show_notice_detail(self, row, col):
+        if col == 4:
+            item = self.table.item(row, col)
+            name_item = self.table.item(row, 1)
+            popup = ShowServerPDF(file_url= config.SERVER_ADDR + item.file, file_name=name_item.text())
+            popup.deleteLater()
+            popup.exec()
+            del popup
+
 
 class Report(QWidget):
     def __init__(self, category='all', *args, **kwargs):
@@ -135,6 +146,7 @@ class Report(QWidget):
         self.page_controller = PageController()
         # signal
         self.page_controller.clicked.connect(self.page_number_changed)
+        self.table.cellClicked.connect(self.show_report_detail)
         # add layout
         layout.addWidget(self.show_message)
         layout.addWidget(self.table)
@@ -185,3 +197,12 @@ class Report(QWidget):
 
     def page_number_changed(self, page):
         self.get_reports(page=page)
+
+    def show_report_detail(self, row, col):
+        if col == 4:
+            item = self.table.item(row, col)
+            name_item = self.table.item(row, 1)
+            popup = ShowServerPDF(file_url= config.SERVER_ADDR + item.file, file_name=name_item.text())
+            popup.deleteLater()
+            popup.exec()
+            del popup

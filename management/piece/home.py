@@ -6,7 +6,6 @@ Author: zizle
 """
 import sys
 import json
-# import fitz
 import requests
 import webbrowser
 from fitz.fitz import Document
@@ -16,8 +15,10 @@ from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QDate, QRect
 
 import config
 from thread.request import RequestThread
+from popup.base import ShowServerPDF, ShowHtmlContent
 from popup.home import PDFReader, ContentReader
 from widgets.base import LeaderLabel, MenuWidget, MenuButton
+from widgets.home import BulletinTable
 
 class Calendar(QWidget):
     click_date = pyqtSignal(QDate)
@@ -628,149 +629,32 @@ class MenuListWidget(QScrollArea):
         self.menu_clicked.emit(button)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class MenuTree(QTreeWidget):
+class HomeBulletin(QWidget):
     def __init__(self, *args, **kwargs):
-        super(MenuTree, self).__init__(*args, **kwargs)
-        # menu tree style
-        self.setMaximumWidth(300)
-        self.setExpandsOnDoubleClick(False)
-        self.setRootIsDecorated(False)  # remove root icon
-        self.setHeaderHidden(True)
-        self.get_menus()
-
-    def get_menus(self):
-        self.menu_thread = RequestThread(
-            url=config.SERVER_ADDR + 'homepage/module/',
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.menu_thread.response_signal.connect(self.menu_thread_back)
-        self.menu_thread.finished.connect(self.menu_thread.deleteLater)
-        self.menu_thread.start()
-
-    def menu_thread_back(self, content):
-        print('piece.home.py {} 主页左菜单：'.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            return
-        # fill tree menu
-        for menu in content['data']:
-            menu_item = QTreeWidgetItem(self)
-            menu_item.setText(0, menu['name'])
-            # menu.setTextAlignment(0, Qt.AlignCenter)
-            menu_item.id = menu['id']
-
-
-class ShowBulletin(QTableWidget):
-    def __init__(self, *args):
-        super(ShowBulletin, self).__init__(*args)
-        # button to show request message and fail retry
-        self.message_btn = QPushButton('刷新中...', self)
-        self.message_btn.resize(100, 20)
-        self.message_btn.move(100, 50)
-        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
-        self.message_btn.clicked.connect(self.get_bulletin)
-        self.message_btn.hide()
-        # table style
-        self.setFixedSize(300,350)
-        self.setMouseTracking(True)
-        self.setShowGrid(False)  # no grid
-        self.setFocusPolicy(0)  # No empty box appears in the selection
-        self.setSelectionMode(QAbstractItemView.NoSelection)  # hold the style(exp:font color)
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)  # no edit
-        self.horizontalHeader().setVisible(False)
-        self.verticalHeader().setVisible(False)
-        self.setStyleSheet("""
-        QTableWidget{
-            background-color:rgb(255,255,255);
-            border: 1px solid rgb(220,220,220);
-        }
-        QTableWidget::item{
-            border-bottom: 1px solid rgb(200,200,200);
-            cursor:hand;
-        }
-        QScrollBar:vertical
-        {
-            width:8px;
-            background:rgba(0,0,0,0%);
-            margin:0px,0px,0px,0px;
-            /*留出8px给上面和下面的箭头*/
-            padding-top:8px;
-            padding-bottom:8px;
-        }
-        QScrollBar::handle:vertical
-        {
-            width:8px;
-            background:rgba(0,0,0,8%);
-            /*滚动条两端变成椭圆*/
-            border-radius:4px;
-
-        }
-        QScrollBar::handle:vertical:hover
-        {
-            width:8px;
-            /*鼠标放到滚动条上的时候，颜色变深*/
-            background:rgba(0,0,0,40%);
-            border-radius:4px;
-            min-height:20;
-        }
-        QScrollBar::add-line:vertical
-        {
-            height:9px;width:8px;
-            /*设置下箭头*/
-            border-image:url(media/scroll/3.png);
-            subcontrol-position:bottom;
-        }
-        QScrollBar::sub-line:vertical 
-        {
-            height:9px;width:8px;
-            /*设置上箭头*/
-            border-image:url(media/scroll/1.png);
-            subcontrol-position:top;
-        }
-        QScrollBar::add-line:vertical:hover
-        /*当鼠标放到下箭头上的时候*/
-        {
-            height:9px;width:8px;
-            border-image:url(media/scroll/4.png);
-            subcontrol-position:bottom;
-        }
-        QScrollBar::sub-line:vertical:hover
-        /*当鼠标放到下箭头上的时候*/
-        {
-            height:9px;
-            width:8px;
-            border-image:url(media/scroll/2.png);
-            subcontrol-position:top;
-        }
-        """)
-        self.cellClicked.connect(self.cell_clicked)
-        # self.get_bulletin()  # threading
+        super(HomeBulletin, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        # widgets
+        self.loading_message = QLabel('正在获取公告数据...')
+        self.table = BulletinTable()
+        # signal
+        self.table.cellClicked.connect(self.show_bulletin_detail)
+        # style
+        layout.setContentsMargins(0,0,0,0)
+        # add layout
+        layout.addWidget(self.loading_message)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+        # initial data
+        self.ble_thread = None
+        self.get_bulletin()
 
     def get_bulletin(self):
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
+        if self.ble_thread:
+            del self.ble_thread
         self.ble_thread = RequestThread(
             url=config.SERVER_ADDR + "homepage/bulletin/",
             method='get',
-            headers=headers,
+            headers=config.CLIENT_HEADERS,
             data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
             cookies=config.app_dawn.value('cookies')
         )
@@ -778,86 +662,30 @@ class ShowBulletin(QTableWidget):
         self.ble_thread.finished.connect(self.ble_thread.deleteLater)
         self.ble_thread.start()
 
-    def ble_thread_back(self, content):
-        print('piece.home.py {} 公告: '.format(str(sys._getframe().f_lineno)), content)
-        return
-        if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
-        # fill table
-        keys = ["name", "file", "create_time"]
-        bulletins = content['data']
-        self.setRowCount(len(bulletins))
-        self.setColumnCount(len(keys))
-        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
-        self.horizontalHeader().setSectionResizeMode(1, 3)  # 第1列随文字宽度
-        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # 第1列随文字宽度
-        for row in range(self.rowCount()):
-            for col in range(self.columnCount()):
-                if col == 1:
-                    item = QTableWidgetItem("查看")
-                    item.file = bulletins[row]["file"]
-                    item.content = bulletins[row]["content"]
-                else:
-                    item = QTableWidgetItem(str(bulletins[row][keys[col]]))
-                    font = QFont()
-                    if col == self.columnCount() - 1:
-                        size = 8
-                        item.setFont(QFont(font))
-                    else:
-                        size = 10
-                    font.setPointSize(size)
-                    item.setFont(QFont(font))
-                self.setItem(row, col, item)
+    def ble_thread_back(self, signal):
+        print('piece.home.py {} 公告: '.format(str(sys._getframe().f_lineno)), signal)
+        if signal['error']:
+            self.loading_message.setText(signal['message'])
+            return
+        self.loading_message.hide()
+        # 展示数据
+        header_couple = [('title', '标题'), ('to_look', ''), ('create_time', '上传时间')]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
 
-    def cell_clicked(self, row, col):
-        print('piece.home.py {} 点击公告:'.format(str(sys._getframe().f_lineno)), row, col)
+    def show_bulletin_detail(self, row, col):
         if col == 1:
-            item = self.item(row, col)
-            name_item = self.item(row, 0)
+            item = self.table.item(row, col)
+            name_item = self.table.item(row, 0)
             if item.file:
-                try:
-                    response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
-                    doc = Document(filename=name_item.text(), stream=response.content)
-                    popup = PDFReader(doc=doc, title=name_item.text())
-                except Exception as error:
-                    QMessageBox.information(self, "错误", '查看公告失败.\n{}'.format(error), QMessageBox.Yes)
-                    return
-            elif item.content:
-                popup = ContentReader(content=item.content, title=name_item.text())
-            else:
-                return
-            if not popup.exec():
+                popup = ShowServerPDF(file_url= config.SERVER_ADDR + item.file, file_name=name_item.text())
+                popup.deleteLater()
+                popup.exec()
                 del popup
-
-    def leaveEvent(self, *args, **kwargs):
-        """鼠标离开控件"""
-        for row in range(self.rowCount()):
-            for col in range(self.columnCount()):
-                self.item(row, col).setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
-
-    def mouseMoveEvent(self, event):
-        """鼠标移动事件"""
-        # 获取当前这个item
-        current_item = self.itemAt(event.pos())
-        if current_item:
-            row = current_item.row()
-            for item in [self.item(row, col) for col in range(self.columnCount())]:
-                # item.setBackground(QBrush(QColor(200, 200, 200)))  # 改变了当前的item背景色
-                item.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
-            for other_row in range(self.rowCount()):
-                if other_row == row:
-                    continue
-                for other_item in [self.item(other_row, col) for col in range(self.columnCount())]:
-                    # other_item.setBackground(QBrush(QColor(240, 240, 240)))  # 改变了其他的item背景色
-                    other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+            elif item.content:
+                popup = ShowHtmlContent(content=item.content, title=name_item.text())
+                popup.deleteLater()
+                popup.exec()
+                del popup
 
 
 class ShowCommodity(QTableWidget):
@@ -1003,206 +831,3 @@ class ShowFinance(QTableWidget):
         self.finance_thread.response_signal.connect(self.finance_thread_back)
         self.finance_thread.finished.connect(self.finance_thread.deleteLater)
         self.finance_thread.start()
-
-
-class ShowNotice(QTableWidget):
-    page_num = pyqtSignal(int)
-
-    def __init__(self, *args):
-        super(ShowNotice, self).__init__(*args)
-        # button to show request message and fail retry
-        self.message_btn = QPushButton('刷新中...', self)
-        self.message_btn.resize(100, 20)
-        self.message_btn.move(100, 50)
-        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
-        self.verticalHeader().setVisible(False)
-        self.cellClicked.connect(self.cell_clicked)
-        # get notice 获取数据在其父窗口调用,传入url,方便按钮点击的逻辑
-
-    def cell_clicked(self, row, col):
-        print('piece.home.py {} 点击通知:'.format(str(sys._getframe().f_lineno)), row, col)
-        if col == 4:
-            item = self.item(row, col)
-            try:
-                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
-                doc = Document(filename=item.name, stream=response.content)
-                popup = PDFReader(doc=doc, title=item.name)
-            except Exception as error:
-                QMessageBox.information(self, "错误", '查看公告失败.\n{}'.format(error), QMessageBox.Yes)
-                return
-            if not popup.exec():
-                del popup
-
-    def get_notice(self, url, page=1, page_size=config.HOMEPAGE_NOTICE_PAGESIZE):
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        self.clear()
-        self.setRowCount(0)
-        self.horizontalHeader().setVisible(False)
-        self.setMinimumHeight(300)
-        headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
-        self.notice_thread = RequestThread(
-            url=url,
-            method='get',
-            headers=headers,
-            data=json.dumps({
-                "machine_code": config.app_dawn.value("machine"),
-                'page': page,
-                'page_size': page_size
-            }),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.notice_thread.response_signal.connect(self.notice_thread_back)
-        self.notice_thread.finished.connect(self.notice_thread.deleteLater)
-        self.notice_thread.start()
-
-    def notice_thread_back(self, content):
-        print('piece.home.py {} 交易通知: '.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-            return
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
-        # set total page
-        self.page_num.emit(content['page_num'])
-        # fill table
-        self.horizontalHeader().setVisible(True)
-        keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '创建时间')]
-        notices = content['data']
-        row = len(notices)
-        self.setRowCount(row)
-        self.setColumnCount(len(keys) + 1)  # 列数
-        labels = []
-        set_keys = []
-        for key_label in keys:
-            set_keys.append(key_label[0])
-            labels.append(key_label[1])
-        labels.append(' ')
-        self.setHorizontalHeaderLabels(labels)
-        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
-        self.verticalHeader().setSectionResizeMode(1)
-        self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
-        self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, QHeaderView.ResizeToContents)  # 第2列随文字宽度
-        for row in range(self.rowCount()):
-            for col in range(self.columnCount()):
-                if col == 0:
-                    item = QTableWidgetItem(str(row+1))
-                elif col == self.columnCount() - 1:
-                    item = QTableWidgetItem('查看')
-                    item.name = notices[row]['name']
-                    item.file = notices[row]['file']
-                else:
-                    item = QTableWidgetItem(str(notices[row][set_keys[col]]))
-                item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, item)
-        self.setMinimumHeight(30 + self.rowCount() * 25)
-
-
-class ShowReport(QTableWidget):
-    page_num = pyqtSignal(int)
-
-    def __init__(self, *args):
-        super(ShowReport, self).__init__(*args)
-        # button to show request message and fail retry
-        self.message_btn = QPushButton('刷新中...', self)
-        self.message_btn.resize(100, 20)
-        self.message_btn.move(100, 50)
-        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
-        self.message_btn.clicked.connect(self.get_report)
-        self.verticalHeader().setVisible(False)
-        self.cellClicked.connect(self.cell_clicked)
-        # get report 获取数据在其父窗口调用,传入url,方便按钮点击的逻辑
-
-    def cell_clicked(self, row, col):
-        print('piece.home.py {} 点击报告:'.format(str(sys._getframe().f_lineno)), row, col)
-        if col == 4:
-            item = self.item(row, col)
-            try:
-                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
-                doc = Document(filename=item.name, stream=response.content)
-                popup = PDFReader(doc=doc, title=item.name)
-            except Exception as error:
-                QMessageBox.information(self, "错误", '查看公告失败.\n{}'.format(error), QMessageBox.Yes)
-                return
-            if not popup.exec():
-                del popup
-
-    def get_report(self, url, page=1, page_size=config.HOMEPAGE_REPORT_PAGESIZE):
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        self.clear()
-        self.setRowCount(0)
-        self.horizontalHeader().setVisible(False)
-        self.setMinimumHeight(300)
-        headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
-        self.report_thread = RequestThread(
-            url=url,
-            method='get',
-            headers=headers,
-            data=json.dumps({
-                "machine_code": config.app_dawn.value("machine"),
-                'page': page,
-                'page_size': page_size
-            }),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.report_thread.response_signal.connect(self.report_thread_back)
-        self.report_thread.finished.connect(self.report_thread.deleteLater)
-        self.report_thread.start()
-
-    def report_thread_back(self, content):
-        print('piece.home.py {} 常规报告: '.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-            return
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
-        # set total page
-        self.page_num.emit(content['page_num'])
-        # fill table
-        self.horizontalHeader().setVisible(True)
-        keys = [('serial_num', '序号'), ("name", "标题"), ("type_zh", "类型"),('create_time', '时间')]
-        reports = content['data']
-        row = len(reports)
-        self.setRowCount(row)
-        self.setColumnCount(len(keys) + 1)  # 列数
-        labels = []
-        set_keys = []
-        for key_label in keys:
-            set_keys.append(key_label[0])
-            labels.append(key_label[1])
-        labels.append(' ')
-        # table style
-        self.setHorizontalHeaderLabels(labels)
-        self.horizontalHeader().setSectionResizeMode(1)  # auto resize
-        self.verticalHeader().setSectionResizeMode(1)
-        self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
-        self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, QHeaderView.ResizeToContents)  # 第2列随文字宽度
-        for row in range(self.rowCount()):
-            for col in range(self.columnCount()):
-                if col == 0:
-                    item = QTableWidgetItem(str(row+1))
-                elif col == self.columnCount() - 1:
-                    item = QTableWidgetItem('查看')
-                    item.name = reports[row]['name']
-                    item.file = reports[row]['file']
-                else:
-                    item = QTableWidgetItem(str(reports[row][set_keys[col]]))
-                item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, item)
-        # resize
-        self.setMinimumHeight(30 + self.rowCount() * 25)

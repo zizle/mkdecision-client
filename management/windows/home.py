@@ -9,9 +9,8 @@ from PyQt5.QtWidgets import *
 
 import config
 from widgets.base import MenuScrollContainer, TableShow
-from piece.home import ShowBulletin, MenuTree, Carousel
+from piece.home import HomeBulletin, Carousel
 from frame.base import NoDataWindow
-from thread.request import RequestThread
 from frame.home import Report, Notice, Commodity, Finance
 
 
@@ -24,14 +23,13 @@ class HomePage(QScrollArea):
         layout = QVBoxLayout()
         ble_crl_layout = QHBoxLayout() # bulletin and carousel layout
         lmn_frame_layout = QHBoxLayout()  # left list menu and middle frame window layout
-        bull_table = ShowBulletin()  # bulletin table
-        bull_table.setMaximumWidth(330)
+        show_bulletin = HomeBulletin()  # bulletin table
+        show_bulletin.setMaximumWidth(330)
         caro_show = Carousel()  # advertisement carousel widget
         # add bulletin widget and advertisement widget to layout
-        ble_crl_layout.addWidget(bull_table)
+        ble_crl_layout.addWidget(show_bulletin)
         ble_crl_layout.addWidget(caro_show)
         self.left_menu = MenuScrollContainer(column=4)  # left list menu
-
         self.show_tab = QTabWidget()  # middle frame window container (use QTabWidget)
         self.show_tab.setTabBarAutoHide(True)
         # signal
@@ -57,11 +55,6 @@ class HomePage(QScrollArea):
             tab = Notice(category=name_en)
         else:
             tab = NoDataWindow(name=parent + '·' + menu.text())
-
-        # if text == '常规报告':
-        #     tab = Report()
-        # elif text == '交易通知':
-        #     tab = Notice()
         # elif text == '现货报表':
         #     tab = Commodity()
         # elif text == '财经日历':

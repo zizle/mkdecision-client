@@ -8,7 +8,7 @@ import re
 import fitz
 import json
 import requests
-from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox, QScrollArea, QVBoxLayout, QWidget, QHBoxLayout
+from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QTextBrowser, QScrollArea, QVBoxLayout, QWidget, QHBoxLayout
 from PyQt5.QtGui import QCursor, QIcon, QImage, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -392,6 +392,80 @@ class PDFReader(QDialog):
     def add_pages(self, doc):
         if not isinstance(doc, fitz.Document):
             raise ValueError("doc must be instance of class fitz.fitz.Document")
+        for page_index in range(doc.pageCount):
+            page = doc.loadPage(page_index)
+            page_label = QLabel()
+            page_label.setMinimumSize(self.width() - 20, self.height())  # 设置label大小
+            # show PDF content
+            zoom_matrix = fitz.Matrix(1.58, 1.5)  # 图像缩放比例
+            pagePixmap = page.getPixmap(
+                matrix=zoom_matrix,
+                alpha=False)
+            imageFormat = QImage.Format_RGB888  # get image format
+            pageQImage = QImage(
+                pagePixmap.samples,
+                pagePixmap.width,
+                pagePixmap.height,
+                pagePixmap.stride,
+                imageFormat)  # init QImage
+            page_map = QPixmap()
+            page_map.convertFromImage(pageQImage)
+            page_label.setPixmap(page_map)
+            page_label.setScaledContents(True)  # pixmap resize with label
+            self.page_container.layout().addWidget(page_label)
+
+
+class ShowHtmlContent(QDialog):
+    def __init__(self, content="<p>没有内容</p>", title="内容"):
+        super(ShowHtmlContent, self).__init__()
+        layout = QVBoxLayout()
+        text_browser = QTextBrowser()
+        text_browser.setStyleSheet("font-size:14px;")
+        text_browser.setHtml(content)
+        layout.addWidget(text_browser)
+        self.setWindowTitle(title)
+        self.setLayout(layout)
+
+class ShowServerPDF(QDialog):
+    def __init__(self, file_url=None, file_name="查看PDF", *args):
+        super(ShowServerPDF, self).__init__(*args)
+        self.file = file_url
+        self.file_name = file_name
+        # auth doc type
+        self.setWindowTitle(file_name)
+        self.setMinimumSize(1000, 600)
+        self.download = QPushButton("下载PDF")
+        self.download.setIcon(QIcon('media/download-file.png'))
+        self.setWindowIcon(QIcon("media/reader.png"))
+        # scroll
+        scroll_area = QScrollArea()
+        scroll_area.horizontalScrollBar().setVisible(False)
+        # content
+        self.page_container = QWidget()
+        self.page_container.setLayout(QVBoxLayout())
+        layout = QVBoxLayout()
+        # initial data
+        self.add_pages()
+        # add to show
+        scroll_area.setWidget(self.page_container)
+        # add layout
+        layout.addWidget(self.download, alignment=Qt.AlignLeft)
+        layout.addWidget(scroll_area)
+        self.setLayout(layout)
+
+    def add_pages(self):
+        # 请求文件
+        if not self.file:
+            message_label = QLabel('没有文件.')
+            self.page_container.layout().addWidget(message_label)
+            return
+        try:
+            response = requests.get(self.file)
+            doc = fitz.Document(filename=self.file_name, stream=response.content)
+        except Exception as e:
+            message_label = QLabel('获取文件内容失败.\n{}'.format(e))
+            self.page_container.layout().addWidget(message_label)
+            return
         for page_index in range(doc.pageCount):
             page = doc.loadPage(page_index)
             page_label = QLabel()
