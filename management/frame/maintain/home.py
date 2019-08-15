@@ -18,7 +18,7 @@ from thread.request import RequestThread
 
 class BulletinMaintain(QWidget):
     def __init__(self, *args, **kwargs):
-        super(BulletinMaintain, self).__init__()
+        super(BulletinMaintain, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
         action_layout = QHBoxLayout()
         # widgets
@@ -82,148 +82,77 @@ class BulletinMaintain(QWidget):
             del popup
 
 
-
-
-class BulletinInfo(QWidget):
-    def __init__(self):
-        super(BulletinInfo, self).__init__()
-        # layout
+class CarouselMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(CarouselMaintain, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
         action_layout = QHBoxLayout()
-        create_btn = QPushButton("设置")
+        # widgets
+        create_btn = QPushButton("+新增")
         refresh_btn = QPushButton('刷新')
-        create_btn.clicked.connect(self.create_new_bulletin)
-        self.show_table = QTableWidget()
-        # mount widget to show request message
-        self.message_btn = QPushButton('刷新中...', self.show_table)
-        self.message_btn.resize(100, 20)
-        self.message_btn.move(100, 100)
-        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
+        self.table = QTableWidget()
+        # signal
+        create_btn.clicked.connect(self.create_new_carousel)
         # style
-        self.show_table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setVisible(False)
+        # add to layout
         action_layout.addWidget(create_btn)
         action_layout.addWidget(refresh_btn)
         action_layout.addStretch()
         layout.addLayout(action_layout)
-        layout.addWidget(self.show_table)
+        layout.addWidget(self.table)
         self.setLayout(layout)
-        # get bulletins
-        self.get_all_bulletin()
 
-    def bulletin_thread_back(self, content):
-        # fill show table
-        print('piece.home.py {} 维护公告: '.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-            return
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
-        # fill table
-        self.show_table.horizontalHeader().setVisible(True)
-        keys = [('serial_num', '序号'), ('create_time', '上传时间'),('name', '名称'), ('raw_name', '文件'), ('content','内容'),('is_active', '展示')]
-        bulletins = content['data']
-        row = len(bulletins)
-        self.show_table.setRowCount(row)
-        self.show_table.setColumnCount(len(keys))  # 列数
-        labels = []
-        set_keys = []
-        for key_label in keys:
-            set_keys.append(key_label[0])
-            labels.append(key_label[1])
-        self.show_table.setHorizontalHeaderLabels(labels)
-        self.show_table.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
-        self.show_table.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
-        for row in range(self.show_table.rowCount()):
-            for col in range(self.show_table.columnCount()):
-                if col == 0:
-                    item = QTableWidgetItem(str(row+1))
-                else:
-                    label_key = set_keys[col]
-                    if label_key == 'is_active':
-                        checkbox = TableCheckBox(row=row, col=col, option_label=label_key)
-                        checkbox.setChecked(int(bulletins[row][label_key]))
-                        checkbox.clicked_changed.connect(self.update_bulletin_info)
-                        self.show_table.setCellWidget(row, col, checkbox)
-                    item = QTableWidgetItem(str(bulletins[row][set_keys[col]]))
-                item.setTextAlignment(Qt.AlignCenter)
-                item.bulletin_id = bulletins[row]['id']
-                self.show_table.setItem(row, col, item)
-
-    def create_new_bulletin(self):
-        # dialog widget for edit bulletin information
-        def update_bulletin(signal):
-            # create new bulletin or update a bulletin in server
-            print('frame.maintain.home.py {} : '.format(str(sys._getframe().f_lineno)), "公告信号:", signal)
+    def create_new_carousel(self):
+        # dialog for add new carousel
+        def upload_carousel(signal):
+            print('frame.maintain.py {} 轮播信号:'.format(str(sys._getframe().f_lineno)), signal)
+            data = dict()
+            data["name"] = signal["name"]
+            data['machine_code'] = config.app_dawn.value('machine')
+            # handler image data
+            image_name_list = signal['image'].rsplit('/', 1)
+            image = open(signal['image'], 'rb')
+            image_content = image.read()
+            image.close()
+            data['image'] = (image_name_list[1], image_content)
+            if signal['file']: # file show
+                file_raw_name = signal["file"].rsplit("/", 1)
+                file = open(signal["file"], "rb")
+                file_content = file.read()
+                file.close()
+                data["file"] = (file_raw_name[1], file_content)
+            data["content"] = signal["content"]
+            data["redirect_url"] = signal['redirect']
+            encode_data = encode_multipart_formdata(data)
+            data = encode_data[0]
             headers = config.CLIENT_HEADERS
-            cookies = config.app_dawn.value('cookies')
-            machine_code = config.app_dawn.value('machine')
-            if signal["set_option"] == "new_bulletin":
-                data = dict()
-                data["name"] = signal["name"]
-                data["show_type"] = signal["show_type"]
-                data['machine_code'] = machine_code
-                if signal["show_type"] == "show_file":
-                    file_raw_name = signal["file"].rsplit("/", 1)
-                    file = open(signal["file"], "rb")
-                    file_content = file.read()
-                    file.close()
-                    data["file"] = (file_raw_name[1], file_content)
-                elif signal["show_type"] == "show_text":
-                    data["content"] = signal["content"]
-                encode_data = encode_multipart_formdata(data)
-                data = encode_data[0]
-                headers['Content-Type'] = encode_data[1]
-                try:
-                    response = requests.post(
-                        url=config.SERVER_ADDR + "homepage/bulletin/",
-                        headers=headers,
-                        data=data,
-                        cookies=cookies
-                    )
-                except Exception as error:
-                    QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
-                    return
-                response_data = json.loads(response.content.decode('utf-8'))
-                if response.status_code != 201:
-                    QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
-                    return
-                else:
-                    QMessageBox.information(self, '成功', '创建成功, 赶紧刷新看看吧.', QMessageBox.Yes)
-                    popup.close()  # close the dialog
-        popup = CreateNewBulletin()
-        popup.new_data_signal.connect(update_bulletin)
+            headers['Content-Type'] = encode_data[1]
+            try:
+                response = requests.post(
+                    url=config.SERVER_ADDR + "homepage/carousel/",
+                    headers=headers,
+                    data=data,
+                    cookies=config.app_dawn.value('cookies')
+                )
+            except Exception as error:
+                QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
+                return
+            response_data = json.loads(response.content.decode('utf-8'))
+            if response.status_code != 201:
+                QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
+                return
+            else:
+                QMessageBox.information(self, '成功', '创建成功, 赶紧刷新看看吧.', QMessageBox.Yes)
+                popup.close()  # close the dialog
+        popup = CreateNewCarousel()
+        popup.new_data_signal.connect(upload_carousel)
         if not popup.exec():
             del popup
 
-    def get_all_bulletin(self):
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        self.show_table.clear()
-        self.show_table.setRowCount(0)
-        self.show_table.horizontalHeader().setVisible(False)
-        self.bulletin_thread = RequestThread(
-            url=config.SERVER_ADDR + 'homepage/bulletin/',
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value('machine'), "maintain": True, 'is_admin': True}),
-            cookies=config.app_dawn.value('cookies'),
-        )
-        self.bulletin_thread.finished.connect(self.bulletin_thread.deleteLater)
-        self.bulletin_thread.response_signal.connect(self.bulletin_thread_back)
-        self.bulletin_thread.start()
 
-    def update_bulletin_info(self, signal):
-        # 获取机器码
-        item = self.show_table.item(signal['row'], signal['col'])
-        show = '显示' if signal['checked'] else '不显示'
-        print('frame.maintain.base.py {} 修改公告：'.format(sys._getframe().f_lineno), item.bulletin_id, show)
+
+
 
 
 class CarouselInfo(QWidget):

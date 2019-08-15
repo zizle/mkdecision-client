@@ -18,7 +18,6 @@ from utils import get_desktop_path
 from thread.request import RequestThread
 from piece.base import PageController
 from piece.maintain import TableCheckBox
-from popup.base import PDFReader
 from popup.maintain.pservice import CreateNewMenu, CreateMessage, CreateMLSFile, CreateTPSFile, CreateRSRFile
 from piece.maintain.pservice import ArticleEditTools
 from widgets.maintain.base import ContentShowTable, TableShow

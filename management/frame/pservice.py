@@ -16,7 +16,6 @@ from PyQt5.QtCore import Qt
 import config
 from thread.request import RequestThread
 from widgets.base import Loading, TableShow
-from popup.base import PDFReader
 
 
 class MarketAnalysis(QScrollArea):

@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
-from frame.maintain.home import BulletinMaintain, CarouselInfo, ReportMaintain, NoticeMaintain, CommodityInfo, FinanceInfo
+from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityInfo, FinanceInfo
 from frame.maintain.pservice import PServiceMenuInfo, PersonTrain, MSGCommunication, MarketAnalysis, TopicalStudy, ResearchReport
 from thread.request import RequestThread
 import config
@@ -103,8 +103,8 @@ class Maintenance(QWidget):
             if parent_en == 'home_page':
                 if name_en == 'bulletin':
                     tab = BulletinMaintain()
-                # elif parent_en == '轮播广告':
-                #     tab = CarouselInfo()
+                elif name_en == 'carousel':
+                    tab = CarouselMaintain()
                 elif name_en == 'routine_report':
                     tab = ReportMaintain()
                 elif name_en == 'transact_notice':

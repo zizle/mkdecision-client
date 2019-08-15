@@ -16,9 +16,326 @@ from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QDate, QRect
 import config
 from thread.request import RequestThread
 from popup.base import ShowServerPDF, ShowHtmlContent
-from popup.home import PDFReader, ContentReader
 from widgets.base import LeaderLabel, MenuWidget, MenuButton
-from widgets.home import BulletinTable
+from widgets.home import BulletinTable, CarouselLabel
+
+
+class Carousel(QWidget):
+    def __init__(self):
+        super(Carousel, self).__init__()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        # widgets
+        self.loading_message = QLabel('数据请求中...')
+        self.carousel = CarouselLabel()
+        # add layout
+        layout.addWidget(self.loading_message)
+        layout.addWidget(self.carousel)
+        self.setLayout(layout)
+        # initial data
+        self.carousel_thread = None
+        self.get_carousel()
+
+    def change_carousel_pixmap(self):
+        # self.animation.start()
+        self.pixmap_flag += 1
+        if self.pixmap_flag >= len(self.pixmap_list):
+            self.pixmap_flag=0
+        pixmap = self.pixmap_list[self.pixmap_flag]
+        # change self property
+        self.ad_name = pixmap.name
+        self.ad_file = pixmap.file
+        self.ad_content = pixmap.content
+        self.ad_redirect = pixmap.redirect
+        self.setPixmap(self.pixmap_list[self.pixmap_flag])
+
+    def get_carousel(self):
+        # get advertisement carousel data
+        if self.carousel_thread:
+            del self.carousel_thread
+        self.carousel_thread = RequestThread(
+            url=config.SERVER_ADDR + 'homepage/carousel/',
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.carousel_thread.finished.connect(self.carousel_thread.deleteLater)
+        self.carousel_thread.response_signal.connect(self.carousel_thread_back)
+        self.carousel_thread.start()
+
+    def carousel_thread_back(self, signal):
+        # set advertisement carousel
+        print('piece.home.py {} 轮播数据: '.format(str(sys._getframe().f_lineno)), signal)
+        if signal['error']:
+            self.loading_message.setText(signal['message'])
+            return
+        self.loading_message.hide()
+        self.carousel.show_carousel(contents=signal['data'])
+
+        # # create advertisements carousel
+        # self.pixmap_list.clear()
+        # for index, item in enumerate(content['data']):
+        #     rep = requests.get(config.SERVER_ADDR + item['image'])
+        #     pixmap = QPixmap()
+        #     pixmap.loadFromData(rep.content)
+        #     # add property
+        #     pixmap.index = index  # index in self.pixmap
+        #     pixmap.name = item['name']
+        #     pixmap.file = item['file']
+        #     pixmap.redirect = item['redirect']
+        #     pixmap.content = item['content']
+        #     # append list
+        #     self.pixmap_list.append(pixmap)
+        # # set pixmap
+        # initial_pixmap = self.pixmap_list[self.pixmap_flag]
+        # self.setPixmap(initial_pixmap)
+        # self.ad_name = initial_pixmap.name
+        # self.ad_file = initial_pixmap.file
+        # self.ad_content = initial_pixmap.content
+        # self.ad_redirect = initial_pixmap.redirect
+        # # start timer change pixmap
+        # self.timer.start(5000)
+
+
+class HomeBulletin(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(HomeBulletin, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        # widgets
+        self.loading_message = QLabel('正在获取公告数据...')
+        self.table = BulletinTable()
+        # signal
+        self.table.cellClicked.connect(self.show_bulletin_detail)
+        # style
+        layout.setContentsMargins(0,0,0,0)
+        # add layout
+        layout.addWidget(self.loading_message)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+        # initial data
+        self.ble_thread = None
+        self.get_bulletin()
+
+    def get_bulletin(self):
+        if self.ble_thread:
+            del self.ble_thread
+        self.ble_thread = RequestThread(
+            url=config.SERVER_ADDR + "homepage/bulletin/",
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.ble_thread.response_signal.connect(self.ble_thread_back)
+        self.ble_thread.finished.connect(self.ble_thread.deleteLater)
+        self.ble_thread.start()
+
+    def ble_thread_back(self, signal):
+        print('piece.home.py {} 公告: '.format(str(sys._getframe().f_lineno)), signal)
+        if signal['error']:
+            self.loading_message.setText(signal['message'])
+            return
+        self.loading_message.hide()
+        # 展示数据
+        header_couple = [('title', '标题'), ('to_look', ''), ('create_time', '上传时间')]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
+
+    def show_bulletin_detail(self, row, col):
+        if col == 1:
+            item = self.table.item(row, col)
+            name_item = self.table.item(row, 0)
+            if item.file:
+                popup = ShowServerPDF(file_url= config.SERVER_ADDR + item.file, file_name=name_item.text())
+                popup.deleteLater()
+                popup.exec()
+                del popup
+            elif item.content:
+                popup = ShowHtmlContent(content=item.content, title=name_item.text())
+                popup.deleteLater()
+                popup.exec()
+                del popup
+
+
+class MenuListWidget(QScrollArea):
+    menu_clicked = pyqtSignal(QPushButton)
+    def __init__(self, column,  *args):
+        super(MenuListWidget, self).__init__(*args)
+        # button to show request message and fail retry
+        self.message_btn = QPushButton('刷新中...', self)
+        self.message_btn.resize(100, 20)
+        self.message_btn.move(100, 50)
+        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
+        self.message_btn.clicked.connect(self.get_menu)
+        self.message_btn.hide()
+        # self size style
+        self.setFixedWidth(70 * column + (column+1)*10)
+        self.column = column
+        self.horizontalScrollBar().setVisible(False)
+        # self.verticalScrollBar().setVisible(True)
+        # widget and layout
+        self.menu_container = QWidget()  # main widget
+        self.menu_container.setFixedWidth(70 * column + (column + 1) * 10)
+        container_layout = QVBoxLayout(spacing=0)  # main layout
+        container_layout.setContentsMargins(0,0,0,0)
+        # widgets add layout
+        self.menu_container.setLayout(container_layout)
+        self.get_menu()
+        # self.setWidget(self.menu_container)  # main widget add scroll area (must be add after drawing)
+        self.setStyleSheet("""
+        QPushButton{
+            color: rgb(50,50,50);
+            border: none;
+            padding:0 4px;
+            margin-left:5px;
+            height:18px;
+        }
+        QPushButton:hover {
+            background-color: rgb(224,255,255);
+            border: 0.5px solid rgb(170,170,170);
+        }
+        QLabel{
+            font-weight:bold;
+            font-size:13px;
+        }
+        MenuWidget{
+            border-bottom: 1px solid rgb(170,170,170);
+        }
+        MenuWidget:hover{
+            background-color: rgb(210,210,210);
+            border-bottom: 1px solid rgb(0,0,0)
+        }
+        QScrollBar:vertical
+        {
+            width:8px;
+            background:rgba(0,0,0,0%);
+            margin:0px,0px,0px,0px;
+            /*留出8px给上面和下面的箭头*/
+            padding-top:8px;
+            padding-bottom:8px;
+        }
+        QScrollBar::handle:vertical
+        {
+            width:4px;
+            background:rgba(0,0,0,8%);
+            /*滚动条两端变成椭圆*/
+            border-radius:4px;
+
+        }
+        QScrollBar::handle:vertical:hover
+        {
+            width:8px;
+            /*鼠标放到滚动条上的时候，颜色变深*/
+            background:rgba(0,0,0,40%);
+            border-radius:4px;
+            min-height:20;
+        }
+        QScrollBar::add-line:vertical
+        {
+            height:9px;width:8px;
+            /*设置下箭头*/
+            border-image:url(media/scroll/3.png);
+            subcontrol-position:bottom;
+        }
+        QScrollBar::sub-line:vertical 
+        {
+            height:9px;width:8px;
+            /*设置上箭头*/
+            border-image:url(media/scroll/1.png);
+            subcontrol-position:top;
+        }
+        QScrollBar::add-line:vertical:hover
+        /*当鼠标放到下箭头上的时候*/
+        {
+            height:9px;width:8px;
+            border-image:url(media/scroll/4.png);
+            subcontrol-position:bottom;
+        }
+        QScrollBar::sub-line:vertical:hover
+        /*当鼠标放到下箭头上的时候*/
+        {
+            height:9px;
+            width:8px;
+            border-image:url(media/scroll/2.png);
+            subcontrol-position:top;
+        }
+        """)
+
+    def get_menu(self):
+        self.message_btn.setText('刷新中...')
+        self.message_btn.show()
+        self.message_btn.setEnabled(False)
+        headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
+        self.menu_thread = RequestThread(
+            url=config.SERVER_ADDR + "pservice/module/",
+            method='get',
+            headers=headers,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.menu_thread.response_signal.connect(self.menu_thread_back)
+        self.menu_thread.finished.connect(self.menu_thread.deleteLater)
+        self.menu_thread.start()
+
+    def menu_thread_back(self, content):
+        print('piece.home.py {} 产品服务菜单: '.format(str(sys._getframe().f_lineno)), content)
+        if content['error']:
+            self.message_btn.setText('失败,请重试!')
+            self.message_btn.setEnabled(True)
+        else:
+            if not content['data']:
+                self.message_btn.setText('完成,无数据.')
+                return  # function finished
+            else:
+                self.message_btn.setText('刷新完成!')
+                self.message_btn.hide()
+        for data_index, menu_data in enumerate(content['data']):
+            # a menu widget
+            menu_widget = MenuWidget()  # a menu widget in piece.pservice.MenuWidget
+            widget_layout = QVBoxLayout(spacing=0) # menu widget layout
+            widget_layout.setContentsMargins(0,0,0,0)  # 设置菜单字是否贴边margin(left, top, right, bottom)
+            menu_widget.setLayout(widget_layout)  # add layout
+            menu_label = LeaderLabel(menu_data['name'])
+            menu_label.clicked.connect(self.menu_label_clicked)
+            # a child widget
+            menu_label.child_widget = QWidget()  # child of menu widget
+            child_layout = QGridLayout(spacing=5)  # child layout
+            child_layout.setContentsMargins(0,0,5,10)
+            menu_label.child_widget.setLayout(child_layout)
+            row_index = 0  # control rows
+            column_index = 0  # control columns
+            for child in menu_data['subs']:
+                # a child widget
+                button = MenuButton(child['name'])
+                # add property
+                button.parent_name = menu_data['name']
+                button.mouse_clicked.connect(self.click_menu)
+                child_layout.addWidget(button, row_index, column_index)
+                column_index += 1
+                if column_index >= self.column:
+                    row_index += 1
+                    column_index = 0
+
+            widget_layout.addWidget(menu_label, alignment=Qt.AlignTop)
+            widget_layout.addWidget(menu_label.child_widget)
+            self.menu_container.layout().addWidget(menu_widget)
+        self.menu_container.layout().addStretch()
+        self.setWidget(self.menu_container)  # main widget add scroll area (must be add after drawing)
+
+    def menu_label_clicked(self, menu_label):
+        if menu_label.child_widget.isHidden():
+            menu_label.child_widget.show()
+        else:
+            menu_label.child_widget.hide()
+
+    def click_menu(self, button):
+        self.menu_clicked.emit(button)
+
+
+
+
+
+
 
 class Calendar(QWidget):
     click_date = pyqtSignal(QDate)
@@ -298,7 +615,7 @@ class Calendar(QWidget):
         self.__change_date(next_sunday)
 
 
-class Carousel(QLabel):
+class Carousel1(QLabel):
     pixmap_list = list()
 
     def __init__(self):
@@ -407,284 +724,6 @@ class Carousel(QLabel):
             else:
                 return
             if not popup.exec():
-                del popup
-
-
-class MenuListWidget(QScrollArea):
-    menu_clicked = pyqtSignal(QPushButton)
-    def __init__(self, column,  *args):
-        super(MenuListWidget, self).__init__(*args)
-        # button to show request message and fail retry
-        self.message_btn = QPushButton('刷新中...', self)
-        self.message_btn.resize(100, 20)
-        self.message_btn.move(100, 50)
-        self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
-        self.message_btn.clicked.connect(self.get_menu)
-        self.message_btn.hide()
-        # self size style
-        self.setFixedWidth(70 * column + (column+1)*10)
-        self.column = column
-        self.horizontalScrollBar().setVisible(False)
-        # self.verticalScrollBar().setVisible(True)
-        # widget and layout
-        self.menu_container = QWidget()  # main widget
-        self.menu_container.setFixedWidth(70 * column + (column + 1) * 10)
-        container_layout = QVBoxLayout(spacing=0)  # main layout
-        container_layout.setContentsMargins(0,0,0,0)
-        # widgets add layout
-        self.menu_container.setLayout(container_layout)
-        self.get_menu()
-        # self.setWidget(self.menu_container)  # main widget add scroll area (must be add after drawing)
-        self.setStyleSheet("""
-        QPushButton{
-            color: rgb(50,50,50);
-            border: none;
-            padding:0 4px;
-            margin-left:5px;
-            height:18px;
-        }
-        QPushButton:hover {
-            background-color: rgb(224,255,255);
-            border: 0.5px solid rgb(170,170,170);
-        }
-        QLabel{
-            font-weight:bold;
-            font-size:13px;
-        }
-        MenuWidget{
-            border-bottom: 1px solid rgb(170,170,170);
-        }
-        MenuWidget:hover{
-            background-color: rgb(210,210,210);
-            border-bottom: 1px solid rgb(0,0,0)
-        }
-        QScrollBar:vertical
-        {
-            width:8px;
-            background:rgba(0,0,0,0%);
-            margin:0px,0px,0px,0px;
-            /*留出8px给上面和下面的箭头*/
-            padding-top:8px;
-            padding-bottom:8px;
-        }
-        QScrollBar::handle:vertical
-        {
-            width:4px;
-            background:rgba(0,0,0,8%);
-            /*滚动条两端变成椭圆*/
-            border-radius:4px;
-
-        }
-        QScrollBar::handle:vertical:hover
-        {
-            width:8px;
-            /*鼠标放到滚动条上的时候，颜色变深*/
-            background:rgba(0,0,0,40%);
-            border-radius:4px;
-            min-height:20;
-        }
-        QScrollBar::add-line:vertical
-        {
-            height:9px;width:8px;
-            /*设置下箭头*/
-            border-image:url(media/scroll/3.png);
-            subcontrol-position:bottom;
-        }
-        QScrollBar::sub-line:vertical 
-        {
-            height:9px;width:8px;
-            /*设置上箭头*/
-            border-image:url(media/scroll/1.png);
-            subcontrol-position:top;
-        }
-        QScrollBar::add-line:vertical:hover
-        /*当鼠标放到下箭头上的时候*/
-        {
-            height:9px;width:8px;
-            border-image:url(media/scroll/4.png);
-            subcontrol-position:bottom;
-        }
-        QScrollBar::sub-line:vertical:hover
-        /*当鼠标放到下箭头上的时候*/
-        {
-            height:9px;
-            width:8px;
-            border-image:url(media/scroll/2.png);
-            subcontrol-position:top;
-        }
-        """)
-
-    def get_menu(self):
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        headers = {"User-Agent": "DAssistant-Client/" + config.VERSION}
-        self.menu_thread = RequestThread(
-            url=config.SERVER_ADDR + "pservice/module/",
-            method='get',
-            headers=headers,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.menu_thread.response_signal.connect(self.menu_thread_back)
-        self.menu_thread.finished.connect(self.menu_thread.deleteLater)
-        self.menu_thread.start()
-
-    def menu_thread_back(self, content):
-        print('piece.home.py {} 产品服务菜单: '.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
-        # fill table
-        # menu_list = [
-        #     {
-        #         'name': '主菜单1',
-        #         'subs': [
-        #             {'name': '菜单1'},
-        #             {'name': '菜单2'},
-        #             {'name': '菜单3'},
-        #             {'name': '菜单4'},
-        #             {'name': '菜单5'},
-        #         ]
-        #     }, {
-        #         'name': '主菜单2',
-        #         'subs': [
-        #             {'name': '菜单1'},
-        #             {'name': '菜单2'},
-        #             {'name': '菜单3'},
-        #         ]
-        #     }, {
-        #         'name': '主菜单3',
-        #         'subs': [
-        #             {'name': '菜单1'},
-        #             {'name': '菜单2'},
-        #             {'name': '菜单3'},
-        #             {'name': '菜单4'},
-        #             {'name': '菜单5'},
-        #             {'name': '菜单6'},
-        #             {'name': '菜单7'},
-        #         ]
-        #     }, {
-        #         'name': '主菜单4',
-        #         'subs': [
-        #             {'name': '菜单1'},
-        #             {'name': '菜单2'},
-        #             {'name': '菜单3'},
-        #             {'name': '菜单4'},
-        #             {'name': '菜单5'},
-        #             {'name': '菜单6'},
-        #             {'name': '菜单7'},
-        #             {'name': '菜单8'},
-        #             {'name': '菜单9'},
-        #         ]
-        #     }
-        # ]
-        for data_index, menu_data in enumerate(content['data']):
-            # a menu widget
-            menu_widget = MenuWidget()  # a menu widget in piece.pservice.MenuWidget
-            widget_layout = QVBoxLayout(spacing=0) # menu widget layout
-            widget_layout.setContentsMargins(0,0,0,0)  # 设置菜单字是否贴边margin(left, top, right, bottom)
-            menu_widget.setLayout(widget_layout)  # add layout
-            menu_label = LeaderLabel(menu_data['name'])
-            menu_label.clicked.connect(self.menu_label_clicked)
-            # a child widget
-            menu_label.child_widget = QWidget()  # child of menu widget
-            child_layout = QGridLayout(spacing=5)  # child layout
-            child_layout.setContentsMargins(0,0,5,10)
-            menu_label.child_widget.setLayout(child_layout)
-            row_index = 0  # control rows
-            column_index = 0  # control columns
-            for child in menu_data['subs']:
-                # a child widget
-                button = MenuButton(child['name'])
-                # add property
-                button.parent_name = menu_data['name']
-                button.mouse_clicked.connect(self.click_menu)
-                child_layout.addWidget(button, row_index, column_index)
-                column_index += 1
-                if column_index >= self.column:
-                    row_index += 1
-                    column_index = 0
-
-            widget_layout.addWidget(menu_label, alignment=Qt.AlignTop)
-            widget_layout.addWidget(menu_label.child_widget)
-            self.menu_container.layout().addWidget(menu_widget)
-        self.menu_container.layout().addStretch()
-        self.setWidget(self.menu_container)  # main widget add scroll area (must be add after drawing)
-
-    def menu_label_clicked(self, menu_label):
-        if menu_label.child_widget.isHidden():
-            menu_label.child_widget.show()
-        else:
-            menu_label.child_widget.hide()
-
-    def click_menu(self, button):
-        self.menu_clicked.emit(button)
-
-
-class HomeBulletin(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(HomeBulletin, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout()
-        # widgets
-        self.loading_message = QLabel('正在获取公告数据...')
-        self.table = BulletinTable()
-        # signal
-        self.table.cellClicked.connect(self.show_bulletin_detail)
-        # style
-        layout.setContentsMargins(0,0,0,0)
-        # add layout
-        layout.addWidget(self.loading_message)
-        layout.addWidget(self.table)
-        self.setLayout(layout)
-        # initial data
-        self.ble_thread = None
-        self.get_bulletin()
-
-    def get_bulletin(self):
-        if self.ble_thread:
-            del self.ble_thread
-        self.ble_thread = RequestThread(
-            url=config.SERVER_ADDR + "homepage/bulletin/",
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.ble_thread.response_signal.connect(self.ble_thread_back)
-        self.ble_thread.finished.connect(self.ble_thread.deleteLater)
-        self.ble_thread.start()
-
-    def ble_thread_back(self, signal):
-        print('piece.home.py {} 公告: '.format(str(sys._getframe().f_lineno)), signal)
-        if signal['error']:
-            self.loading_message.setText(signal['message'])
-            return
-        self.loading_message.hide()
-        # 展示数据
-        header_couple = [('title', '标题'), ('to_look', ''), ('create_time', '上传时间')]
-        self.table.show_content(contents=signal['data'], header_couple=header_couple)
-
-    def show_bulletin_detail(self, row, col):
-        if col == 1:
-            item = self.table.item(row, col)
-            name_item = self.table.item(row, 0)
-            if item.file:
-                popup = ShowServerPDF(file_url= config.SERVER_ADDR + item.file, file_name=name_item.text())
-                popup.deleteLater()
-                popup.exec()
-                del popup
-            elif item.content:
-                popup = ShowHtmlContent(content=item.content, title=name_item.text())
-                popup.deleteLater()
-                popup.exec()
                 del popup
 
 

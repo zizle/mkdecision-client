@@ -3,9 +3,14 @@
 Create: 2019-08-15
 Author: zizle
 """
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QAbstractItemView
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QFont
+import requests
+import webbrowser
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QAbstractItemView, QLabel
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QBrush, QColor, QFont, QPixmap
+
+import config
+from popup.base import ShowServerPDF, ShowHtmlContent
 
 class BulletinTable(QTableWidget):
     def __init__(self, *args):
@@ -141,3 +146,76 @@ class BulletinTable(QTableWidget):
                 else:
                     item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
+
+
+class CarouselLabel(QLabel):
+    pixmap_list = list()
+
+    def __init__(self):
+        super(CarouselLabel, self).__init__()
+        # timer
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.change_carousel_pixmap)
+        # initial property
+        self.ad_name = None
+        self.ad_file = None
+        self.ad_content = None
+        self.ad_redirect = None
+        self.pixmap_flag = 0
+        self.setScaledContents(True)
+
+    def show_carousel(self, contents):
+        self.pixmap_list.clear()
+        for index, item in enumerate(contents):
+            rep = requests.get(config.SERVER_ADDR + item['image'])
+            pixmap = QPixmap()
+            pixmap.loadFromData(rep.content)
+            # add property
+            pixmap.index = index  # index in self.pixmap
+            pixmap.name = item['name']
+            pixmap.file = item['file']
+            pixmap.redirect = item['redirect']
+            pixmap.content = item['content']
+            # append list
+            self.pixmap_list.append(pixmap)
+        # set pixmap
+        initial_pixmap = self.pixmap_list[self.pixmap_flag]
+        self.setPixmap(initial_pixmap)
+        self.ad_name = initial_pixmap.name
+        self.ad_file = initial_pixmap.file
+        self.ad_content = initial_pixmap.content
+        self.ad_redirect = initial_pixmap.redirect
+        # start timer change pixmap
+        if len(self.pixmap_list) > 1:
+            self.timer.start(5000)
+
+    def change_carousel_pixmap(self):
+        # self.animation.start()
+        self.pixmap_flag += 1
+        if self.pixmap_flag >= len(self.pixmap_list):
+            self.pixmap_flag=0
+        pixmap = self.pixmap_list[self.pixmap_flag]
+        # change self property
+        self.ad_name = pixmap.name
+        self.ad_file = pixmap.file
+        self.ad_content = pixmap.content
+        self.ad_redirect = pixmap.redirect
+        self.setPixmap(self.pixmap_list[self.pixmap_flag])
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            if self.ad_file:
+                popup = ShowServerPDF(file_url=config.SERVER_ADDR + self.ad_file, file_name=self.ad_name)
+                popup.deleteLater()
+                popup.exec()
+                del popup
+            elif self.ad_content:
+                popup = ShowHtmlContent(content=self.ad_content, title=self.ad_name)
+                popup.deleteLater()
+                popup.exec()
+                del popup
+            elif self.ad_redirect:
+                webbrowser.open(self.ad_redirect)
+                return
+            else:
+                return
