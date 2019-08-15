@@ -725,7 +725,7 @@ class ReportInfo(QWidget):
         create_btn.clicked.connect(self.create_new_report)
         self.show_table = QTableWidget()
         # mount widget to show request message
-        self.message_btn = QPushButton('刷新中...', self.show_table)
+        self.message_btn = QPushButton('功能未开发...', self.show_table)
         self.message_btn.resize(100, 20)
         self.message_btn.move(100, 100)
         self.message_btn.setStyleSheet('text-align:center;border:none;background-color:rgb(210,210,210)')
@@ -738,7 +738,7 @@ class ReportInfo(QWidget):
         layout.addWidget(self.show_table)
         self.setLayout(layout)
         # get all reports
-        self.get_all_reports()
+        # self.get_all_reports()
 
     def create_new_report(self):
         def upload_report(signal):
@@ -747,7 +747,7 @@ class ReportInfo(QWidget):
             data['machine_code'] = config.app_dawn.value('machine')
             data['type_en'] = signal['type_en']
             data['type_zh'] = signal['type_zh']
-            data['name'] = signal['name']
+            data['title'] = signal['title']
             file_raw_name = signal["file_path"].rsplit("/", 1)
             file = open(signal["file_path"], "rb")
             file_content = file.read()
@@ -779,75 +779,75 @@ class ReportInfo(QWidget):
         if not popup.exec():
             del popup
 
-    def get_all_reports(self):
-        self.message_btn.setText('刷新中...')
-        self.message_btn.show()
-        self.message_btn.setEnabled(False)
-        self.show_table.clear()
-        self.show_table.setRowCount(0)
-        self.show_table.horizontalHeader().setVisible(False)
-        self.report_thread = RequestThread(
-            url=config.SERVER_ADDR + 'homepage/report/',
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value('machine'), "maintain": True}),
-            cookies=config.app_dawn.value('cookies'),
-        )
-        self.report_thread.finished.connect(self.report_thread.deleteLater)
-        self.report_thread.response_signal.connect(self.report_thread_back)
-        self.report_thread.start()
-
-    def report_thread_back(self, content):
-        # fill show table
-        print('frame.maintain.home.py {} 维护常规报告: '.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            self.message_btn.setText('失败,请重试!')
-            self.message_btn.setEnabled(True)
-            return
-        else:
-            if not content['data']:
-                self.message_btn.setText('完成,无数据.')
-                return  # function finished
-            else:
-                self.message_btn.setText('刷新完成!')
-                self.message_btn.hide()
-        # fill table
-        self.show_table.horizontalHeader().setVisible(True)
-        keys = [
-            ('serial_num', '序号'),
-            ('create_time', '上传时间'),
-            ('name', '名称'),
-            ('type_zh', '类型'),
-            ('raw_name', '文件'),
-            ('is_active', '展示')
-        ]
-        reports = content['data']
-        row = len(reports)
-        self.show_table.setRowCount(row)
-        self.show_table.setColumnCount(len(keys))  # 列数
-        labels = []
-        set_keys = []
-        for key_label in keys:
-            set_keys.append(key_label[0])
-            labels.append(key_label[1])
-        self.show_table.setHorizontalHeaderLabels(labels)
-        self.show_table.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
-        self.show_table.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
-        for row in range(self.show_table.rowCount()):
-            for col in range(self.show_table.columnCount()):
-                if col == 0:
-                    item = QTableWidgetItem(str(row + 1))
-                else:
-                    label_key = set_keys[col]
-                    if label_key == 'is_active':
-                        checkbox = TableCheckBox(row=row, col=col, option_label=label_key)
-                        checkbox.setChecked(int(reports[row][label_key]))
-                        checkbox.clicked_changed.connect(self.update_report_info)
-                        self.show_table.setCellWidget(row, col, checkbox)
-                    item = QTableWidgetItem(str(reports[row][set_keys[col]]))
-                item.setTextAlignment(Qt.AlignCenter)
-                item.report_id = reports[row]['id']
-                self.show_table.setItem(row, col, item)
+    # def get_all_reports(self):
+    #     self.message_btn.setText('刷新中...')
+    #     self.message_btn.show()
+    #     self.message_btn.setEnabled(False)
+    #     self.show_table.clear()
+    #     self.show_table.setRowCount(0)
+    #     self.show_table.horizontalHeader().setVisible(False)
+    #     self.report_thread = RequestThread(
+    #         url=config.SERVER_ADDR + 'homepage/report/',
+    #         method='get',
+    #         headers=config.CLIENT_HEADERS,
+    #         data=json.dumps({"machine_code": config.app_dawn.value('machine'), "maintain": True}),
+    #         cookies=config.app_dawn.value('cookies'),
+    #     )
+    #     self.report_thread.finished.connect(self.report_thread.deleteLater)
+    #     self.report_thread.response_signal.connect(self.report_thread_back)
+    #     self.report_thread.start()
+    #
+    # def report_thread_back(self, content):
+    #     # fill show table
+    #     print('frame.maintain.home.py {} 维护常规报告: '.format(str(sys._getframe().f_lineno)), content)
+    #     if content['error']:
+    #         self.message_btn.setText('失败,请重试!')
+    #         self.message_btn.setEnabled(True)
+    #         return
+    #     else:
+    #         if not content['data']:
+    #             self.message_btn.setText('完成,无数据.')
+    #             return  # function finished
+    #         else:
+    #             self.message_btn.setText('刷新完成!')
+    #             self.message_btn.hide()
+    #     # fill table
+    #     self.show_table.horizontalHeader().setVisible(True)
+    #     keys = [
+    #         ('serial_num', '序号'),
+    #         ('create_time', '上传时间'),
+    #         ('title', '标题'),
+    #         ('type_zh', '类型'),
+    #         ('raw_name', '文件'),
+    #         ('is_active', '展示')
+    #     ]
+    #     reports = content['data']
+    #     row = len(reports)
+    #     self.show_table.setRowCount(row)
+    #     self.show_table.setColumnCount(len(keys))  # 列数
+    #     labels = []
+    #     set_keys = []
+    #     for key_label in keys:
+    #         set_keys.append(key_label[0])
+    #         labels.append(key_label[1])
+    #     self.show_table.setHorizontalHeaderLabels(labels)
+    #     self.show_table.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
+    #     self.show_table.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
+    #     for row in range(self.show_table.rowCount()):
+    #         for col in range(self.show_table.columnCount()):
+    #             if col == 0:
+    #                 item = QTableWidgetItem(str(row + 1))
+    #             else:
+    #                 label_key = set_keys[col]
+    #                 if label_key == 'is_active':
+    #                     checkbox = TableCheckBox(row=row, col=col, option_label=label_key)
+    #                     checkbox.setChecked(int(reports[row][label_key]))
+    #                     checkbox.clicked_changed.connect(self.update_report_info)
+    #                     self.show_table.setCellWidget(row, col, checkbox)
+    #                 item = QTableWidgetItem(str(reports[row][set_keys[col]]))
+    #             item.setTextAlignment(Qt.AlignCenter)
+    #             item.report_id = reports[row]['id']
+    #             self.show_table.setItem(row, col, item)
 
     def update_report_info(self, signal):
         item = self.show_table.item(signal['row'], signal['col'])

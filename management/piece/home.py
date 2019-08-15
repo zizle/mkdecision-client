@@ -319,7 +319,7 @@ class Carousel(QLabel):
         self.pixmap_flag = 0
         self.setMaximumHeight(350)
         self.setScaledContents(True)
-        self.get_carousel()
+        # self.get_carousel()
 
     def carousel_thread_back(self, content):
         # set advertisement carousel
@@ -760,7 +760,7 @@ class ShowBulletin(QTableWidget):
         }
         """)
         self.cellClicked.connect(self.cell_clicked)
-        self.get_bulletin()  # threading
+        # self.get_bulletin()  # threading
 
     def get_bulletin(self):
         self.message_btn.setText('刷新中...')

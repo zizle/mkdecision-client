@@ -62,15 +62,25 @@ class Finance(QWidget):
 
 
 class Report(QWidget):
-    def __init__(self, category=None, *args, **kwargs):
+    def __init__(self, category='all', *args, **kwargs):
         super(Report, self).__init__(*args, **kwargs)
         self.category=category
         layout = QVBoxLayout()
+        # widgets
         self.show_message = QLabel('请求中...')
         self.table = TableShow()
+        self.page_controller = PageController()
+        # signal
+        self.page_controller.clicked.connect(self.page_number_changed)
+        # add layout
         layout.addWidget(self.show_message)
         layout.addWidget(self.table)
+        layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
+        # style
+        self.page_controller.hide()
         self.setLayout(layout)
+        # initial data
+        self.report_thread = None
         self.get_reports()
 
     def get_reports(self, page=1, page_size=20):
@@ -79,6 +89,9 @@ class Report(QWidget):
             url = config.SERVER_ADDR + 'homepage/report/'
         else:
             url = config.SERVER_ADDR + 'homepage/report/?category=' + self.category
+        print('frame.home.py {} 请求报告：'.format(sys._getframe().f_lineno), url)
+        if self.report_thread:
+            del self.report_thread
         self.report_thread = RequestThread(
             url=url,
             method='get',
@@ -95,66 +108,20 @@ class Report(QWidget):
         self.report_thread.start()
 
     def report_thread_back(self, signal):
+        print('frame.home.py {} 报告数据：'.format(sys._getframe().f_lineno), signal)
         if signal['error']:
             self.show_message.setText('出错.\n{}'.format(signal['error']))
             return
         self.show_message.hide()
-        if signal['page_num'] > 1:  # 数据大于1页添加页码控制器
-            self.page_controller = PageController()
+        if signal['page_num'] > 1:  # 数据大于1页设置页码控制器
             self.page_controller.set_total_page(signal['page_num'])
-            self.layout().addWidget(self.page_controller, alignment=Qt.AlignCenter)
+            self.page_controller.show()
         # 展示数据
-
-
-
-
-
-
-class Report1(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(Report, self).__init__(*args, *kwargs)
-        layout = QVBoxLayout(spacing=5)
-        # report table
-        self.show_table = ShowReport()
-        # page controller
-        self.page_controller = PageController()
-        # signal
-        self.page_controller.clicked.connect(self.page_number_changed)
-        self.show_table.page_num.connect(self.set_total_page)
-        layout.addWidget(self.show_table)
-        layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
-        self.setStyleSheet("""
-        MenuBar {
-            background-color:rgb(255,255,255);
-        }
-        """)
-        self.setLayout(layout)
-        # get report
-        self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/')  # query param type=None
-
-    def menu_clicked(self, menu):
-        print('frame.home.py {} 点击类别:'.format(str(sys._getframe().f_lineno)), menu.text())
-        type_dict = {
-            "日报": "daily",
-            "周报": "weekly",
-            "月报": "monthly",
-            "年报": "annual",
-            "专题": "special",
-            "投资报告": "invest",
-            "其他": "others"
-        }
-        type_en = type_dict.get(menu.text())
-        url = config.SERVER_ADDR + 'homepage/report/'
-        if type_en:
-            url += '?category=' + type_en
-        self.show_table.get_report(url=url)
+        header_couple = [('serial_num', '序号'), ('title','标题'), ('type_zh', '类型'), ('create_time', '上传时间'), ('to_look', '')]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
 
     def page_number_changed(self, page):
-        self.show_table.get_report(url=config.SERVER_ADDR + 'homepage/report/', page=page)  # query param type=None
-
-    def set_total_page(self, pages_num):
-        print('frame.home.py {} 总页码信号:'.format(sys._getframe().f_lineno), pages_num)
-        self.page_controller.set_total_page(pages_num)
+        self.get_reports(page=page)
 
 
 class Notice(QWidget):

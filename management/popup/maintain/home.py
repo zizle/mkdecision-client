@@ -560,7 +560,7 @@ class CreateNewReport(QDialog):
         super(CreateNewReport, self).__init__()
         layout = QGridLayout()
         # labels
-        name_label = QLabel("名称：")
+        title_label = QLabel("名称：")
         type_label = QLabel("类型：")
         file_label = QLabel("文件：")
         # edits
@@ -578,7 +578,7 @@ class CreateNewReport(QDialog):
         select_file_btn.clicked.connect(self.select_file_clicked)
         submit_btn.clicked.connect(self.submit_report)
         # add layout
-        layout.addWidget(name_label, 0, 0)
+        layout.addWidget(title_label, 0, 0)
         layout.addWidget(self.name_edit, 0, 1, 1,2)
         layout.addWidget(type_label, 1, 0)
         layout.addWidget(self.type_combo, 1, 1, 1,2)
@@ -610,10 +610,10 @@ class CreateNewReport(QDialog):
             "其他": "others"
         }
         # collect data
-        name = self.name_edit.text().strip(' ')
+        title = self.name_edit.text().strip(' ')
         type_text = self.type_combo.currentText()
         file_path = self.file_edit.text()
-        if not name:
+        if not title:
             QMessageBox.warning(self, "错误", "请起一个名字!", QMessageBox.Yes)
             return
         if not type_text:
@@ -623,7 +623,7 @@ class CreateNewReport(QDialog):
             QMessageBox.warning(self, "错误", "请选择报告文件!", QMessageBox.Yes)
             return
         self.new_data_signal.emit({
-            'name': name,
+            'title': title,
             'type_zh': type_text,
             'type_en': type_dict.get(type_text, None),
             'file_path': file_path

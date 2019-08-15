@@ -60,6 +60,31 @@ class Maintenance(QWidget):
         self.left_tree_thread.response_signal.connect(self.set_tree_menu)
         self.left_tree_thread.start()
 
+    def set_tree_menu(self, content):
+        """ set the left list navigate"""
+        print('windows.maintenance.py {} : '.format(str(sys._getframe().f_lineno)), content)
+        if content['error']:
+            return
+        for module in content['data']:
+            menu = QTreeWidgetItem(self.left_tree)
+            menu.setText(0, module['name'])
+            # menu.setTextAlignment(0, Qt.AlignCenter)
+            menu.name_en = module['name_en']
+            sub_menus = module['subs']
+            # 添加子节点
+            for sub_module in sub_menus:
+                child = QTreeWidgetItem()
+                child.name_en = sub_module['name_en']
+                child.setText(0, sub_module['name'])
+                menu.addChild(child)
+                # 添加孙节点
+                grandson_menus = sub_module['subs']
+                for grand_module in grandson_menus:
+                    grand_son = QTreeWidgetItem()
+                    grand_son.name_en = grand_module['name_en']
+                    grand_son.setText(0, grand_module['name'])
+                    child.addChild(grand_son)
+
     def left_tree_clicked(self):
         """ click action """
         item = self.left_tree.currentItem()
@@ -70,76 +95,55 @@ class Maintenance(QWidget):
                 item.setExpanded(True)
         else:
             parent = item.parent()
-            text = item.text(0)
+            name_text = item.text(0)
+            name_en = item.name_en
             parent_text = parent.parent().text(0) if parent.parent() else parent.text(0)  # has grandpa parent text is grandpa
-            if  parent_text == '首页':
-                if text == '公告栏':
+            parent_en = parent.parent().name_en if parent.parent() else parent.name_en  # has grandpa parent text is grandpa
+            tab_name = parent_text + '·' + name_text
+            if parent_en == 'home_page':
+                if name_en == 'bulletin':
                     tab = BulletinInfo()
-                elif text == '轮播广告':
-                    tab = CarouselInfo()
-                elif text == '常规报告':
+                # elif parent_en == '轮播广告':
+                #     tab = CarouselInfo()
+                elif name_en == 'routine_report':
                     tab = ReportInfo()
-                elif text == '交易通知':
-                    tab = NoticeInfo()
-                elif text == '现货报表':
-                    tab = CommodityInfo()
-                elif text == '财经日历':
-                    tab = FinanceInfo()
+                # elif text == '交易通知':
+                #     tab = NoticeInfo()
+                # elif text == '现货报表':
+                #     tab = CommodityInfo()
+                # elif text == '财经日历':
+                #     tab = FinanceInfo()
                 else:
-                    tab = NoDataWindow(name=text)
-            elif parent_text == '产品服务':
-                if text == '菜单列表':
+                    tab = NoDataWindow(name=tab_name)
+            elif parent_en == '产品服务':
+                if name_en == '菜单列表':
                     tab = PServiceMenuInfo()
-                elif text == '短信通':
-                    tab = MSGCommunication()
-                elif text == '市场分析':
-                    tab = MarketAnalysis()
-                elif text == '专题研究':
-                    tab = TopicalStudy()
-                elif text == '调研报告':
-                    tab = ResearchReport()
-                elif text == '人才培养':
-                    tab = PersonTrain()
+                # elif text == '短信通':
+                #     tab = MSGCommunication()
+                # elif text == '市场分析':
+                #     tab = MarketAnalysis()
+                # elif text == '专题研究':
+                #     tab = TopicalStudy()
+                # elif text == '调研报告':
+                #     tab = ResearchReport()
+                # elif text == '人才培养':
+                #     tab = PersonTrain()
 
                 else:
-                    tab = NoDataWindow(name=text)
-            elif parent_text == '系统信息':
-                if text == '客户端':
-                    tab = ClientInfo()
-                elif text == '用户':
-                    tab = UserInfo()
-                else:
-                    tab = NoDataWindow(name=text)
+                    tab = NoDataWindow(name=tab_name)
+            # elif parent_text == '系统信息':
+            #     if text == '客户端':
+            #         tab = ClientInfo()
+            #     elif text == '用户':
+            #         tab = UserInfo()
+            #     else:
+            #         tab = NoDataWindow(name=text)
             else:
-                tab = NoDataWindow(name=text)
-            self.right_tab.addTab(tab, text)
+                tab = NoDataWindow(name=tab_name)
+            self.right_tab.addTab(tab, tab_name)
             self.right_tab.setCurrentWidget(tab)
 
-    def set_tree_menu(self, content):
-        """ set the left list navigate"""
-        print('windows.maintenance.py {} : '.format(str(sys._getframe().f_lineno)), content)
-        if content['error']:
-            return
-        for module in content['data']:
-            menu = QTreeWidgetItem(self.left_tree)
-            menu.setText(0, module['name'])
-            # menu.setTextAlignment(0, Qt.AlignCenter)
-            menu.id = module['id']
-            menu.name_en = module['name_en']
-            sub_menus = module['subs']
-            # 添加子节点
-            for sub_module in sub_menus:
-                child = QTreeWidgetItem()
-                child.id = sub_module['id']
-                child.setText(0, sub_module['name'])
-                menu.addChild(child)
-                # 添加孙节点
-                grandson_menus = sub_module['subs']
-                for grand_module in grandson_menus:
-                    grand_son = QTreeWidgetItem()
-                    grand_son.id = grand_module['id']
-                    grand_son.setText(0, grand_module['name'])
-                    child.addChild(grand_son)
+
 
 
 

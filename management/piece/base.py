@@ -321,6 +321,7 @@ class PermitBar(QWidget):
     def register_button_clicked(self):
         from popup.base import Register
         popup = Register()
+        popup.login_signal.connect(self.has_login)
         popup.deleteLater()
         popup.exec()
         del popup

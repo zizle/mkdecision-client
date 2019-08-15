@@ -201,6 +201,7 @@ class Login(QDialog):
 class Register(QDialog):
     """注册弹窗"""
     button_click_signal = pyqtSignal(str)
+    login_signal = pyqtSignal(str)
 
     def __init__(self):
         super(Register, self).__init__()
@@ -269,16 +270,16 @@ class Register(QDialog):
         self.register_button.setStyleSheet("color:#FFFFFF;font-size:15px;background-color:rgb(30,50,190);")
         self.register_button.setGeometry(145, 330, 220, 35)
         self.register_button.clicked.connect(self.register_account)
-        # 已有账号
-        has_account = QLabel("已有账号?", self)
-        has_account.setStyleSheet("font-size:11px;")
-        has_account.setGeometry(145, 370, 60, 20)
-        # 登录
-        self.login_button = QPushButton("登录", self)
-        self.login_button.setStyleSheet("font-size:11px;border:none;color:rgb(30,50,190)")
-        self.login_button.setGeometry(195, 370, 30, 20)
-        self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
-        self.login_button.clicked.connect(self.to_login)
+        # # 已有账号
+        # has_account = QLabel("已有账号?", self)
+        # has_account.setStyleSheet("font-size:11px;")
+        # has_account.setGeometry(145, 370, 60, 20)
+        # # 登录
+        # self.login_button = QPushButton("登录", self)
+        # self.login_button.setStyleSheet("font-size:11px;border:none;color:rgb(30,50,190)")
+        # self.login_button.setGeometry(195, 370, 30, 20)
+        # self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
+        # self.login_button.clicked.connect(self.to_login)
         self.setStyleSheet("RegisterDialog {border:1px solid rgb(54, 157, 180)}")
 
     def agreement_state_changed(self):
@@ -292,8 +293,12 @@ class Register(QDialog):
 
     def to_login(self):
         # close self and to show login dialog widget
+        def emit_login_successful(message):
+            # 重新实例化的登录窗口，要再次传出信号才能改变登录栏的显示状态
+            popup.successful_login.emit(message)
         self.close()
         popup = Login()
+        popup.successful_login.connect(emit_login_successful)
         popup.deleteLater()
         popup.exec()
         del popup
