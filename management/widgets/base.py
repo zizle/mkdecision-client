@@ -8,7 +8,7 @@ import sys
 import json
 from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QWidget, QPushButton, QScrollArea, QVBoxLayout, QGridLayout
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
-from PyQt5.QtGui import QCursor
+from PyQt5.QtGui import QCursor, QPalette
 
 import config
 from thread.request import RequestThread
@@ -135,7 +135,6 @@ class MenuScrollContainer(QScrollArea):
         self.setFixedWidth(70 * column + (column + 1) * 10)
         self.column = column
         self.horizontalScrollBar().setVisible(False)
-        # self.verticalScrollBar().setVisible(True)
         # widget and layout
         self.menu_container = QWidget()  # main widget
         self.menu_container.setFixedWidth(70 * column + (column + 1) * 10)

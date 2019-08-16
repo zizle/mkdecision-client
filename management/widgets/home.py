@@ -182,13 +182,11 @@ class BulletinTable(QTableWidget):
         if current_item:
             row = current_item.row()
             for item in [self.item(row, col) for col in range(self.columnCount())]:
-                # item.setBackground(QBrush(QColor(200, 200, 200)))  # 改变了当前的item背景色
                 item.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
             for other_row in range(self.rowCount()):
                 if other_row == row:
                     continue
                 for other_item in [self.item(other_row, col) for col in range(self.columnCount())]:
-                    # other_item.setBackground(QBrush(QColor(240, 240, 240)))  # 改变了其他的item背景色
                     other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
 
 

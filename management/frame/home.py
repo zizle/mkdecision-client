@@ -103,6 +103,8 @@ class Finance(QWidget):
         self.table = NormalTable()
         # signal
         self.calendar_selection.click_date.connect(self.mouse_select_date)
+        # style
+        layout.setContentsMargins(0,0,0,0)
         # add to layout
         layout.addWidget(self.calendar_selection)
         layout.addWidget(self.table)
@@ -175,6 +177,7 @@ class Notice(QWidget):
         layout.addWidget(self.table)
         layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
         # style
+        layout.setContentsMargins(0,0,0,0)
         self.page_controller.hide()
         self.setLayout(layout)
         # initial data

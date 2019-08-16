@@ -7,12 +7,38 @@ Author: zizle
 import sys
 from PyQt5.QtWidgets import *
 
+import config
+from widgets.base import MenuScrollContainer
 from piece.pservice import MenuListWidget
 from frame.base import NoDataWindow
 from frame.pservice import MsgCommunication, MarketAnalysis, PersonTrain, TopicalStudy, ResearchReport
 
 
-class PService(QWidget):
+class PService(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(PService, self).__init__(*args, **kwargs)
+        pservice = QWidget()
+        layout = QHBoxLayout()
+        # widgets
+        left_menu = MenuScrollContainer(column=3)
+        self.show_tab = QWidget()
+        # signal
+
+        # style
+        layout.setContentsMargins(0,0,0,0)
+        self.setWidgetResizable(True)
+        # add to layout
+        layout.addWidget(left_menu)
+        layout.addWidget(self.show_tab)
+        pservice.setLayout(layout)
+        self.setWidget(pservice)
+        # initial data
+        # 左侧2级菜单
+        left_menu.get_menu(url=config.SERVER_ADDR + 'pservice/module/')
+
+
+
+class PService1(QWidget):
     def __init__(self, *args, **kwargs):
         super(PService, self).__init__(*args, **kwargs)
         layout = QHBoxLayout()

@@ -17,9 +17,7 @@ from frame.home import Report, Notice, Commodity, Finance
 class HomePage(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(HomePage, self).__init__(*args, **kwargs)
-        self.home = QWidget()
-        self.setWidgetResizable(True)  # resize to windows size
-        self.setWidget(self.home)
+        home = QWidget()
         layout = QGridLayout()
         # widgets
         show_bulletin = BulletinTable()  # bulletin table
@@ -33,18 +31,20 @@ class HomePage(QScrollArea):
         # signal
         left_menu.menu_clicked.connect(self.tree_menu_clicked)
         # style
+        self.setWidgetResizable(True)  # resize to windows size
         layout.setContentsMargins(0,0,0,0)
         show_bulletin.setFixedWidth(330)
         show_bulletin.setFixedHeight(350)
         caro_show.setFixedHeight(350)
         self.show_tab.setTabBarAutoHide(True)
         # add to layout
+        self.setWidget(home)
         layout.addWidget(show_bulletin, 0, 0)
         layout.addWidget(caro_show, 0, 1)
         layout.addWidget(left_menu, 1, 0)
         layout.addWidget(self.show_tab, 1, 1)
         self.show_tab.addTab(self.report_show, '常规报告·全部')
-        self.home.setLayout(layout)  # add layout to home widget
+        home.setLayout(layout)  # add layout to home widget
         # initial data
         show_bulletin.get_bulletin(url=config.SERVER_ADDR + "homepage/bulletin/") # bulletin
         caro_show.get_carousel(url=config.SERVER_ADDR + 'homepage/carousel/') # carousel
