@@ -13,7 +13,7 @@ from PyQt5.QtGui import QCursor
 import config
 from thread.request import RequestThread
 
-__all__ = ('Loading', 'TableShow', 'MenuScrollContainer')
+__all__ = ('Loading', 'TableShow', 'MenuScrollContainer', 'NormalTable')
 
 
 class Loading(QLabel):
@@ -118,7 +118,6 @@ class TableShow(QTableWidget):
                 item.setTextAlignment(Qt.AlignCenter)
                 item.content_id = contents[row]['id']
                 self.setItem(row, col, item)
-        # 设定固定高度
         self.setMinimumHeight(35 + row * 30)
 
     def clear(self):
@@ -146,6 +145,9 @@ class MenuScrollContainer(QScrollArea):
         self.menu_container.setLayout(container_layout)
         # self.setWidget(self.menu_container)  # main widget add scroll area (must be add after drawing)
         self.setStyleSheet("""
+        MenuScrollContainer{
+            background-color: rgb(255,255,255);
+        }
         QPushButton{
             color: rgb(50,50,50);
             border: none;
@@ -163,6 +165,7 @@ class MenuScrollContainer(QScrollArea):
             font-size:14px;
         }
         MenuWidget{
+            background-color: rgb(255,255,255);
             border-bottom: 1px solid rgb(170,170,170);
         }
         MenuWidget:hover{
@@ -224,10 +227,14 @@ class MenuScrollContainer(QScrollArea):
             subcontrol-position:top;
         }
         """)
+        # initial data
+        self.menu_thread = None
 
     def get_menu(self, url=None):
         if not url:
             return
+        if self.menu_thread:
+            del self.menu_thread
         self.menu_thread = RequestThread(
             url=url,
             method='get',
@@ -307,8 +314,6 @@ class NormalTable(QTableWidget):
             set_keys.append(key_label[0])
             labels.append(key_label[1])
         self.setHorizontalHeaderLabels(labels)
-        self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
-        self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, 3)  # 最后1列随文字宽度
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
                 if col == 0:

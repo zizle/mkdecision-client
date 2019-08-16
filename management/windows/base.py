@@ -163,10 +163,7 @@ class Base(QWidget):
         if name_en == 'machine_code':
             tab = RegisterClient()
         elif name_en == 'home_page':
-            try:
-                tab = HomePage()
-            except Exception as e:
-                print(e)
+            tab = HomePage()
         elif name_en == 'product_service':
             tab = PService()
         elif name_en == 'maintenance':

@@ -248,6 +248,7 @@ class Calendar(QWidget):
         self.__change_date(sunday)
         # 改变今日样式
         self.__today_style_change()
+        self.click_date.emit(self.date)
 
     def date_clicked(self, date_btn):
         """点击的时间通过信号传出"""
@@ -290,6 +291,9 @@ class Calendar(QWidget):
         self.date_edit.setDate(next_sunday)
         # 改变按钮的date属性与显示
         self.__change_date(next_sunday)
+
+    def set_current_date(self, date):
+        self.date_edit.setDate(date)
 
 
 

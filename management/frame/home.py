@@ -8,18 +8,19 @@ import sys
 import json
 import datetime
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import QDate, Qt
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor
 
 import config
 from thread.request import RequestThread
 from widgets.base import TableShow, NormalTable
 from piece.base import PageController
-from piece.home import ShowCommodity, Calendar, ShowFinance
+from piece.home import Calendar
 from popup.base import ShowServerPDF
 
 
 class Commodity(QWidget):
+    # 现货报表
     def __init__(self, *args, **kwargs):
         super(Commodity, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
@@ -34,7 +35,6 @@ class Commodity(QWidget):
         self.date_selection.setDisplayFormat("yyyy年MM月dd日")  # 时间选择
         self.date_selection.setCalendarPopup(True)
         self.date_selection.setCursor(QCursor(Qt.PointingHandCursor))
-        self.set_start_date('today')
         # signal
         date_confirm.clicked.connect(self.get_commodity)
         # add to layout
@@ -64,7 +64,7 @@ class Commodity(QWidget):
         self.commodity_thread.start()
 
     def commodity_thread_back(self, signal):
-        print('piece.home.py {} 现货报表: '.format(str(sys._getframe().f_lineno)), signal)
+        print('frame.home.py {} 现货报表: '.format(str(sys._getframe().f_lineno)), signal)
         if signal['error']:
             return
         # 展示数据
@@ -78,11 +78,12 @@ class Commodity(QWidget):
             ('date', '日期'),
         ]
         self.table.show_content(contents=signal['data'], header_couple=header_couple)
+        self.table.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
+        self.table.horizontalHeader().setSectionResizeMode(self.table.columnCount() - 1, 3)  # 最后1列随文字宽度
 
-    def set_start_date(self, date_name):
+    def set_current_date(self, date_name):
         if date_name == 'today':
             date = datetime.datetime.now()
-
         elif date_name == 'yesterday':
             date = datetime.datetime.now() + datetime.timedelta(days=-1)
         elif date_name == 'tomorrow':
@@ -93,14 +94,74 @@ class Commodity(QWidget):
 
 
 class Finance(QWidget):
+    # 财经日历
     def __init__(self, *args, **kwargs):
         super(Finance, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
+        # widgets
+        self.calendar_selection = Calendar()
+        self.table = NormalTable()
+        # signal
+        self.calendar_selection.click_date.connect(self.mouse_select_date)
+        # add to layout
+        layout.addWidget(self.calendar_selection)
+        layout.addWidget(self.table)
         self.setLayout(layout)
+        # initial data
+        self.finance_thread = None
+
+    def get_finance(self):
+        date = self.calendar_selection.date_edit.date().toPyDate()
+        url = config.SERVER_ADDR + 'homepage/finance/?date=' + str(date)
+        if self.finance_thread:
+            del self.finance_thread
+        self.finance_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.finance_thread.response_signal.connect(self.finance_thread_back)
+        self.finance_thread.finished.connect(self.finance_thread.deleteLater)
+        self.finance_thread.start()
+
+    def finance_thread_back(self, signal):
+        print('frame.home.py {} 财经日历: '.format(str(sys._getframe().f_lineno)), signal)
+        if signal['error']:
+            return
+        # 展示数据
+        header_couple = [
+            ('serial_num', '序号'),
+            ('date', '日期'),
+            ('time', '时间'),
+            ('country', '地区'),
+            ('event', '事件描述'),
+            ('expected', '预期值'),
+        ]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
+        self.table.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
+        self.table.horizontalHeader().setSectionResizeMode(1, 3)
+        self.table.horizontalHeader().setSectionResizeMode(2, 3)
+
+    def mouse_select_date(self, date):
+        self.calendar_selection.date_edit.setDate(date)
+        self.get_finance()
+
+    def set_current_date(self, date_name):
+        if date_name == 'today':
+            date = datetime.datetime.now()
+        elif date_name == 'yesterday':
+            date = datetime.datetime.now() + datetime.timedelta(days=-1)
+        elif date_name == 'tomorrow':
+            date = datetime.datetime.now() + datetime.timedelta(days=1)
+        else:
+            date = datetime.datetime.now()
+        self.calendar_selection.set_current_date(date)
 
 
 class Notice(QWidget):
-    # 交易通知显示窗口
+    # 交易通知
     def __init__(self, *args, **kwargs):
         super(Notice, self).__init__(*args, *kwargs)
         layout = QVBoxLayout()
@@ -169,7 +230,7 @@ class Notice(QWidget):
 
 
 class Report(QWidget):
-    # 常规报告显示窗口
+    # 常规报告
     def __init__(self, *args, **kwargs):
         super(Report, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
@@ -236,27 +297,3 @@ class Report(QWidget):
             popup.deleteLater()
             popup.exec()
             del popup
-
-
-
-
-
-
-class Finance1(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(Finance, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(spacing=5)
-        # calendar
-        calendar_selection = Calendar()
-        self.show_table = ShowFinance()
-        # signal
-        calendar_selection.click_date.connect(self.date_selected)
-        layout.addWidget(calendar_selection)
-        layout.addWidget(self.show_table)
-        self.setLayout(layout)
-        self.show_table.get_finance(url=config.SERVER_ADDR + 'homepage/finance/')  # query param date=None
-
-    def date_selected(self, date):
-        self.show_table.get_finance(url=config.SERVER_ADDR + 'homepage/finance/?date=' + str(date.toPyDate()))
-
-

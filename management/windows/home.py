@@ -66,18 +66,22 @@ class HomePage(QScrollArea):
             self.notice_show.get_notices(category=name_en)
             tab = self.notice_show
         elif parent_en == 'spot_statement':
-            if not self.commodity_show:
-                self.commodity_show = Commodity()
-            self.commodity_show.set_start_date(date_name=name_en)
-            self.commodity_show.get_commodity()
-            tab = self.commodity_show
+            try:
+                if not self.commodity_show:
+                    self.commodity_show = Commodity()
+                self.commodity_show.set_current_date(date_name=name_en)
+                self.commodity_show.get_commodity()
+                tab = self.commodity_show
+            except Exception as e:
+                print(e)
         elif parent_en == 'economic_calendar':
             if not self.finance_show:
                 self.finance_show = Finance()
+            self.finance_show.set_current_date(date_name=name_en)
+            self.finance_show.get_finance()
             tab = self.finance_show
         else:
             tab = NoDataWindow(name=parent + '·' + menu.text())
-
         self.show_tab.clear()
         self.show_tab.addTab(tab, menu.text())
 

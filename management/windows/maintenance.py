@@ -1,7 +1,5 @@
 # _*_ coding:utf-8 _*_
 """
-管理端数据维护窗口
-Create: 2019-07-22
 Update: 2019-07-22
 Author: zizle
 """
@@ -11,7 +9,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
-from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceInfo
+from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
 from frame.maintain.pservice import PServiceMenuInfo, PersonTrain, MSGCommunication, MarketAnalysis, TopicalStudy, ResearchReport
 from thread.request import RequestThread
 import config
@@ -111,10 +109,8 @@ class Maintenance(QWidget):
                     tab = NoticeMaintain()
                 elif name_en == 'spot_statement':
                     tab = CommodityMaintain()
-                # elif text == '现货报表':
-                #     tab = CommodityInfo()
-                # elif text == '财经日历':
-                #     tab = FinanceInfo()
+                elif name_en == 'economic_calendar':
+                    tab = FinanceMaintain()
                 else:
                     tab = NoDataWindow(name=tab_name)
             elif parent_en == '产品服务':
