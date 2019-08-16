@@ -3,6 +3,8 @@
 Create: 2019-08-15
 Author: zizle
 """
+import sys
+import json
 import requests
 import webbrowser
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QAbstractItemView, QLabel
@@ -10,7 +12,9 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QBrush, QColor, QFont, QPixmap
 
 import config
+from thread.request import RequestThread
 from popup.base import ShowServerPDF, ShowHtmlContent
+
 
 class BulletinTable(QTableWidget):
     def __init__(self, *args):
@@ -87,28 +91,31 @@ class BulletinTable(QTableWidget):
             subcontrol-position:top;
         }
         """)
+        # actions
+        self.ble_thread = None
+        self.cellClicked.connect(self.show_bulletin_detail)
 
-    def leaveEvent(self, *args, **kwargs):
-        """鼠标离开控件"""
-        for row in range(self.rowCount()):
-            for col in range(self.columnCount()):
-                self.item(row, col).setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+    def get_bulletin(self, url):
+        if self.ble_thread:
+            del self.ble_thread
+        self.ble_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.ble_thread.response_signal.connect(self.ble_thread_back)
+        self.ble_thread.finished.connect(self.ble_thread.deleteLater)
+        self.ble_thread.start()
 
-    def mouseMoveEvent(self, event):
-        """鼠标移动事件"""
-        # 获取当前这个item
-        current_item = self.itemAt(event.pos())
-        if current_item:
-            row = current_item.row()
-            for item in [self.item(row, col) for col in range(self.columnCount())]:
-                # item.setBackground(QBrush(QColor(200, 200, 200)))  # 改变了当前的item背景色
-                item.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
-            for other_row in range(self.rowCount()):
-                if other_row == row:
-                    continue
-                for other_item in [self.item(other_row, col) for col in range(self.columnCount())]:
-                    # other_item.setBackground(QBrush(QColor(240, 240, 240)))  # 改变了其他的item背景色
-                    other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+    def ble_thread_back(self, signal):
+        print('piece.home.py {} 公告: '.format(str(sys._getframe().f_lineno)), signal)
+        if signal['error']:
+            return
+        # 展示数据
+        header_couple = [('title', '标题'), ('to_look', ''), ('create_time', '上传时间')]
+        self.show_content(contents=signal['data'], header_couple=header_couple)
 
     def show_content(self, contents, header_couple):
         row = len(contents)
@@ -147,6 +154,43 @@ class BulletinTable(QTableWidget):
                     item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, item)
 
+    def show_bulletin_detail(self, row, col):
+        if col == 1:
+            item = self.item(row, col)
+            name_item = self.item(row, 0)
+            if item.file:
+                popup = ShowServerPDF(file_url= config.SERVER_ADDR + item.file, file_name=name_item.text())
+                popup.deleteLater()
+                popup.exec()
+                del popup
+            elif item.content:
+                popup = ShowHtmlContent(content=item.content, title=name_item.text())
+                popup.deleteLater()
+                popup.exec()
+                del popup
+
+    def leaveEvent(self, *args, **kwargs):
+        """鼠标离开控件"""
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
+                self.item(row, col).setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+
+    def mouseMoveEvent(self, event):
+        """鼠标移动事件"""
+        # 获取当前这个item
+        current_item = self.itemAt(event.pos())
+        if current_item:
+            row = current_item.row()
+            for item in [self.item(row, col) for col in range(self.columnCount())]:
+                # item.setBackground(QBrush(QColor(200, 200, 200)))  # 改变了当前的item背景色
+                item.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
+            for other_row in range(self.rowCount()):
+                if other_row == row:
+                    continue
+                for other_item in [self.item(other_row, col) for col in range(self.columnCount())]:
+                    # other_item.setBackground(QBrush(QColor(240, 240, 240)))  # 改变了其他的item背景色
+                    other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+
 
 class CarouselLabel(QLabel):
     pixmap_list = list()
@@ -163,6 +207,30 @@ class CarouselLabel(QLabel):
         self.ad_redirect = None
         self.pixmap_flag = 0
         self.setScaledContents(True)
+        # actions
+        self.carousel_thread = None
+
+    def get_carousel(self, url):
+        # get advertisement carousel data
+        if self.carousel_thread:
+            del self.carousel_thread
+        self.carousel_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.carousel_thread.finished.connect(self.carousel_thread.deleteLater)
+        self.carousel_thread.response_signal.connect(self.carousel_thread_back)
+        self.carousel_thread.start()
+
+    def carousel_thread_back(self, signal):
+        # set advertisement carousel
+        print('piece.home.py {} 轮播数据: '.format(str(sys._getframe().f_lineno)), signal)
+        if signal['error']:
+            return
+        self.show_carousel(contents=signal['data'])
 
     def show_carousel(self, contents):
         self.pixmap_list.clear()

@@ -12,6 +12,7 @@ from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap
 import config
 
 class MenuBar(QWidget):
+    # 横向菜单栏
     menu_btn_clicked = pyqtSignal(QPushButton)
     def __init__(self, *args, **kwargs):
         super(MenuBar, self).__init__(*args, **kwargs)
@@ -40,7 +41,7 @@ class MenuBar(QWidget):
 
 
 class PDFReaderContent(QWidget):
-    """显示PDF内容控件"""
+    # 显示PDF内容控件
     def __init__(self):
         super(PDFReaderContent, self).__init__()
         self.page_layout = QVBoxLayout()  # 每一页内容展示在一个竖向布局中
@@ -70,8 +71,8 @@ class PDFReaderContent(QWidget):
 
 
 class PageController(QWidget):
+    # 页码控制器
     clicked = pyqtSignal(int)
-
     def __init__(self, *args, **kwargs):
         super(PageController, self).__init__(*args, **kwargs)
         # total page
@@ -196,6 +197,7 @@ class PageController(QWidget):
 
 
 class PermitBar(QWidget):
+    # 登录注销栏
     def __init__(self, *args, **kwargs):
         super(PermitBar, self).__init__(*args, **kwargs)
         styleSheet = """
@@ -376,17 +378,12 @@ class TableCheckBox(QWidget):
 
 
 class TitleBar(QWidget):
-    # 窗口最小化信号
-    windowMinimumed = pyqtSignal()
-    # 窗口最大化信号
-    windowMaximumed = pyqtSignal()
-    # 窗口还原信号
-    windowNormaled = pyqtSignal()
-    # 窗口关闭信号
-    windowClosed = pyqtSignal()
-    # 窗口移动
-    windowMoved = pyqtSignal(QPoint)
-
+    # 窗口标题栏
+    windowMinimumed = pyqtSignal()  # 窗口最小化信号
+    windowMaximumed = pyqtSignal()  # 窗口最大化信号
+    windowNormaled = pyqtSignal()  # 窗口还原信号
+    windowClosed = pyqtSignal()  # 窗口关闭信号
+    windowMoved = pyqtSignal(QPoint)  # 窗口移动
     def __init__(self, *args, **kwargs):
         super(TitleBar, self).__init__(*args, **kwargs)
         # 样式

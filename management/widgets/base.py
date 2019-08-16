@@ -13,11 +13,14 @@ from PyQt5.QtGui import QCursor
 import config
 from thread.request import RequestThread
 
+__all__ = ('Loading', 'TableShow', 'MenuScrollContainer')
+
+
 class Loading(QLabel):
     clicked = pyqtSignal(bool)
 
     def __init__(self, *args):
-        super(Loading, self).__init__()
+        super(Loading, self).__init__(*args)
         self.click_able = False
         self.loading_text = '数据请求中···'
         self.setText(self.loading_text)
@@ -74,7 +77,10 @@ class Loading(QLabel):
 class TableShow(QTableWidget):
     def __init__(self, *args):
         super(TableShow, self).__init__(*args)
-        self.verticalHeader().setVisible(False)
+        # style
+        self.horizontalHeader().setSectionResizeMode(1)  # 横向随控件大小
+        self.verticalHeader().setVisible(False)  # 纵向随控件大小
+        self.verticalHeader().setSectionResizeMode(1)
 
     def show_content(self, contents, header_couple, show='file'):
         if show not in ['file', 'content']:
@@ -90,7 +96,6 @@ class TableShow(QTableWidget):
             set_keys.append(key_label[0])
             labels.append(key_label[1])
         self.setHorizontalHeaderLabels(labels)
-        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
         self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
         self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, 3)  # 最后1列随文字宽度
         for row in range(self.rowCount()):
@@ -113,43 +118,13 @@ class TableShow(QTableWidget):
                 item.setTextAlignment(Qt.AlignCenter)
                 item.content_id = contents[row]['id']
                 self.setItem(row, col, item)
+        # 设定固定高度
+        self.setMinimumHeight(35 + row * 30)
 
     def clear(self):
         super().clear()
         self.setRowCount(0)
         self.setColumnCount(0)
-
-
-class LeaderLabel(QLabel):
-    # 菜单的展开与关闭label
-    clicked = pyqtSignal(QLabel)
-    def __init__(self, *args):
-        super(LeaderLabel, self).__init__(*args)
-        self.setStyleSheet('padding:8px 0; border:none')
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.clicked.emit(self)
-
-
-class MenuButton(QPushButton):
-    # 菜单
-    mouse_clicked = pyqtSignal(QPushButton)
-
-    def __init__(self, *args, **kwargs):
-        super(MenuButton, self).__init__(*args)
-        self.clicked.connect(self.btn_clicked)
-        self.setCursor(QCursor(Qt.PointingHandCursor))
-
-    def btn_clicked(self):
-        self.mouse_clicked.emit(self)
-
-
-class MenuWidget(QWidget):
-    # 每个菜单块容器
-    def __init__(self, *args, **kwargs):
-        super(MenuWidget, self).__init__(*args, **kwargs)
-        self.setAttribute(Qt.WA_StyledBackground, True)
 
 
 class MenuScrollContainer(QScrollArea):
@@ -310,6 +285,85 @@ class MenuScrollContainer(QScrollArea):
 
     def click_menu(self, button):
         self.menu_clicked.emit(button)
+
+
+class NormalTable(QTableWidget):
+    def __init__(self, *args):
+        super(NormalTable, self).__init__(*args)
+        # style
+        self.horizontalHeader().setSectionResizeMode(1)  # 横向随控件大小
+        self.verticalHeader().setVisible(False)  # 纵向随控件大小
+        self.verticalHeader().setSectionResizeMode(1)
+
+    def show_content(self, contents, header_couple):
+        if not isinstance(contents, list):
+            raise ValueError('content must be a list.')
+        row = len(contents)
+        self.setRowCount(row)
+        self.setColumnCount(len(header_couple))  # 列数
+        labels = []
+        set_keys = []
+        for key_label in header_couple:
+            set_keys.append(key_label[0])
+            labels.append(key_label[1])
+        self.setHorizontalHeaderLabels(labels)
+        self.horizontalHeader().setSectionResizeMode(0, 3)  # 第1列随文字宽度
+        self.horizontalHeader().setSectionResizeMode(self.columnCount()-1, 3)  # 最后1列随文字宽度
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
+                if col == 0:
+                    item = QTableWidgetItem(str(row + 1))
+                else:
+                    label_key = set_keys[col]
+                    item = QTableWidgetItem(str(contents[row][label_key]))
+                item.setTextAlignment(Qt.AlignCenter)
+                item.content_id = contents[row]['id']
+                self.setItem(row, col, item)
+        # 设定固定高度
+        self.setMinimumHeight(35 + row * 30)
+
+    def clear(self):
+        super().clear()
+        self.setRowCount(0)
+        self.setColumnCount(0)
+
+
+"""本模块内部自引用控件"""
+
+# /* 菜单栏内部控件 */
+
+class LeaderLabel(QLabel):
+    # 菜单的展开与关闭label
+    clicked = pyqtSignal(QLabel)
+    def __init__(self, *args):
+        super(LeaderLabel, self).__init__(*args)
+        self.setStyleSheet('padding:8px 0; border:none')
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self)
+
+
+class MenuButton(QPushButton):
+    # 菜单
+    mouse_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(MenuButton, self).__init__(*args)
+        self.clicked.connect(self.btn_clicked)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
+
+    def btn_clicked(self):
+        self.mouse_clicked.emit(self)
+
+
+class MenuWidget(QWidget):
+    # 每个菜单块容器
+    def __init__(self, *args, **kwargs):
+        super(MenuWidget, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+
+# /* 菜单栏内部控件 */
 
 
 

@@ -1,51 +1,131 @@
 # _*_ coding:utf-8 _*_
 """
-homepage frame window will make in tab
+homepage frame window made in tab
 Update: 2019-07-25
 Author: zizle
 """
 import sys
 import json
+import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QCursor
 
 import config
 from thread.request import RequestThread
-from widgets.base import TableShow
-from piece.base import MenuBar, PageController
+from widgets.base import TableShow, NormalTable
+from piece.base import PageController
 from piece.home import ShowCommodity, Calendar, ShowFinance
 from popup.base import ShowServerPDF
 
+
+class Commodity(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(Commodity, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        action_layout = QHBoxLayout()
+        # widgets
+        self.date_selection = QDateEdit()
+        date_confirm = QPushButton('确定')
+        self.table = NormalTable()
+        # style
+        layout.setContentsMargins(0,0,0,0)
+        action_layout.setContentsMargins(0,0,0,0)
+        self.date_selection.setDisplayFormat("yyyy年MM月dd日")  # 时间选择
+        self.date_selection.setCalendarPopup(True)
+        self.date_selection.setCursor(QCursor(Qt.PointingHandCursor))
+        self.set_start_date('today')
+        # signal
+        date_confirm.clicked.connect(self.get_commodity)
+        # add to layout
+        action_layout.addWidget(self.date_selection)
+        action_layout.addWidget(date_confirm)
+        action_layout.addStretch()
+        layout.addLayout(action_layout)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+        # initial data
+        self.commodity_thread = None
+
+    def get_commodity(self):
+        date = self.date_selection.date().toPyDate()
+        url = config.SERVER_ADDR + 'homepage/commodity/?date=' + str(date)
+        if self.commodity_thread:
+            del self.commodity_thread
+        self.commodity_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.commodity_thread.response_signal.connect(self.commodity_thread_back)
+        self.commodity_thread.finished.connect(self.commodity_thread.deleteLater)
+        self.commodity_thread.start()
+
+    def commodity_thread_back(self, signal):
+        print('piece.home.py {} 现货报表: '.format(str(sys._getframe().f_lineno)), signal)
+        if signal['error']:
+            return
+        # 展示数据
+        header_couple = [
+            ('serial_num', '序号'),
+            ('variety', '品种'),
+            ('area', '地区'),
+            ('level', '等级'),
+            ('price', '价格'),
+            ('note', '备注'),
+            ('date', '日期'),
+        ]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
+
+    def set_start_date(self, date_name):
+        if date_name == 'today':
+            date = datetime.datetime.now()
+
+        elif date_name == 'yesterday':
+            date = datetime.datetime.now() + datetime.timedelta(days=-1)
+        elif date_name == 'tomorrow':
+            date = datetime.datetime.now() + datetime.timedelta(days=1)
+        else:
+            date = datetime.datetime.now()
+        self.date_selection.setDate(date)
+
+
+class Finance(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(Finance, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+
 class Notice(QWidget):
-    def __init__(self, category='all', *args, **kwargs):
+    # 交易通知显示窗口
+    def __init__(self, *args, **kwargs):
         super(Notice, self).__init__(*args, *kwargs)
-        self.category = category
         layout = QVBoxLayout()
         # widgets
-        self.show_message = QLabel('请求中...')
         self.table = TableShow()
         self.page_controller = PageController()
         # signal
         self.page_controller.clicked.connect(self.page_number_changed)
         self.table.cellClicked.connect(self.show_notice_detail)
         # add layout
-        layout.addWidget(self.show_message)
         layout.addWidget(self.table)
         layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
         # style
         self.page_controller.hide()
         self.setLayout(layout)
         # initial data
+        self.category = 'all'
         self.notice_thread = None
-        self.get_notices()
 
-    def get_notices(self, page=1, page_size=20):
-        self.show_message.setText('请求中...')
-        if self.category == 'all':
-            url = config.SERVER_ADDR + 'homepage/notice/'
-        else:
-            url = config.SERVER_ADDR + 'homepage/notice/?category=' + self.category
+    def get_notices(self, category, page=1, page_size=20):
+        if category in ["changelib", "company", "system", "others"]:
+            self.category = category
+        url = config.SERVER_ADDR + 'homepage/notice/'
+        if self.category != 'all':
+            url += '?category=' + self.category
         print('frame.home.py {} 请求通知：'.format(sys._getframe().f_lineno), url)
         if self.notice_thread:
             del self.notice_thread
@@ -67,9 +147,7 @@ class Notice(QWidget):
     def notice_thread_back(self, signal):
         print('frame.home.py {} 通知数据：'.format(sys._getframe().f_lineno), signal)
         if signal['error']:
-            self.show_message.setText('出错.\n{}'.format(signal['message']))
             return
-        self.show_message.hide()
         if signal['page_num'] > 1:  # 数据大于1页设置页码控制器
             self.page_controller.set_total_page(signal['page_num'])
             self.page_controller.show()
@@ -78,7 +156,7 @@ class Notice(QWidget):
         self.table.show_content(contents=signal['data'], header_couple=header_couple)
 
     def page_number_changed(self, page):
-        self.get_notices(page=page)
+        self.get_notices(category=self.category, page=page)
 
     def show_notice_detail(self, row, col):
         if col == 4:
@@ -91,34 +169,33 @@ class Notice(QWidget):
 
 
 class Report(QWidget):
-    def __init__(self, category='all', *args, **kwargs):
+    # 常规报告显示窗口
+    def __init__(self, *args, **kwargs):
         super(Report, self).__init__(*args, **kwargs)
-        self.category=category
         layout = QVBoxLayout()
         # widgets
-        self.show_message = QLabel('请求中...')
         self.table = TableShow()
         self.page_controller = PageController()
         # signal
         self.page_controller.clicked.connect(self.page_number_changed)
         self.table.cellClicked.connect(self.show_report_detail)
         # add layout
-        layout.addWidget(self.show_message)
         layout.addWidget(self.table)
         layout.addWidget(self.page_controller, alignment=Qt.AlignCenter)
         # style
+        layout.setContentsMargins(0,0,0,0)
         self.page_controller.hide()
         self.setLayout(layout)
         # initial data
+        self.category = 'all'
         self.report_thread = None
-        self.get_reports()
 
-    def get_reports(self, page=1, page_size=20):
-        self.show_message.setText('请求中...')
-        if self.category == 'all':
-            url = config.SERVER_ADDR + 'homepage/report/'
-        else:
-            url = config.SERVER_ADDR + 'homepage/report/?category=' + self.category
+    def get_reports(self, category, page=1, page_size=1):
+        if category in ["daily", "weekly", "monthly", "annual", "special", "invest", "others"]:
+            self.category = category
+        url = config.SERVER_ADDR + 'homepage/report/'
+        if self.category != 'all':
+            url += '?category=' + self.category
         print('frame.home.py {} 请求报告：'.format(sys._getframe().f_lineno), url)
         if self.report_thread:
             del self.report_thread
@@ -140,9 +217,7 @@ class Report(QWidget):
     def report_thread_back(self, signal):
         print('frame.home.py {} 报告数据：'.format(sys._getframe().f_lineno), signal)
         if signal['error']:
-            self.show_message.setText('出错.{}'.format(signal['message']))
             return
-        self.show_message.hide()
         if signal['page_num'] > 1:  # 数据大于1页设置页码控制器
             self.page_controller.set_total_page(signal['page_num'])
             self.page_controller.show()
@@ -151,7 +226,7 @@ class Report(QWidget):
         self.table.show_content(contents=signal['data'], header_couple=header_couple)
 
     def page_number_changed(self, page):
-        self.get_reports(page=page)
+        self.get_reports(category=self.category, page=page)
 
     def show_report_detail(self, row, col):
         if col == 4:
@@ -167,37 +242,7 @@ class Report(QWidget):
 
 
 
-
-
-
-class Commodity(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(Commodity, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout()
-        # date edit
-        current_date = QDate.currentDate()
-        self.date_selection = QDateEdit(current_date)
-        # show table
-        self.show_table = ShowCommodity()
-        # style
-        self.date_selection.setDisplayFormat("yyyy年MM月dd日")  # 时间选择
-        self.date_selection.setCalendarPopup(True)
-        self.date_selection.setCursor(QCursor(Qt.PointingHandCursor))
-        # signal
-        self.date_selection.dateChanged.connect(self.new_date_selected)
-        # add layout
-        layout.addWidget(self.date_selection, alignment=Qt.AlignLeft)
-        layout.addWidget(self.show_table)
-        self.setLayout(layout)
-        # get commodity
-        self.show_table.get_commodity(url=config.SERVER_ADDR + 'homepage/commodity/')  # query param date=None
-
-    def new_date_selected(self):
-        date = self.date_selection.date().toPyDate()
-        self.show_table.get_commodity(url=config.SERVER_ADDR + 'homepage/commodity/?date=' + str(date))
-
-
-class Finance(QWidget):
+class Finance1(QWidget):
     def __init__(self, *args, **kwargs):
         super(Finance, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(spacing=5)
