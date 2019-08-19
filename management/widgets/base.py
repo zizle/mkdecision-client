@@ -6,7 +6,7 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QWidget, QPushButton, QScrollArea, QVBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QWidget, QPushButton, QScrollArea, QVBoxLayout, QGridLayout,QTextEdit, QTextBrowser
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import QCursor, QPalette
 

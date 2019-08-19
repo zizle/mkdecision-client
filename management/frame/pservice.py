@@ -9,7 +9,7 @@ import json
 import requests
 from lxml import etree
 from fitz.fitz import Document
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QTextBrowser, QLabel, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QTextBrowser, QLabel, QMessageBox, QTextEdit
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 
@@ -28,15 +28,15 @@ class MessageComm(QScrollArea):
         # style
         self.container.setLayout(layout)
         self.setWidgetResizable(True)
-        # self.setStyleSheet("""
-        # QTextBrowser{
-        #     border: none;
-        #     border-bottom: 1px solid rgb(200,200,200)
-        # }
-        # QTextBrowser:hover{
-        #     background:rgb(220,220,220);
-        # }
-        # """)
+        self.setStyleSheet("""
+        QTextBrowser{
+            border: none;
+            border-bottom: 1px solid rgb(200,200,200)
+        }
+        QTextBrowser:hover{
+            background:rgb(220,220,220);
+        }
+        """)
         # 添加显示widget只能在填充内容之后，不然无法看见内容，所以在线程回来处理内容后添加
         # initial data
         self.msg_thread = None
@@ -59,19 +59,21 @@ class MessageComm(QScrollArea):
         print('frame.pservice.py {} 短信通数据: '.format(sys._getframe().f_lineno), signal)
         if signal['error']:
             return
-        content = '<style type="text/css">div:hover{background:rgb(200,200,200)}</style>'
         for item in signal['data'] * 5:
-            content += "<div><h2 style='display:inline-block'>" + item['title'] + "</h2>" + \
+            content = "<h2>" + item['title'] + "</h2>" + \
                               "<span style='display:inline-block'>" + item['create_time'] + "</span>" + \
-                          item['content'] + '</div>'
-
-        text_browser = QTextBrowser()
-        text_browser.setText(content)
-        # text_browser.setMinimumHeight(text_browser.document().lineCount() * 35)
-        print(text_browser.document().adjustSize())
-        self.container.layout().addWidget(text_browser)
-        # self.container.layout().addStretch()
+                          item['content']
+            text_browser = QTextBrowser()
+            text_browser.document().adjustSize()
+            text_browser.setText(content)
+            h = text_browser.document().size().height()
+            text_browser.setMinimumHeight(h + 20)
+            self.container.layout().addWidget(text_browser)
+        self.container.layout().addStretch()
         self.setWidget(self.container)
+
+
+
 
 
 
