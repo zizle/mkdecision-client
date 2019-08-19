@@ -11,30 +11,48 @@ import config
 from widgets.base import MenuScrollContainer
 from piece.pservice import MenuListWidget
 from frame.base import NoDataWindow
-from frame.pservice import MsgCommunication, MarketAnalysis, PersonTrain, TopicalStudy, ResearchReport
+from frame.pservice import MessageComm, MsgCommunication, MarketAnalysis, PersonTrain, TopicalStudy, ResearchReport
 
 
-class PService(QScrollArea):
+class PService(QWidget):
     def __init__(self, *args, **kwargs):
         super(PService, self).__init__(*args, **kwargs)
-        pservice = QWidget()
         layout = QHBoxLayout()
         # widgets
         left_menu = MenuScrollContainer(column=3)
-        self.show_tab = QWidget()
+        self.tab_show = QTabWidget()
         # signal
-
+        left_menu.menu_clicked.connect(self.left_menu_clicked)
         # style
         layout.setContentsMargins(0,0,0,0)
-        self.setWidgetResizable(True)
+        self.tab_show.setTabBarAutoHide(True)
         # add to layout
         layout.addWidget(left_menu)
-        layout.addWidget(self.show_tab)
-        pservice.setLayout(layout)
-        self.setWidget(pservice)
+        layout.addWidget(self.tab_show)
+        self.setLayout(layout)
         # initial data
         # 左侧2级菜单
         left_menu.get_menu(url=config.SERVER_ADDR + 'pservice/module/')
+
+    def left_menu_clicked(self, menu):
+        print('windows.pservice.py {} 选择菜单：'.format(sys._getframe().f_lineno), menu.parent, menu.name_en)
+        parent = menu.parent
+        parent_en = menu.parent_en
+        name = menu.text()
+        name_en = menu.name_en
+        print(name)
+        if parent_en == 'consultation':  # 咨询服务
+            if name_en == 'message_comm':
+                tab = MessageComm()
+            else:
+                tab = NoDataWindow(name=parent + '·' + name)
+        else:
+            tab = NoDataWindow(name=parent + '·' + name)
+        self.tab_show.clear()
+        self.tab_show.addTab(tab, parent + '·' + name)
+
+
+
 
 
 

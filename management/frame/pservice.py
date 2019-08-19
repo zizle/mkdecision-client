@@ -18,6 +18,70 @@ from thread.request import RequestThread
 from widgets.base import Loading, TableShow
 
 
+class MessageComm(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(MessageComm, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        layout.expandingDirections()
+        # widgets
+        self.container = QWidget()
+        # style
+        self.container.setLayout(layout)
+        self.setWidgetResizable(True)
+        # self.setStyleSheet("""
+        # QTextBrowser{
+        #     border: none;
+        #     border-bottom: 1px solid rgb(200,200,200)
+        # }
+        # QTextBrowser:hover{
+        #     background:rgb(220,220,220);
+        # }
+        # """)
+        # 添加显示widget只能在填充内容之后，不然无法看见内容，所以在线程回来处理内容后添加
+        # initial data
+        self.msg_thread = None
+        self.get_message_comm()
+
+    def get_message_comm(self):
+        if self.msg_thread:
+            del self.msg_thread
+        self.msg_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/msg/',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.msg_thread.response_signal.connect(self.msg_thread_back)
+        self.msg_thread.finished.connect(self.msg_thread.deleteLater)
+        self.msg_thread.start()
+
+    def msg_thread_back(self, signal):
+        print('frame.pservice.py {} 短信通数据: '.format(sys._getframe().f_lineno), signal)
+        if signal['error']:
+            return
+        content = '<style type="text/css">div:hover{background:rgb(200,200,200)}</style>'
+        for item in signal['data'] * 5:
+            content += "<div><h2 style='display:inline-block'>" + item['title'] + "</h2>" + \
+                              "<span style='display:inline-block'>" + item['create_time'] + "</span>" + \
+                          item['content'] + '</div>'
+
+        text_browser = QTextBrowser()
+        text_browser.setText(content)
+        # text_browser.setMinimumHeight(text_browser.document().lineCount() * 35)
+        print(text_browser.document().adjustSize())
+        self.container.layout().addWidget(text_browser)
+        # self.container.layout().addStretch()
+        self.setWidget(self.container)
+
+
+
+
+
+
+
+
+
+
 class MarketAnalysis(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(MarketAnalysis, self).__init__(*args, **kwargs)

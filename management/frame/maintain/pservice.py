@@ -18,10 +18,65 @@ from utils import get_desktop_path
 from thread.request import RequestThread
 from piece.base import PageController
 from piece.maintain import TableCheckBox
-from popup.maintain.pservice import CreateNewMenu, CreateMessage, CreateMLSFile, CreateTPSFile, CreateRSRFile
+from popup.maintain.pservice import CreateMessage, CreateMLSFile, CreateTPSFile, CreateRSRFile
 from piece.maintain.pservice import ArticleEditTools
 from widgets.maintain.base import ContentShowTable, TableShow
 from widgets.base import Loading
+
+class MessageCommMaintain(QWidget):
+    def __init__(self):
+        super(MessageCommMaintain, self).__init__()
+        layout = QVBoxLayout()
+        action_layout = QHBoxLayout()
+        # widgets
+        create_btn = QPushButton("+新增")
+        refresh_btn = QPushButton('刷新')
+        self.table = QTableWidget()
+        # signal
+        create_btn.clicked.connect(self.create_new_msg_comm)
+        # style
+        self.table.verticalHeader().setVisible(False)
+        # add to layout
+        action_layout.addWidget(create_btn)
+        action_layout.addWidget(refresh_btn)
+        action_layout.addStretch()
+        layout.addLayout(action_layout)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+    def create_new_msg_comm(self):
+        def create_message(signal):
+            try:
+                response = requests.post(
+                    url=config.SERVER_ADDR + 'pservice/consult/msg/',
+                    data=json.dumps(signal[1]),
+                    cookies=config.app_dawn.value('cookies')
+                )
+                response_data = json.loads(response.content.decode('utf-8'))
+            except Exception as error:
+                QMessageBox.information(popup, '错误', '创建失败.\n{}'.format(error), QMessageBox.Yes)
+                return
+            if response.status_code != 201:
+                QMessageBox.information(popup, '错误', response_data['message'], QMessageBox.Yes)
+                return
+            QMessageBox.information(popup, '成功', '创建成功.赶紧刷新看看吧。', QMessageBox.Yes)
+            popup.close()
+        popup = CreateMessage()
+        popup.new_data_signal.connect(create_message)
+        if not popup.exec():
+            del popup
+
+
+
+
+
+
+
+
+
+
+
+
 
 class MarketAnalysis(QScrollArea):
     def __init__(self):
