@@ -18,6 +18,43 @@ from thread.request import RequestThread
 from widgets.base import Loading, TableShow
 
 
+class MarketAnalysis(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(MarketAnalysis, self).__init__(*args, **kwargs)
+        # widget
+        self.table = TableShow()
+        # style
+        self.table.verticalHeader().setSectionResizeMode(0)
+        self.setWidgetResizable(True)
+        self.setWidget(self.table)
+        # init data
+        self.get_thread = None
+        self.get_market_analysis()
+
+    def get_market_analysis(self):
+        if self.get_thread:
+            del self.get_thread
+        self.get_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/mks/',
+            method='get',
+            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.get_thread.response_signal.connect(self.get_thread_back)
+        self.get_thread.finished.connect(self.get_thread.deleteLater)
+        self.get_thread.start()
+
+    def get_thread_back(self, signal):
+        print('frame.pservice.py {} 市场分析数据: '.format(sys._getframe().f_lineno), signal)
+        if signal['error']:
+            return
+        # 展示数据
+        header_couple = [('serial_num', '序号'), ('title', '标题'), ('create_time', '上传时间'), ('to_look', '')]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
+
+
+
+
 class MessageComm(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(MessageComm, self).__init__(*args, **kwargs)
@@ -84,7 +121,7 @@ class MessageComm(QScrollArea):
 
 
 
-class MarketAnalysis(QScrollArea):
+class MarketAnalysis1(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(MarketAnalysis, self).__init__(*args, **kwargs)
         self.setWidgetResizable(True)

@@ -5,11 +5,15 @@ Update: 2019-07-25
 Author: zizle
 """
 import re
+import json
+import requests
+from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIntValidator
 
 import config
+from utils import get_desktop_path
 
 class CreateNewClient(QDialog):
     new_data_signal = pyqtSignal(dict)
@@ -60,3 +64,81 @@ class CreateNewClient(QDialog):
             return
         # emit signal
         self.new_data_signal.emit(data)
+
+
+class UploadFile(QDialog):
+    def __init__(self, url):
+        super(UploadFile, self).__init__()
+        self.url = url
+        layout = QGridLayout()
+        # widgets
+        title_label = QLabel('标题')
+        file_label = QLabel('文件')
+        self.title_edit = QLineEdit()
+        self.file_edit = QLineEdit()
+        select_btn = QPushButton('选择')
+        submit_btn = QPushButton('提交')
+        # signal
+        select_btn.clicked.connect(self.select_file)
+        submit_btn.clicked.connect(self.submit_file)
+        # style
+        self.setMinimumWidth(300)
+        select_btn.setMaximumWidth(30)
+        self.title_edit.setPlaceholderText('默认文件名')
+        self.file_edit.setEnabled(False)
+        # add layout
+        layout.addWidget(title_label, 0, 0)
+        layout.addWidget(self.title_edit, 0, 1, 1, 2)
+        layout.addWidget(file_label, 1, 0)
+        layout.addWidget(self.file_edit, 1,1)
+        layout.addWidget(select_btn, 1,2)
+        layout.addWidget(submit_btn, 2, 1, 1,2)
+        self.setLayout(layout)
+
+    def select_file(self):
+        # select file
+        desktop_path = get_desktop_path()
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.pdf)")
+        if not file_path:
+            return
+        file_name_list = file_path.rsplit('/', 1)
+        if not self.title_edit.text().strip(' '):
+            self.title_edit.setText((file_name_list[1].rsplit('.', 1))[0])
+        self.file_edit.setText(file_path)
+
+    def submit_file(self):
+        # submit file to server
+        title = self.title_edit.text().strip(' ')
+        if not title:
+            self.title_edit.setPlaceholderText('您还未填写标题.')
+            return
+        data = dict()
+        file_path = self.file_edit.text().strip(' ')
+        file_raw_name = file_path.rsplit("/", 1)
+        file = open(file_path, "rb")
+        file_content = file.read()
+        file.close()
+        data['title'] = title
+        data["file"] = (file_raw_name[1], file_content)
+        data['machine_code'] = config.app_dawn.value('machine')
+        encode_data = encode_multipart_formdata(data)
+        data = encode_data[0]
+        headers = config.CLIENT_HEADERS
+        headers['Content-Type'] = encode_data[1]
+        try:
+            response = requests.post(
+                url=self.url,
+                headers=headers,
+                data=data,
+                cookies=config.app_dawn.value('cookies')
+            )
+        except Exception as error:
+            QMessageBox.information(self, '提示', "发生了个错误!\n{}".format(error), QMessageBox.Yes)
+            return
+        response_data = json.loads(response.content.decode('utf-8'))
+        if response.status_code != 201:
+            QMessageBox.information(self, '提示', response_data['message'], QMessageBox.Yes)
+            return
+        else:
+            QMessageBox.information(self, '成功', '添加成功, 赶紧刷新看看吧.', QMessageBox.Yes)
+            self.close()  # close the dialog

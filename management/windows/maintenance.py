@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
-from frame.maintain.pservice import MessageCommMaintain, PServiceMenuInfo, PersonTrain, MSGCommunication, MarketAnalysis, TopicalStudy, ResearchReport
+from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, PServiceMenuInfo, PersonTrain, MSGCommunication, MarketAnalysis, TopicalStudy, ResearchReport
 from thread.request import RequestThread
 import config
 
@@ -116,6 +116,8 @@ class Maintenance(QWidget):
             elif parent_en == 'product_service':
                 if name_en == 'message_comm':
                     tab = MessageCommMaintain()
+                elif name_en == 'market_analysis':
+                    tab = MarketAnalysisMaintain()
                 # elif text == '短信通':
                 #     tab = MSGCommunication()
                 # elif text == '市场分析':

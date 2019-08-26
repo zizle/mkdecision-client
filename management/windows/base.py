@@ -167,7 +167,7 @@ class Base(QWidget):
         if name_en not in ['machine_code','home_page', 'maintenance'] + access_modules:
             popup = TipShow()
             popup.confirm_btn.clicked.connect(popup.close)
-            popup.information(title='无权限', message='您不能查看此功能，\n请联系管理员开放！')
+            popup.information(title='无权限', message='您不能查看此功能，\n如已登录请联系管理员开放！')
             if not popup.exec():
                 del popup
             return

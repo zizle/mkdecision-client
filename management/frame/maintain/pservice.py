@@ -18,6 +18,7 @@ from utils import get_desktop_path
 from thread.request import RequestThread
 from piece.base import PageController
 from piece.maintain import TableCheckBox
+from popup.maintain.base import UploadFile
 from popup.maintain.pservice import CreateMessage, CreateMLSFile, CreateTPSFile, CreateRSRFile
 from piece.maintain.pservice import ArticleEditTools
 from widgets.maintain.base import ContentShowTable, TableShow
@@ -67,7 +68,31 @@ class MessageCommMaintain(QWidget):
             del popup
 
 
+class MarketAnalysisMaintain(QWidget):
+    def __init__(self):
+        super(MarketAnalysisMaintain, self).__init__()
+        layout = QVBoxLayout()
+        action_layout = QHBoxLayout()
+        # widgets
+        create_btn = QPushButton("+新增")
+        refresh_btn = QPushButton('刷新')
+        self.table = QTableWidget()
+        # signal
+        create_btn.clicked.connect(self.create_new_mks)
+        # style
+        self.table.verticalHeader().setVisible(False)
+        # add to layout
+        action_layout.addWidget(create_btn)
+        action_layout.addWidget(refresh_btn)
+        action_layout.addStretch()
+        layout.addLayout(action_layout)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
 
+    def create_new_mks(self):
+        popup = UploadFile(url=config.SERVER_ADDR + 'pservice/consult/mks/')
+        if not popup.exec():
+            del popup
 
 
 

@@ -11,7 +11,7 @@ import config
 from widgets.base import MenuScrollContainer
 from piece.pservice import MenuListWidget
 from frame.base import NoDataWindow
-from frame.pservice import MessageComm, MsgCommunication, MarketAnalysis, PersonTrain, TopicalStudy, ResearchReport
+from frame.pservice import MessageComm, MarketAnalysis, PersonTrain, TopicalStudy, ResearchReport
 
 
 class PService(QWidget):
@@ -40,10 +40,11 @@ class PService(QWidget):
         parent_en = menu.parent_en
         name = menu.text()
         name_en = menu.name_en
-        print(name)
         if parent_en == 'consultation':  # 咨询服务
             if name_en == 'message_comm':
                 tab = MessageComm()
+            elif name_en == 'market_analysis':
+                tab = MarketAnalysis()
             else:
                 tab = NoDataWindow(name=parent + '·' + name)
         else:

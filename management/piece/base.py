@@ -378,7 +378,6 @@ class TableCheckBox(QWidget):
 
 
 class TitleBar(QWidget):
-    # 窗口标题栏
     windowMinimumed = pyqtSignal()  # 窗口最小化信号
     windowMaximumed = pyqtSignal()  # 窗口最大化信号
     windowNormaled = pyqtSignal()  # 窗口还原信号
@@ -436,7 +435,7 @@ class TitleBar(QWidget):
         # 窗口图标
         self.iconLabel = QLabel(self)
         self.iconLabel.setContentsMargins(8, 0, 3, 0)
-#         self.iconLabel.setScaledContents(True)
+        # self.iconLabel.setScaledContents(True)
         layout.addWidget(self.iconLabel)
         # 窗口标题
         self.titleLabel = QLabel(self)
