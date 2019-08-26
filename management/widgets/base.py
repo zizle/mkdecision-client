@@ -80,7 +80,7 @@ class TableShow(QTableWidget):
         # style
         self.horizontalHeader().setSectionResizeMode(1)  # 横向随控件大小
         self.verticalHeader().setVisible(False)  # 纵向随控件大小
-        self.verticalHeader().setSectionResizeMode(1)
+        # self.verticalHeader().setSectionResizeMode(1)
 
     def show_content(self, contents, header_couple, show='file'):
         if show not in ['file', 'content']:
@@ -118,7 +118,7 @@ class TableShow(QTableWidget):
                 item.setTextAlignment(Qt.AlignCenter)
                 item.content_id = contents[row]['id']
                 self.setItem(row, col, item)
-        self.setMinimumHeight(35 + row * 30)
+        self.setMinimumHeight(35 + row * 30.5)
 
     def clear(self):
         super().clear()

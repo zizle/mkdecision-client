@@ -8,8 +8,7 @@ import sys
 import json
 import requests
 from lxml import etree
-from fitz.fitz import Document
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QTextBrowser, QLabel, QMessageBox, QTextEdit
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QTextBrowser, QLabel, QMessageBox
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 
@@ -24,7 +23,7 @@ class MarketAnalysis(QScrollArea):
         # widget
         self.table = TableShow()
         # style
-        self.table.verticalHeader().setSectionResizeMode(0)
+        # self.table.verticalHeader().setSectionResizeMode(0)
         self.setWidgetResizable(True)
         self.setWidget(self.table)
         # init data
@@ -51,8 +50,6 @@ class MarketAnalysis(QScrollArea):
         # 展示数据
         header_couple = [('serial_num', '序号'), ('title', '标题'), ('create_time', '上传时间'), ('to_look', '')]
         self.table.show_content(contents=signal['data'], header_couple=header_couple)
-
-
 
 
 class MessageComm(QScrollArea):
@@ -110,136 +107,81 @@ class MessageComm(QScrollArea):
         self.setWidget(self.container)
 
 
-
-
-
-
-
-
-
-
-
-
-
-class MarketAnalysis1(QScrollArea):
+class TopicalStudy(QScrollArea):
     def __init__(self, *args, **kwargs):
-        super(MarketAnalysis, self).__init__(*args, **kwargs)
+        super(TopicalStudy, self).__init__(*args, **kwargs)
+        # widget
+        self.table = TableShow()
+        # style
+        self.table.verticalHeader().setSectionResizeMode(0)
         self.setWidgetResizable(True)
-        layout = QVBoxLayout()
-        loading_layout = QHBoxLayout(self)
-        self.loading = Loading()
-        self.show_table = TableShow()
-        self.container = QWidget()
-        # signal
-        self.show_table.cellClicked.connect(self.show_table_clicked)
-        loading_layout.addWidget(self.loading)
-        layout.addWidget(self.show_table)
-        self.container.setLayout(layout)
-        self.get_content_to_show()
+        self.setWidget(self.table)
+        # init data
+        self.get_thread = None
+        self.get_topical_study()
 
-    def get_content_to_show(self):
-        self.loading.show()
-        self.show_table.clear()
-        self.mls_thread = RequestThread(
-            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=mls',
+    def get_topical_study(self):
+        if self.get_thread:
+            del self.get_thread
+        self.get_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/tps/',
             method='get',
             data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
             cookies=config.app_dawn.value('cookies')
         )
-        self.mls_thread.response_signal.connect(self.mls_thread_back)
-        self.mls_thread.finished.connect(self.mls_thread.deleteLater)
-        self.mls_thread.start()
+        self.get_thread.response_signal.connect(self.get_thread_back)
+        self.get_thread.finished.connect(self.get_thread.deleteLater)
+        self.get_thread.start()
 
-    def mls_thread_back(self, content):
-        print('frame.pservice.py {} 市场分析文件: '.format(sys._getframe().f_lineno), content)
-        if content['error']:
-            self.loading.retry()
+    def get_thread_back(self, signal):
+        print('frame.pservice.py {} 专题研究数据: '.format(sys._getframe().f_lineno), signal)
+        if signal['error']:
             return
-        if not content['data']:
-            self.loading.no_data()
-            return
-        self.loading.hide()
-        # fill show table
-        header_couple = [
-            ('serial_num', '序号'),
-            ('title', '标题'),
-            ('create_time', '上传时间'),
-            ('to_look', ' ')
-        ]
-        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
-        self.setWidget(self.container)
-
-    def show_table_clicked(self, row, col):
-        print('frame.pservice.py {} 点击市场分析:'.format(str(sys._getframe().f_lineno)), row, col)
-        if col == 3:
-            item = self.show_table.item(row, col)
-            try:
-                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
-                doc = Document(filename=item.title, stream=response.content)
-                popup = PDFReader(doc=doc, title=item.title)
-            except Exception as error:
-                QMessageBox.information(self, "错误", '查看文件失败.\n{}'.format(error), QMessageBox.Yes)
-                return
-            if not popup.exec():
-                del popup
+        # 展示数据
+        header_couple = [('serial_num', '序号'), ('title', '标题'), ('create_time', '上传时间'), ('to_look', '')]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
 
 
-class MsgCommunication(QScrollArea):
+class ResearchReport(QScrollArea):
     def __init__(self, *args, **kwargs):
-        super(MsgCommunication, self).__init__(*args, **kwargs)
+        super(ResearchReport, self).__init__(*args, **kwargs)
+        # widget
+        self.table = TableShow()
+        # style
+        self.table.verticalHeader().setSectionResizeMode(0)
         self.setWidgetResizable(True)
-        self.container = QWidget()
-        layout = QVBoxLayout()
-        # show data loading
-        self.loading = Loading()
-        self.loading.clicked.connect(self.get_message_communication)
-        loading_layout = QVBoxLayout(self)
-        loading_layout.addWidget(self.loading)
-        self.container.setLayout(layout)
-        self.setStyleSheet("""
-        QTextBrowser{
-            border: none;
-            border-bottom: 1px solid rgb(200,200,200)
-        }
-        QTextBrowser:hover{
-            background:rgb(220,220,220);   
-        }
-        """)
-        self.get_message_communication()
+        self.setWidget(self.table)
+        # init data
+        self.get_thread = None
+        self.get_research_report()
 
-
-    def get_message_communication(self):
-        self.loading.show()
-        self.msg_thread = RequestThread(
-            url=config.SERVER_ADDR + 'pservice/consult/msg/',
+    def get_research_report(self):
+        if self.get_thread:
+            del self.get_thread
+        self.get_thread = RequestThread(
+            url=config.SERVER_ADDR + 'pservice/consult/rsr/',
             method='get',
             data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
             cookies=config.app_dawn.value('cookies')
         )
-        self.msg_thread.response_signal.connect(self.msg_thread_back)
-        self.msg_thread.finished.connect(self.msg_thread.deleteLater)
-        self.msg_thread.start()
+        self.get_thread.response_signal.connect(self.get_thread_back)
+        self.get_thread.finished.connect(self.get_thread.deleteLater)
+        self.get_thread.start()
 
-    def msg_thread_back(self, content):
-        print('frame.pservice.py {} 短信通数据: '.format(sys._getframe().f_lineno), content)
-        if content['error']:
-            self.loading.retry()
+    def get_thread_back(self, signal):
+        print('frame.pservice.py {} 调研报告数据: '.format(sys._getframe().f_lineno), signal)
+        if signal['error']:
             return
-        if not content['data']:
-            self.loading.no_data()
-            return
-        self.loading.hide()
-        # show content
-        for item in content['data']:
-            content = "<h2 style='display:inline-block'>" + item['title'] + "</h2>" + \
-                              "<span style='display:inline-block'>" + item['create_time'] + "</span>" + \
-                          item['content']
-            text_browser = QTextBrowser()
-            text_browser.setText(content)
-            text_browser.setMinimumHeight(text_browser.document().lineCount() * 30)
-            self.container.layout().addWidget(text_browser)
+        # 展示数据
+        header_couple = [('serial_num', '序号'), ('title', '标题'), ('create_time', '上传时间'), ('to_look', '')]
+        self.table.show_content(contents=signal['data'], header_couple=header_couple)
 
-        self.setWidget(self.container)
+
+
+
+
+
+
 
 
 class PersonTrain(QScrollArea):
@@ -319,7 +261,7 @@ class PersonTrain(QScrollArea):
         self.window.layout().addStretch()
         self.loading.hide()
 
-class ResearchReport(MarketAnalysis):
+class ResearchReport1(MarketAnalysis):
     def get_content_to_show(self):
         self.loading.show()
         self.show_table.clear()
@@ -354,65 +296,4 @@ class ResearchReport(MarketAnalysis):
 
 
 
-class TopicalStudy(QScrollArea):
-    def __init__(self, *args, **kwargs):
-        super(TopicalStudy, self).__init__(*args, **kwargs)
-        self.setWidgetResizable(True)
-        layout = QVBoxLayout()
-        loading_layout = QHBoxLayout(self)
-        self.loading = Loading()
-        self.show_table = TableShow()
-        self.container = QWidget()
-        # signal
-        self.show_table.cellClicked.connect(self.show_table_clicked)
-        loading_layout.addWidget(self.loading)
-        layout.addWidget(self.show_table)
-        self.container.setLayout(layout)
-        self.get_content_to_show()
-
-    def get_content_to_show(self):
-        self.loading.show()
-        self.show_table.clear()
-        self.tps_thread = RequestThread(
-            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=tps',
-            method='get',
-            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.tps_thread.response_signal.connect(self.tps_thread_back)
-        self.tps_thread.finished.connect(self.tps_thread.deleteLater)
-        self.tps_thread.start()
-
-    def tps_thread_back(self, content):
-        print('frame.pservice.py {} 专题研究文件: '.format(sys._getframe().f_lineno), content)
-        if content['error']:
-            self.loading.retry()
-            return
-        if not content['data']:
-            self.loading.no_data()
-            return
-        self.loading.hide()
-        # fill show table
-        header_couple = [
-            ('serial_num', '序号'),
-            ('title', '标题'),
-            ('create_time', '上传时间'),
-            ('to_look', ' ')
-        ]
-        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
-        self.setWidget(self.container)
-
-    def show_table_clicked(self, row, col):
-        print('frame.pservice.py {} 点击专题研究:'.format(str(sys._getframe().f_lineno)), row, col)
-        if col == 3:
-            item = self.show_table.item(row, col)
-            try:
-                response = requests.get(url=config.SERVER_ADDR + item.file, headers=config.CLIENT_HEADERS)
-                doc = Document(filename=item.title, stream=response.content)
-                popup = PDFReader(doc=doc, title=item.title)
-            except Exception as error:
-                QMessageBox.information(self, "错误", '查看文件失败.\n{}'.format(error), QMessageBox.Yes)
-                return
-            if not popup.exec():
-                del popup
 

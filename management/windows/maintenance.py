@@ -8,9 +8,9 @@ import json
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
-from frame.maintain.base import NoDataWindow, ClientInfo, UserInfo
+from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
-from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, PServiceMenuInfo, PersonTrain, MSGCommunication, MarketAnalysis, TopicalStudy, ResearchReport
+from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain
 from thread.request import RequestThread
 import config
 
@@ -118,14 +118,10 @@ class Maintenance(QWidget):
                     tab = MessageCommMaintain()
                 elif name_en == 'market_analysis':
                     tab = MarketAnalysisMaintain()
-                # elif text == '短信通':
-                #     tab = MSGCommunication()
-                # elif text == '市场分析':
-                #     tab = MarketAnalysis()
-                # elif text == '专题研究':
-                #     tab = TopicalStudy()
-                # elif text == '调研报告':
-                #     tab = ResearchReport()
+                elif name_en == 'topical_study':
+                    tab = TopicalStudyMaintain()
+                elif name_en == 'research':
+                    tab = ResearchReportMaintain()
                 # elif text == '人才培养':
                 #     tab = PersonTrain()
 
