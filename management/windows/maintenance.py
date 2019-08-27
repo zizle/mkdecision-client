@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt
 
 from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
-from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain
+from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
 from thread.request import RequestThread
 import config
 
@@ -35,6 +35,7 @@ class Maintenance(QWidget):
         layout.addLayout(hor_layout)
         self.setLayout(layout)
         # 线程请求菜单
+        self.left_tree_thread = None
         self.get_list_menu()
 
     def close_tab(self, index):
@@ -46,6 +47,8 @@ class Maintenance(QWidget):
 
     def get_list_menu(self):
         """ get menus """
+        if self.left_tree_thread:
+            del self.left_tree_thread
         headers = config.CLIENT_HEADERS
         self.left_tree_thread = RequestThread(
             url=config.SERVER_ADDR + 'basic/maintenance/',
@@ -122,9 +125,8 @@ class Maintenance(QWidget):
                     tab = TopicalStudyMaintain()
                 elif name_en == 'research':
                     tab = ResearchReportMaintain()
-                # elif text == '人才培养':
-                #     tab = PersonTrain()
-
+                elif name_en == 'adviser':
+                    tab = AdviserMaintain()
                 else:
                     tab = NoDataWindow(name=tab_name)
             # elif parent_text == '系统信息':

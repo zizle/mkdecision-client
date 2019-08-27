@@ -61,74 +61,73 @@ class CreateMessage(QDialog):
         self.content_edit.setText(content)
 
 
+class CreateNewAdviser(QDialog):
+        new_data_signal = pyqtSignal(dict)
 
+        def __init__(self):
+            super(CreateNewAdviser, self).__init__()
+            layout = QGridLayout()
+            # labels
+            title_label = QLabel("名称：")
+            type_label = QLabel("类型：")
+            file_label = QLabel("文件：")
+            # edits
+            self.name_edit = QLineEdit()
+            self.file_edit = QLineEdit()
+            # combo
+            self.type_combo = QComboBox()
+            self.type_combo.addItems(["人才培养", "部门组建", "制度考核"])
+            # buttons
+            select_file_btn = QPushButton('选择')
+            submit_btn = QPushButton('提交')
+            # styles
+            select_file_btn.setMaximumWidth(30)
+            # signal
+            select_file_btn.clicked.connect(self.select_file_clicked)
+            submit_btn.clicked.connect(self.submit_report)
+            # add layout
+            layout.addWidget(title_label, 0, 0)
+            layout.addWidget(self.name_edit, 0, 1, 1, 2)
+            layout.addWidget(type_label, 1, 0)
+            layout.addWidget(self.type_combo, 1, 1, 1, 2)
+            layout.addWidget(file_label, 2, 0)
+            layout.addWidget(self.file_edit, 2, 1)
+            layout.addWidget(select_file_btn, 2, 2)
+            layout.addWidget(submit_btn, 3, 1, 1, 2)
+            self.setLayout(layout)
 
-
-
-
-
-
-
-class CreateMLSFile(QDialog):
-    new_data_signal = pyqtSignal(dict)
-    def __init__(self, content=None, *args):
-        super(CreateMLSFile, self).__init__(*args)
-        self.content = content
-        layout = QGridLayout()
-        # labels
-        title_label = QLabel('标题')
-        file_label = QLabel('文件')
-        # edits
-        self.title_edit = QLineEdit()
-        self.file_edit = QLineEdit()
-        # button
-        select_btn = QPushButton('浏览')
-        submit_btn = QPushButton('提交')
-        # signal
-        select_btn.clicked.connect(self.file_selected)
-        submit_btn.clicked.connect(self.submit)
-        # style sheet
-        self.title_edit.setPlaceholderText('展示标题(默认文件名)')
-        select_btn.setFixedWidth(30)
-        self.setMaximumWidth(400)
-        layout.addWidget(title_label, 0, 0)
-        layout.addWidget(self.title_edit, 0, 1, 1, 2)
-        layout.addWidget(file_label, 1, 0)
-        layout.addWidget(self.file_edit, 1, 1)
-        layout.addWidget(select_btn, 1, 2)
-        layout.addWidget(submit_btn, 2, 1, 1,2)
-        self.setLayout(layout)
-
-    def file_selected(self):
-        # select file
-        desktop_path = get_desktop_path()
-        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.pdf)")
-        if not file_path:
-            return
-        self.file_edit.setText(file_path)
-        title = self.title_edit.text().strip(' ')
-        if not title:
+        def select_file_clicked(self):
+            # select file
+            desktop_path = get_desktop_path()
+            file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', desktop_path, "PDF files (*.pdf)")
+            if not file_path:
+                return
             file_name_list = file_path.rsplit('/', 1)
-            file_raw_name = file_name_list[1].rsplit('.', 1)[0]
-            self.title_edit.setText(file_raw_name)
+            if not self.name_edit.text().strip(' '):
+                self.name_edit.setText((file_name_list[1].rsplit('.', 1))[0])
+            self.file_edit.setText(file_path)
 
-    def submit(self):
-        data = dict()
-        data['title'] = self.title_edit.text().strip(' ')
-        data['file_path'] = self.file_edit.text()
-        if not all([data['title'], data['file_path']]):
-            return
-        self.new_data_signal.emit(data)
-
-
-class CreateTPSFile(CreateMLSFile):
-    pass
-
-class CreateRSRFile(CreateMLSFile):
-    pass
-
-
-
-
-
-
+        def submit_report(self):
+            type_dict = {
+                "人才培养": "person_train",
+                "部门组建": "department",
+                "制度考核": "rule_check"
+            }
+            # collect data
+            title = self.name_edit.text().strip(' ')
+            type_text = self.type_combo.currentText()
+            file_path = self.file_edit.text()
+            if not title:
+                QMessageBox.warning(self, "错误", "请起一个名字!", QMessageBox.Yes)
+                return
+            if not type_text:
+                QMessageBox.warning(self, "错误", "请选择报告类型!", QMessageBox.Yes)
+                return
+            if not file_path:
+                QMessageBox.warning(self, "错误", "请选择报告文件!", QMessageBox.Yes)
+                return
+            self.new_data_signal.emit({
+                'title': title,
+                'category': type_dict.get(type_text, None),
+                'file_path': file_path
+            })

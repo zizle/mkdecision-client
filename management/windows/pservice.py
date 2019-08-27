@@ -9,9 +9,8 @@ from PyQt5.QtWidgets import *
 
 import config
 from widgets.base import MenuScrollContainer
-from piece.pservice import MenuListWidget
 from frame.base import NoDataWindow
-from frame.pservice import MessageComm, MarketAnalysis, PersonTrain, TopicalStudy, ResearchReport
+from frame.pservice import MessageComm, MarketAnalysis, TopicalStudy, ResearchReport, AdviserShow
 
 
 class PService(QWidget):
@@ -51,6 +50,8 @@ class PService(QWidget):
                 tab = ResearchReport()
             else:
                 tab = NoDataWindow(name=parent + '·' + name)
+        elif parent_en == 'adviser':   # 顾问服务
+            tab = AdviserShow(category=name_en)  # 显示pdf文件内容
         else:
             tab = NoDataWindow(name=parent + '·' + name)
         self.tab_show.clear()

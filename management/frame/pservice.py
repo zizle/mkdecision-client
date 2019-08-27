@@ -6,10 +6,11 @@ Author: zizle
 """
 import sys
 import json
+import fitz
 import requests
 from lxml import etree
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QTextBrowser, QLabel, QMessageBox
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt
 
 import config
@@ -17,6 +18,7 @@ from thread.request import RequestThread
 from widgets.base import Loading, TableShow
 
 
+"""咨询服务"""
 class MarketAnalysis(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(MarketAnalysis, self).__init__(*args, **kwargs)
@@ -177,11 +179,70 @@ class ResearchReport(QScrollArea):
         self.table.show_content(contents=signal['data'], header_couple=header_couple)
 
 
+"""顾问服务"""
+class AdviserShow(QScrollArea):
+    def __init__(self, category, *args):
+        super(AdviserShow, self).__init__(*args)
+        self.category = category
+        self.file_name = '查看文件'
+        layout = QVBoxLayout()
+        self.container = QWidget()
+        self.container.setLayout(layout)
+        # init pages
+        # 请求文件
+        file_url = self.get_file_url()
+        print(file_url)
+        self.add_pages(file_url)
+        self.setWidget(self.container)
 
+    def get_file_url(self):
+        try:
+            response = requests.get(
+                url=config.SERVER_ADDR + 'pservice/adviser/',
+                headers=config.CLIENT_HEADERS,
+                data=json.dumps({'machine_code': config.app_dawn.value('machine'), 'category': self.category})
+            )
+            response_data = json.loads(response.content.decode('utf-8'))
+            if response.status_code != 200:
+                raise ValueError(response_data['message'])
+        except Exception as e:
+            return None
+        return response_data['data']['file']
 
-
-
-
+    def add_pages(self, file):
+        # 请求文件
+        if not file:
+            message_label = QLabel('没有数据.')
+            self.container.layout().addWidget(message_label)
+            return
+        try:
+            response = requests.get(config.SERVER_ADDR + file)
+            doc = fitz.Document(filename=self.file_name, stream=response.content)
+        except Exception as e:
+            message_label = QLabel('获取文件内容失败.\n{}'.format(e))
+            self.container.layout().addWidget(message_label)
+            return
+        for page_index in range(doc.pageCount):
+            page = doc.loadPage(page_index)
+            page_label = QLabel()
+            page_label.setMinimumSize(self.width() - 20, self.height())  # 设置label大小
+            # show PDF content
+            zoom_matrix = fitz.Matrix(1.58, 1.5)  # 图像缩放比例
+            pagePixmap = page.getPixmap(
+                matrix=zoom_matrix,
+                alpha=False)
+            imageFormat = QImage.Format_RGB888  # get image format
+            pageQImage = QImage(
+                pagePixmap.samples,
+                pagePixmap.width,
+                pagePixmap.height,
+                pagePixmap.stride,
+                imageFormat)  # init QImage
+            page_map = QPixmap()
+            page_map.convertFromImage(pageQImage)
+            page_label.setPixmap(page_map)
+            page_label.setScaledContents(True)  # pixmap resize with label
+            self.container.layout().addWidget(page_label)
 
 
 class PersonTrain(QScrollArea):
@@ -260,40 +321,3 @@ class PersonTrain(QScrollArea):
             text = ''
         self.window.layout().addStretch()
         self.loading.hide()
-
-class ResearchReport1(MarketAnalysis):
-    def get_content_to_show(self):
-        self.loading.show()
-        self.show_table.clear()
-        self.rsr_thread = RequestThread(
-            url=config.SERVER_ADDR + 'pservice/consult/file/?mark=rsr',
-            method='get',
-            data=json.dumps({'machine_code': config.app_dawn.value('machine')}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.rsr_thread.response_signal.connect(self.rsr_thread_back)
-        self.rsr_thread.finished.connect(self.rsr_thread.deleteLater)
-        self.rsr_thread.start()
-
-    def rsr_thread_back(self, content):
-        print('frame.pservice.py {} 市场分析文件: '.format(sys._getframe().f_lineno), content)
-        if content['error']:
-            self.loading.retry()
-            return
-        if not content['data']:
-            self.loading.no_data()
-            return
-        self.loading.hide()
-        # fill show table
-        header_couple = [
-            ('serial_num', '序号'),
-            ('title', '标题'),
-            ('create_time', '上传时间'),
-            ('to_look', ' ')
-        ]
-        self.show_table.show_content(contents=content['data'], header_couple=header_couple)
-        self.setWidget(self.container)
-
-
-
-
