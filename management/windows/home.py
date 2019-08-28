@@ -37,6 +37,11 @@ class HomePage(QScrollArea):
         show_bulletin.setFixedHeight(350)
         caro_show.setFixedHeight(350)
         self.show_tab.setTabBarAutoHide(True)
+        self.setStyleSheet("""
+        QScrollArea{
+            border:none
+        }
+        """)
         # add to layout
         self.setWidget(home)
         layout.addWidget(show_bulletin, 0, 0)

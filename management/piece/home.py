@@ -296,7 +296,6 @@ class Calendar(QWidget):
         self.date_edit.setDate(date)
 
 
-
 class ShowCommodity(QTableWidget):
     def __init__(self, *args):
         super(ShowCommodity, self).__init__(*args)

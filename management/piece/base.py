@@ -105,7 +105,7 @@ class PageController(QWidget):
         layout.addWidget(self.skipPage)
         layout.addWidget(skipLabel_1)
         layout.addWidget(confirmSkip)
-        self.setStyleSheet("""
+        self.setStyleSheet("""     
         QLineEdit{
             max-width:25px;
             min-width:25px;

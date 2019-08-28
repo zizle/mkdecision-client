@@ -188,6 +188,8 @@ class AdviserShow(QScrollArea):
         layout = QVBoxLayout()
         self.container = QWidget()
         self.container.setLayout(layout)
+        # style
+        self.setWidgetResizable(True)
         # init pages
         # 请求文件
         file_url = self.get_file_url()
@@ -227,7 +229,7 @@ class AdviserShow(QScrollArea):
             page_label = QLabel()
             page_label.setMinimumSize(self.width() - 20, self.height())  # 设置label大小
             # show PDF content
-            zoom_matrix = fitz.Matrix(1.58, 1.5)  # 图像缩放比例
+            zoom_matrix = fitz.Matrix(1.2, 1.8)  # 图像缩放比例
             pagePixmap = page.getPixmap(
                 matrix=zoom_matrix,
                 alpha=False)
@@ -242,7 +244,7 @@ class AdviserShow(QScrollArea):
             page_map.convertFromImage(pageQImage)
             page_label.setPixmap(page_map)
             page_label.setScaledContents(True)  # pixmap resize with label
-            self.container.layout().addWidget(page_label)
+            self.container.layout().addWidget(page_label, alignment=Qt.AlignCenter)
 
 
 class PersonTrain(QScrollArea):

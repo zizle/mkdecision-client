@@ -254,7 +254,7 @@ class Report(QWidget):
         self.category = 'all'
         self.report_thread = None
 
-    def get_reports(self, category, page=1, page_size=1):
+    def get_reports(self, category, page=1, page_size=20):
         if category in ["daily", "weekly", "monthly", "annual", "special", "invest", "others"]:
             self.category = category
         url = config.SERVER_ADDR + 'homepage/report/'

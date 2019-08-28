@@ -101,6 +101,12 @@ class Base(QWidget):
         palette.setColor(palette.Window, QColor(255,255,255))
         self.tab.setPalette(palette)
         self.tab.installEventFilter(self) # 事件过滤
+        # style
+        self.setStyleSheet("""
+        QTabWidget::pane{
+            border:none;
+        }
+        """)
         # add widget to menu and permit layout
         mp_layout.addWidget(self.menu_bar)
         mp_layout.addWidget(permit_bar)

@@ -6,9 +6,9 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QWidget, QPushButton, QScrollArea, QVBoxLayout, QGridLayout,QTextEdit, QTextBrowser
+from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QWidget, QPushButton, QScrollArea, QVBoxLayout, QGridLayout,QAbstractItemView, QTextBrowser
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
-from PyQt5.QtGui import QCursor, QPalette
+from PyQt5.QtGui import QCursor, QBrush, QColor
 
 import config
 from thread.request import RequestThread
@@ -80,6 +80,9 @@ class TableShow(QTableWidget):
         # style
         self.horizontalHeader().setSectionResizeMode(1)  # 横向随控件大小
         self.verticalHeader().setVisible(False)  # 纵向随控件大小
+        self.setFocusPolicy(0)  # 选中后边框虚线-无
+        self.setMouseTracking(True)  # 跟踪鼠标-滑过整行颜色改变
+        self.setSelectionMode(QAbstractItemView.NoSelection)  # 选中后的前景色-无
         # self.verticalHeader().setSectionResizeMode(1)
 
     def show_content(self, contents, header_couple, show='file'):
@@ -124,6 +127,29 @@ class TableShow(QTableWidget):
         super().clear()
         self.setRowCount(0)
         self.setColumnCount(0)
+
+    def leaveEvent(self, *args, **kwargs):
+        """鼠标离开控件"""
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
+                # self.item(row, col).setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+                self.item(row, col).setBackground(QBrush(QColor(255, 255, 255)))
+
+    def mouseMoveEvent(self, event):
+        """鼠标移动事件"""
+        # 获取当前这个item
+        current_item = self.itemAt(event.pos())
+        if current_item:
+            row = current_item.row()
+            for item in [self.item(row, col) for col in range(self.columnCount())]:
+                # item.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
+                item.setBackground(QBrush(QColor(220,220,220)))
+            for other_row in range(self.rowCount()):
+                if other_row == row:
+                    continue
+                for other_item in [self.item(other_row, col) for col in range(self.columnCount())]:
+                    # other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
+                    other_item.setBackground(QBrush(QColor(255,255,255)))
 
 
 class MenuScrollContainer(QScrollArea):
