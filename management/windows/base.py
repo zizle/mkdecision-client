@@ -20,6 +20,7 @@ from piece.base import TitleBar, MenuBar, PermitBar
 from frame.base import NoDataWindow, RegisterClient
 from .home import HomePage
 from .pservice import PService
+from .danalysis import DAnalysis
 # 枚举左上右下以及四个定点
 Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
 
@@ -117,7 +118,7 @@ class Base(QWidget):
         self.setLayout(layout)
         # set icon and title
         self.setWindowIcon(QIcon("media/logo.png"))
-        self.setWindowTitle("瑞达期货研究院分析决策系统-管理端 " + config.VERSION)
+        self.setWindowTitle("瑞达期货研究院分析决策系统_管理端 " + config.VERSION)
         # get menus in server
         self.get_menus()
 
@@ -173,7 +174,7 @@ class Base(QWidget):
         if name_en not in ['machine_code','home_page', 'maintenance'] + access_modules:
             popup = TipShow()
             popup.confirm_btn.clicked.connect(popup.close)
-            popup.information(title='无权限', message='您不能查看此功能，\n如已登录请联系管理员开放！')
+            popup.information(title='无权限', message='您还不能查看此功能，\n如已登录请联系管理员开放！')
             if not popup.exec():
                 del popup
             return
@@ -183,6 +184,8 @@ class Base(QWidget):
             tab = HomePage()
         elif name_en == 'product_service':
             tab = PService()
+        elif name_en == 'data_analysis':
+            tab = DAnalysis()
         elif name_en == 'maintenance':
             tab = Maintenance()
         else:

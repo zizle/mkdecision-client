@@ -37,6 +37,26 @@ class Maintenance(QWidget):
         # 线程请求菜单
         self.left_tree_thread = None
         self.get_list_menu()
+        self.left_tree.setStyleSheet("""
+        QTreeWidget{
+            font-size: 13px;
+        }
+        QTreeWidget::item{
+            min-height: 30px;
+        }
+        QTreeWidget::item:selected {
+            border:none;
+            color: rgb(0,0,0)
+
+        }
+        QTreeWidget::item:!selected{
+
+        }
+        QTreeWidget::item:hover {
+            background-color: rgb(230,230,230);
+            cursor: pointer;
+        }
+        """)
 
     def close_tab(self, index):
         if self.right_tab.count() > 1:
