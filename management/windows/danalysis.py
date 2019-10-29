@@ -8,37 +8,54 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTabWidget, QTabBar
 from widgets.base import MenuScrollContainer
 
 import config
-from widgets.danalysis import VarietyDetailMenuWidget
+from piece.danalysis import VarietyHome, VarietyDetail
 
 
-class DAnalysis(QWidget):
+class DAnalysis(QTabWidget):
     def __init__(self, *args, **kwargs):
         super(DAnalysis, self).__init__(*args, **kwargs)
-        layout = QHBoxLayout()
-        # widgets
-        self.left_selected_tab = QTabWidget()
-        self.tab_show = QTabWidget()
-        layout.addWidget(self.left_selected_tab)
-        layout.addWidget(self.tab_show)
-        self.variety_menu = MenuScrollContainer(column=3)
-        self.left_selected_tab.addTab(self.variety_menu, '品种')
+        # 索引为0的tab，即首页
+        self.tab_0 = VarietyHome()
+        # 索引1为点击品种后产生
+        self.addTab(self.tab_0, '品种')
         # signal
-        self.variety_menu.menu_clicked.connect(self.variety_selected)
-        self.setLayout(layout)
-        # 获取品种菜单
+        self.tab_0.variety_menu.menu_clicked.connect(self.variety_selected)
+        self.tabCloseRequested.connect(self.click_tab_closed)
         # style
-        self.left_selected_tab.setTabsClosable(True)
-        self.left_selected_tab.tabBar().setTabButton(0, QTabBar.RightSide, None)
-        self.variety_menu.get_menu(url=config.SERVER_ADDR + 'danalysis/variety_menu/')
+        self.setTabsClosable(True)
+        self.tabBar().setTabButton(0, QTabBar.RightSide, None)
+        self.setStyleSheet("""
+           QTabBar::pane{
+               border: 0.5px solid rgb(180,180,180);
+           }
+           QTabBar::tab{
+               min-height: 25px
+           }
+           QTabBar::tab:selected {
+           
+           }
+           QTabBar::tab:!selected {
+               background-color:rgb(180,180,180)
+           }
+           QTabBar::tab:hover {
+               color: rgb(20,100,230);
+               background: rgb(220,220,220)
+           }
+           """
+        )
 
+    # 选择品种后的相信tab
     def variety_selected(self, menu):
-        print('windows.danalysis.py {} 选择菜单：'.format(sys._getframe().f_lineno), menu.parent, menu.name_en)
+        print('windows.danalysis.py {} 选择品种菜单：'.format(sys._getframe().f_lineno), menu.parent, menu.name_en)
         parent = menu.parent
         parent_en = menu.parent_en
         name = menu.text()
         name_en = menu.name_en
-        self.left_selected_tab.removeTab(1)
-        self.left_selected_tab.addTab(VarietyDetailMenuWidget(), '行业数据')
-        self.left_selected_tab.setCurrentIndex(1)
+        self.removeTab(1)
+        tab_1 = VarietyDetail(variety=name_en, width=self.tab_0.variety_menu.width())
+        self.addTab(tab_1, '行业数据')
+        self.setCurrentIndex(1)
 
+    def click_tab_closed(self, index):
+        self.removeTab(index)
 
