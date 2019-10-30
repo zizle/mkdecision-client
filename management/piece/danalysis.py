@@ -70,30 +70,36 @@ class VDChartsWidgets(QWidget):
         self.setLayout(layout)
 
 
-class DetailDWidgetShow(QWidget):
-    def __init__(self, option, *args, **kwargs):
-        super(DetailDWidgetShow, self).__init__(*args, **kwargs)
+class DetailWidgetShow(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(DetailWidgetShow, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
         # 初始化图表
-        chart_view = QChartView()
+        self.chart_view = QChartView()
+        # 表格数据
+        self.chart_table = QTableWidget()
+        layout.addWidget(self.chart_view)
+        layout.addWidget(self.chart_table)
+        self.setLayout(layout)
+
+    def draw_series(self, x_values, y_values, series_name):
         chart = QChart()
-        x_axes = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月']
-        y_axes = [random.randint(1, 1000) for _ in range(len(x_axes))]
-        series_names = [option]
         series = QBarSeries()
-        for name in series_names:
-            bar = QBarSet(name)
-            for index in range(len(x_axes)):
-                bar.append(y_axes[index])
-            series.append(bar)
+        bar = QBarSet(series_name)
+        for index in range(len(x_values)):
+            bar.append(y_values[index])
+        series.append(bar)
         chart.addSeries(series)
         chart.createDefaultAxes()
-        chart_view.setChart(chart)
+        self.chart_view.setChart(chart)
         # 表格数据
-        chart_table = QTableWidget()
-        chart_table.setRowCount(len(x_axes))
-        chart_table.setColumnCount(3)  # 列数
-        chart_table.setHorizontalHeaderLabels(['月份', '产量(万吨)', '增减(万吨)'])
+        self.chart_table.clear()
+        self.fill_char_data(x_values, y_values)
+
+    def fill_char_data(self, x_axes, y_axes):
+        self.chart_table.setRowCount(len(x_axes))
+        self.chart_table.setColumnCount(3)  # 列数
+        self.chart_table.setHorizontalHeaderLabels(['月份', '产量(万吨)', '增减(万吨)'])
         for row in range(len(x_axes)):
             for col in range(3):
                 if col == 0:
@@ -107,13 +113,10 @@ class DetailDWidgetShow(QWidget):
                         value = y_axes[row] - y_axes[row - 1]
                     item = QTableWidgetItem(str(value))
                 item.setTextAlignment(132)
-                chart_table.setItem(row, col, item)
-        chart_table.setFixedHeight(340)
-        chart_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                self.chart_table.setItem(row, col, item)
+        self.chart_table.setFixedHeight(340)
+        self.chart_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         # chart_table.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        layout.addWidget(chart_view)
-        layout.addWidget(chart_table)
-        self.setLayout(layout)
 
 
 # 品种首页(初始页面,索引为0的tab)
@@ -211,6 +214,7 @@ class VarietyDetail(QWidget):
                 child.name_en = sub_module['name_en']
                 child.setText(0, sub_module['name'])
                 menu.addChild(child)
+        self.detail_tree.expandAll()
 
     def tree_item_clicked(self):
         item = self.detail_tree.currentItem()
@@ -224,9 +228,17 @@ class VarietyDetail(QWidget):
             name_text = item.text(0)
             name_en = item.name_en
             print(item.name_en)
-            self.vd_charts.hide()
-            if hasattr(self, 'detail_show'):
-                self.detail_show.hide()
-                del self.detail_show
-            self.detail_show = DetailDWidgetShow(option=name_text)
-            self.layout().addWidget(self.detail_show)
+            # 先去除主页默认显示的详情页面
+            if not hasattr(self, 'detail_show'):
+                self.detail_show = DetailWidgetShow()
+            self.detail_show.show()
+            if self.layout().itemAt(1).widget() != self.detail_show:
+                self.layout().itemAt(1).widget().close()
+                self.layout().removeWidget(self.layout().itemAt(1).widget())
+                self.layout().addWidget(self.detail_show)
+            # 生成数据
+            x_axes = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月', '一月', '二月']
+            y_axes = [random.randint(1, 1000) for _ in range(len(x_axes))]
+            # 更新数据
+            self.detail_show.draw_series(x_axes, y_axes, series_name=name_text)
+

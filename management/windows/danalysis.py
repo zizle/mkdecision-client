@@ -4,10 +4,7 @@
 data analysis 数据分析
 """
 import sys
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTabWidget, QTabBar
-from widgets.base import MenuScrollContainer
-
-import config
+from PyQt5.QtWidgets import QTabWidget, QTabBar
 from piece.danalysis import VarietyHome, VarietyDetail
 
 
@@ -21,6 +18,7 @@ class DAnalysis(QTabWidget):
         # signal
         self.tab_0.variety_menu.menu_clicked.connect(self.variety_selected)
         self.tabCloseRequested.connect(self.click_tab_closed)
+        self.tabBarClicked.connect(self.click_tab_bar)
         # style
         self.setTabsClosable(True)
         self.tabBar().setTabButton(0, QTabBar.RightSide, None)
@@ -53,9 +51,19 @@ class DAnalysis(QTabWidget):
         name_en = menu.name_en
         self.removeTab(1)
         tab_1 = VarietyDetail(variety=name_en, width=self.tab_0.variety_menu.width())
-        self.addTab(tab_1, '行业数据')
+        self.addTab(tab_1, name + '数据')
         self.setCurrentIndex(1)
 
     def click_tab_closed(self, index):
         self.removeTab(index)
+
+    def click_tab_bar(self, index):
+        self.setCurrentIndex(index)
+        if index == 1:  # 品种详情页面
+            current = self.currentWidget()
+            current.vd_charts.show()
+            if current.layout().itemAt(1).widget() != current.vd_charts:
+                current.layout().itemAt(1).widget().close()
+                current.layout().removeWidget(current.layout().itemAt(1).widget())
+                current.layout().addWidget(current.vd_charts)
 
