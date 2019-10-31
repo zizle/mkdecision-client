@@ -3,24 +3,106 @@
 import sys
 import json
 import random
+import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTreeWidget, QTableWidget, QTreeWidgetItem,\
-    QTabWidget, QGridLayout, QVBoxLayout, QTableWidgetItem, QHeaderView
+    QTabWidget, QGridLayout, QVBoxLayout, QTableWidgetItem, QHeaderView, QPushButton
 from PyQt5.QtChart import QChartView, QChart, QLineSeries, QBarSeries, QBarSet
 from PyQt5.QtGui import QPainter
 from widgets.base import MenuScrollContainer
 import config
+from widgets.danalysis import ChartView
 from thread.request import RequestThread
 
 
 # 首页初始右侧图表区widget
 class VHChartsWidgets(QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, horizontal_count, *args, **kwargs):
         super(VHChartsWidgets, self).__init__(*args, **kwargs)
+        self.horizontal_count = horizontal_count
         layout = QGridLayout()
-        # 实例化各种图表
-        chart_names = ['文华指数', '有色金属指数', '黒链指数', '化工指数', '农产品指数']
-        x_axes = [0,1,2,3,4,5,6,7,8,9,10]
-        for i in range(5):
+        self.setLayout(layout)
+        # 请求图表名称及其数据
+        self.get_charts(url=config.SERVER_ADDR + 'danalysis/charts/home/')
+
+    def get_charts(self, url):
+        if not url:
+            return
+        try:
+            response = requests.get(
+                url=url,
+                headers=config.CLIENT_HEADERS,
+                data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+                cookies=config.app_dawn.value('cookies')
+            )
+            response_content = json.loads(response.content.decode('utf-8'))
+        except Exception:
+            return
+        if response_content['error']:
+            return
+        x_axes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        row_index = 0
+        column_index = 0
+        for chart_index, chart_data in enumerate(response_content['data']):
+            y_axes = [random.randint(1, 100) for _ in range(len(x_axes))]
+            chart_view = ChartView()
+            chart_view.clicked.connect(self.chart_view_clicked)
+            chart = QChart()
+            series = QLineSeries()
+            for idx, x in enumerate(x_axes):
+                series.append(x, y_axes[idx])
+            chart.addSeries(series)
+            chart.setTitle(chart_data['name'])
+            chart_view.setChart(chart)
+            chart_view.setRenderHint(QPainter.Antialiasing)
+            chart.createDefaultAxes()
+            chart.setBackgroundVisible(False)
+            chart_view.setStyleSheet("""
+                background-image: url('media/shuiyin.png');
+            """)
+            self.layout().addWidget(chart_view, row_index, column_index)
+            # 计数处理
+            column_index += 1
+            if column_index >= self.horizontal_count:
+                column_index = 0
+                row_index += 1
+
+    def chart_view_clicked(self, chart_view):
+        # 图表被点击
+        for i in range(self.layout().count()):
+            view = self.layout().itemAt(i).widget()
+            if view != chart_view:
+                view.hide()
+
+
+# 品种详情初始图表区(无分某项指标)
+class VDChartsWidgets(QWidget):
+    def __init__(self, variety, horizontal_count, *args, **kwargs):
+        super(VDChartsWidgets, self).__init__(*args, **kwargs)
+        self.variety = variety
+        layout = QGridLayout()
+        self.horizontal_count = horizontal_count
+        self.setLayout(layout)
+        self.get_charts(url=config.SERVER_ADDR + 'danalysis/charts/variety/')
+
+    def get_charts(self, url):
+        if not url:
+            return
+        try:
+            response = requests.get(
+                url=url,
+                headers=config.CLIENT_HEADERS,
+                data=json.dumps({"machine_code": config.app_dawn.value("machine"), 'variety': self.variety}),
+                cookies=config.app_dawn.value('cookies')
+            )
+            response_content = json.loads(response.content.decode('utf-8'))
+        except Exception:
+            return
+        if response_content['error']:
+            return
+        x_axes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        row_index = 0
+        column_index = 0
+        for chart_index, chart_data in enumerate(response_content['data']):
             y_axes = [random.randint(1, 100) for _ in range(len(x_axes))]
             chart_view = QChartView()
             chart = QChart()
@@ -28,62 +110,51 @@ class VHChartsWidgets(QWidget):
             for idx, x in enumerate(x_axes):
                 series.append(x, y_axes[idx])
             chart.addSeries(series)
-            chart.setTitle(chart_names[i])
+            chart.setTitle(chart_data['name'])
             chart_view.setChart(chart)
             chart_view.setRenderHint(QPainter.Antialiasing)
             chart.createDefaultAxes()
-            if i <= 1:
-                layout.addWidget(chart_view, 0, i)
-            elif 1 < i <= 3:
-                layout.addWidget(chart_view, 1, i-2)
-            else:
-                layout.addWidget(chart_view, 2, i-4)
-        self.setLayout(layout)
+            chart.setBackgroundVisible(False)
+            chart_view.setStyleSheet("""
+                background-image: url('media/shuiyin.png');
+            """)
+            self.layout().addWidget(chart_view, row_index, column_index)
+            # 计数处理
+            column_index += 1
+            if column_index >= self.horizontal_count:
+                column_index = 0
+                row_index += 1
 
 
-# 品种详情初始图表区
-class VDChartsWidgets(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(VDChartsWidgets, self).__init__(*args, **kwargs)
-        layout = QGridLayout()
-        # 实例化各种图表
-        chart_names = ['现货价格', '期货价格', '产量', '进出口', '库存', '持仓排名']
-        x_axes = [0,1,2,3,4,5,6,7,8,9,10]
-        for i in range(6):
-            y_axes = [random.randint(1, 1000) for _ in range(len(x_axes))]
-            chart_view = QChartView()
-            chart = QChart()
-            series = QLineSeries()
-            for idx, x in enumerate(x_axes):
-                series.append(x, y_axes[idx])
-            chart.addSeries(series)
-            chart.setTitle(chart_names[i])
-            chart_view.setChart(chart)
-            chart_view.setRenderHint(QPainter.Antialiasing)
-            chart.createDefaultAxes()
-            if i <= 1:
-                layout.addWidget(chart_view, 0, i)
-            elif 1 < i <= 3:
-                layout.addWidget(chart_view, 1, i-2)
-            else:
-                layout.addWidget(chart_view, 2, i-4)
-        self.setLayout(layout)
-
-
+# 品种具体某项指标详情页
 class DetailWidgetShow(QWidget):
     def __init__(self, *args, **kwargs):
         super(DetailWidgetShow, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
         # 初始化图表
         self.chart_view = QChartView()
+
         # 表格数据
         self.chart_table = QTableWidget()
         layout.addWidget(self.chart_view)
         layout.addWidget(self.chart_table)
         self.setLayout(layout)
 
+
     def draw_series(self, x_values, y_values, series_name):
         chart = QChart()
+        # 添加水印背景图片
+        chart.setBackgroundVisible(False)
+        self.chart_view.setStyleSheet("""
+            background-image: url('media/shuiyin.png');
+        """)
+
+        # pixmap = QPixmap('media/shuiyin.png')
+        # label = QLabel("这是一个标签", self.chart_view)
+        # label.setFixedSize(150, 50)
+        # label.setPixmap(pixmap)
+        # label.setScaledContents(True)
+
         series = QBarSeries()
         bar = QBarSet(series_name)
         for index in range(len(x_values)):
@@ -94,9 +165,9 @@ class DetailWidgetShow(QWidget):
         self.chart_view.setChart(chart)
         # 表格数据
         self.chart_table.clear()
-        self.fill_char_data(x_values, y_values)
+        self.fill_chart_data(x_values, y_values)
 
-    def fill_char_data(self, x_axes, y_axes):
+    def fill_chart_data(self, x_axes, y_axes):
         self.chart_table.setRowCount(len(x_axes))
         self.chart_table.setColumnCount(3)  # 列数
         self.chart_table.setHorizontalHeaderLabels(['月份', '产量(万吨)', '增减(万吨)'])
@@ -125,7 +196,7 @@ class VarietyHome(QWidget):
         super(VarietyHome, self).__init__(*args, **kwargs)
         layout = QHBoxLayout()
         self.variety_menu = MenuScrollContainer(column=3)
-        vh_charts = VHChartsWidgets()
+        vh_charts = VHChartsWidgets(horizontal_count=2)  # 参数为横向展示的个数
         layout.addWidget(self.variety_menu)  # 左侧菜单
         layout.addWidget(vh_charts)  # 右侧图表区
         self.setLayout(layout)
@@ -143,7 +214,7 @@ class VarietyDetail(QWidget):
         # widgets
         left_tab = QTabWidget()
         self.detail_tree = QTreeWidget()
-        self.vd_charts = VDChartsWidgets()
+        self.vd_charts = VDChartsWidgets(variety=variety, horizontal_count=2)
         # style
         left_tab.setMaximumWidth(width)
         left_tab.setMinimumWidth(width)
@@ -227,7 +298,6 @@ class VarietyDetail(QWidget):
             parent = item.parent()
             name_text = item.text(0)
             name_en = item.name_en
-            print(item.name_en)
             # 先去除主页默认显示的详情页面
             if not hasattr(self, 'detail_show'):
                 self.detail_show = DetailWidgetShow()

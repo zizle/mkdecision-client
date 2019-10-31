@@ -42,7 +42,7 @@ class DAnalysis(QTabWidget):
            """
         )
 
-    # 选择品种后的相信tab
+    # 选择品种后的详情tab
     def variety_selected(self, menu):
         print('windows.danalysis.py {} 选择品种菜单：'.format(sys._getframe().f_lineno), menu.parent, menu.name_en)
         parent = menu.parent
