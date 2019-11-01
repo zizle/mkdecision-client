@@ -61,9 +61,10 @@ class DAnalysis(QTabWidget):
         self.setCurrentIndex(index)
         if index == 1:  # 品种详情页面
             current = self.currentWidget()
-            current.vd_charts.show()
-            if current.layout().itemAt(1).widget() != current.vd_charts:
+            current.vd_right.show()
+            if current.layout().itemAt(1).widget() != current.vd_right:
                 current.layout().itemAt(1).widget().close()
                 current.layout().removeWidget(current.layout().itemAt(1).widget())
-                current.layout().addWidget(current.vd_charts)
+                current.layout().addWidget(current.vd_right)
+
 
