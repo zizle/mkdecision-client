@@ -11,6 +11,9 @@ class ChartView(QChartView):
 
     def __init__(self, row, column, zoom_in=False):
         super(ChartView, self).__init__()
+        # 去除水印按钮
+        self.watermark_wiped = QPushButton('去除水印', self)
+        self.has_watermark = True
         self.row = row
         self.column = column
         self.zoom_in_out = QPushButton()
@@ -21,14 +24,16 @@ class ChartView(QChartView):
         else:
             btn_pixmap = 'media/zoomout.png'
         self.zoom_in_out.setIcon(QIcon(btn_pixmap))
-        self.zoom_in_out.setStyleSheet("QPushButton{border:none};")
         self.zoom_in_out.setCursor(Qt.PointingHandCursor)
         self.setRenderHint(QPainter.Antialiasing)
-        self.setStyleSheet("background-image: url('media/shuiyin.png');")
+        self.setStyleSheet("background-image: url('media/chartbg-watermark.png');")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.watermark_wiped.setStyleSheet('color:rgb(120,120,120);border:none;font-size:10px;max-width:40px;max-height:20px}')
+        self.zoom_in_out.setStyleSheet('border:none')
         layout.addWidget(self.zoom_in_out, alignment=Qt.AlignTop | Qt.AlignRight)
         self.zoom_in_out.clicked.connect(self.click_chart_view)
+        self.watermark_wiped.clicked.connect(self.wipe_watermark)
 
     def click_chart_view(self):
         if self.zoom_in_out.zoom_in:
@@ -50,3 +55,13 @@ class ChartView(QChartView):
                 xy_dict['y_values'].append(series.at(i).y())
             value_data['series'].append(xy_dict)
         self.clicked.emit(value_data)
+
+    def wipe_watermark(self):
+        if self.has_watermark:
+            self.setStyleSheet("background-image: url('media/chartbg.png');")
+            self.has_watermark = False
+            self.watermark_wiped.setText('附加水印')
+        else:
+            self.setStyleSheet("background-image: url('media/chartbg-watermark.png');")
+            self.has_watermark = True
+            self.watermark_wiped.setText('清除水印')

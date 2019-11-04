@@ -70,7 +70,7 @@ class VHRightWidgets(QWidget):
             chart.createDefaultAxes()
             chart.setBackgroundVisible(False)
             chart_view.setStyleSheet("""
-                background-image: url('media/shuiyin.png');
+                background-image: url('media/chartbg-watermark.png');
             """)
             self.chart_layout.addWidget(chart_view, row_index, column_index)
             # 计数处理
@@ -215,7 +215,7 @@ class VDRightWidgets(VHRightWidgets):
             chart.createDefaultAxes()
             chart.setBackgroundVisible(False)
             chart_view.setStyleSheet("""
-                background-image: url('media/shuiyin.png');
+                background-image: url('media/chartbg-watermark.png');
             """)
             self.chart_layout.addWidget(chart_view, row_index, column_index)
             # 计数处理
@@ -243,7 +243,7 @@ class DetailWidgetShow(QWidget):
         # 添加水印背景图片
         chart.setBackgroundVisible(False)
         self.chart_view.setStyleSheet("""
-            background-image: url('media/shuiyin.png');
+            background-image: url('media/chartbg-watermark.png');
         """)
         series = QBarSeries()
         bar = QBarSet(series_name)

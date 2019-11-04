@@ -11,6 +11,7 @@ from PyQt5.QtCore import Qt
 from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
 from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
+from frame.maintain.danalysis import VarietyMenuMaintain
 from thread.request import RequestThread
 import config
 
@@ -147,6 +148,11 @@ class Maintenance(QWidget):
                     tab = ResearchReportMaintain()
                 elif name_en == 'adviser':
                     tab = AdviserMaintain()
+                else:
+                    tab = NoDataWindow(name=tab_name)
+            elif parent_en == 'data_analysis':
+                if name_en == 'variety_menu':
+                    tab = VarietyMenuMaintain()
                 else:
                     tab = NoDataWindow(name=tab_name)
             # elif parent_text == '系统信息':

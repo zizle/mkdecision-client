@@ -16,6 +16,7 @@ from thread.request import RequestThread
 from piece.maintain import TableCheckBox
 from popup.maintain import CreateNewClient
 
+
 class ClientInfo(QWidget):
     # 客户端信息
     def __init__(self):
