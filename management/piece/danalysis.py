@@ -388,6 +388,9 @@ class VarietyDetail(QWidget):
             parent = item.parent()
             name_text = item.text(0)
             name_en = item.name_en
+            # 一级菜单无功能
+            if not parent:
+                return
             # 先去除主页默认显示的详情页面
             if not hasattr(self, 'detail_show'):
                 self.detail_show = DetailWidgetShow()

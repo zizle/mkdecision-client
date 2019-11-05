@@ -4,12 +4,13 @@ import json
 import xlrd
 import requests
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,\
-    QHeaderView, QMessageBox, QFileDialog
+    QHeaderView, QMessageBox, QFileDialog, QScrollArea
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 import config
 from piece.base import TableCheckBox
 from thread.request import RequestThread
+from popup.maintain.danalysis import DANewHomeChart, DANewVarietyChart
 
 
 class AbstractMaintainWidget(QWidget):
@@ -127,39 +128,36 @@ class AbstractMaintainWidget(QWidget):
         self.refresh_btn.setEnabled(True)
 
     def create_new_data(self):
-        try:
-            self.show_table.hide()
-            self.review_table.show()
-            self.submit_btn.show()
-            # 弹窗选择文件
-            file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files (*.xlsx)")
-            if not file_path:
-                return
-            # excel file header match
-            header_labels = self.get_header_labels()  # 获取固定格式的表头
-            if not header_labels:
-                return
-            # 处理Excel数据写入表格
-            rf = xlrd.open_workbook(filename=file_path)
-            sheet1 = rf.sheet_by_index(0)
-            row_header = sheet1.row_values(0)
-            if row_header != header_labels:
-                QMessageBox.warning(self, '错误', '选择的文件格式有误.', QMessageBox.Yes)
-                return
-            # table initial
-            self.review_table.setRowCount(sheet1.nrows - 1)
-            self.review_table.setColumnCount(len(header_labels))
-            self.review_table.setHorizontalHeaderLabels(header_labels)
-            self.set_review_table_scale()  # 设置表格的伸缩
-            for row in range(1, sheet1.nrows):  # skip header
-                row_content = sheet1.row_values(row)
-                # data to review table
-                for col, col_data in enumerate(row_content):
-                    item = QTableWidgetItem(str(col_data))
-                    item.setTextAlignment(132)
-                    self.review_table.setItem(row - 1, col, item)
-        except Exception as e:
-            print(e)
+        self.show_table.hide()
+        self.review_table.show()
+        self.submit_btn.show()
+        # 弹窗选择文件
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files (*.xlsx)")
+        if not file_path:
+            return
+        # excel file header match
+        header_labels = self.get_header_labels()  # 获取固定格式的表头
+        if not header_labels:
+            return
+        # 处理Excel数据写入表格
+        rf = xlrd.open_workbook(filename=file_path)
+        sheet1 = rf.sheet_by_index(0)
+        row_header = sheet1.row_values(0)
+        if row_header != header_labels:
+            QMessageBox.warning(self, '错误', '选择的文件格式有误.', QMessageBox.Yes)
+            return
+        # table initial
+        self.review_table.setRowCount(sheet1.nrows - 1)
+        self.review_table.setColumnCount(len(header_labels))
+        self.review_table.setHorizontalHeaderLabels(header_labels)
+        self.set_review_table_scale()  # 设置表格的伸缩
+        for row in range(1, sheet1.nrows):  # skip header
+            row_content = sheet1.row_values(row)
+            # data to review table
+            for col, col_data in enumerate(row_content):
+                item = QTableWidgetItem(str(col_data))
+                item.setTextAlignment(132)
+                self.review_table.setItem(row - 1, col, item)
 
     def get_header_labels(self):
         # 子类需重写，确定每个数据源的表头, 数据格式为列表
@@ -269,6 +267,107 @@ class VarietyMenuMaintain(AbstractMaintainWidget):
         self.upload_data(new_list)
 
 
+class VarietyDetailMenuMaintain(AbstractMaintainWidget):
+    data_url = config.SERVER_ADDR + 'danalysis/detail_menu/all/'
+
+    def data_thread_back(self, content):
+        # print(content)
+        if content['error']:
+            return
+        keys = [('serial_num', '序号'), ('create_time', '创建时间'), ("name", "名称"), ("name_en", "英文"),
+                ("parent", "父级"), ('is_active', "启用")]
+        # 每个item含有subs,原来的方法不适用
+        # self.fill_data_show_table(data=content['data'], keys=keys)
+
+    def get_header_labels(self):
+        return ['名称', '英文代码', '父级', '所属品种']
+
+    def submit_new_data(self):
+        blank_item = False  # 标记为空，品种不得为空
+        self.submit_btn.setEnabled(False)  # 禁止重复点击提交
+        # 原数据暂无填充无法判重
+        # repeat_flag = False  # 标记重复（与原有数据，本身无作对比）
+        # # 遍历表格中所有数据# 对比是否有重复(标准：名称或英文代码一致)
+        # old_table_row = self.show_table.rowCount()
+        new_table_row = self.review_table.rowCount()
+        # for old_row in range(old_table_row):
+        #     old_item_zh = self.show_table.item(old_row, 2)
+        #     old_item_en = self.show_table.item(old_row, 3)
+        #     for new_row in range(new_table_row):
+        #         new_item_zh = self.review_table.item(new_row, 0)
+        #         new_item_en = self.review_table.item(new_row, 1)
+        #         if old_item_zh.text() == new_item_zh.text():
+        #             # print('中文简称相等了：', new_row, 1)
+        #             # 重复了就改变当前行字体颜色
+        #             [self.review_table.item(new_row, col).setForeground(QBrush(QColor(255, 10, 20))) for col in
+        #              range(self.review_table.columnCount())]
+        #             # new_item_zh.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
+        #             # item.setBackground(QBrush(QColor(220, 220, 220)))
+        #             repeat_flag = True
+
+        # 判空
+        for new_row in range(new_table_row):
+            if not self.review_table.item(new_row, 3).text():
+                [self.review_table.item(new_row, col).setForeground(QBrush(QColor(20, 10, 255))) for col in
+                 range(self.review_table.columnCount())]
+                blank_item = True
+
+        # # 重复数据标出, 禁止上传
+        # if repeat_flag:
+        #     # print('数据重复,请检查后上传')
+        #     QMessageBox.warning(self, '错误', '红色标记数据重复.\n请检查后上传.', QMessageBox.Yes)
+        #     # 开放可提交
+        #     self.submit_btn.setEnabled(True)
+        #     return
+
+        if blank_item:
+            QMessageBox.warning(self, '错误', '蓝色标记数据所属品种为空.\n请检查后上传.', QMessageBox.Yes)
+            # 开放可提交
+            self.submit_btn.setEnabled(True)
+            return
+        # 所有数据非重复，上传
+        # print('数据重复检测通过')
+        # 获取数据
+        new_list = list()
+        for row in range(self.review_table.rowCount()):
+            item = dict()
+            item['name'] = self.review_table.item(row, 0).text()
+            item['name_en'] = self.review_table.item(row, 1).text()
+            item['parent'] = self.review_table.item(row, 2).text()
+            item['variety'] = self.review_table.item(row, 3).text()
+            new_list.append(item)
+        self.upload_data(new_list)
 
 
+# 首页图表管理页面
+class DAHomeChartMaintain(AbstractMaintainWidget):
+    data_url = config.SERVER_ADDR + 'danalysis/charts/home/'
+
+    def data_thread_back(self, content):
+        if content['error']:
+            return
+        # print(content)
+
+    # 重写新增方法（弹窗新增）
+    def create_new_data(self):
+        popup = DANewHomeChart() # 上传首页图表的弹窗
+        popup.upload_new.connect(self.upload_data)
+        if not popup.exec_():
+            del popup
+
+
+# 品种页图表管理页面
+class DAVarietyChartMaintain(AbstractMaintainWidget):
+    data_url = config.SERVER_ADDR + 'danalysis/charts/variety/'
+
+    def data_thread_back(self, content):
+        if content['error']:
+            return
+
+    # 重写新增方法（弹窗新增）
+    def create_new_data(self):
+        popup = DANewVarietyChart()  # 上传品种图表的弹窗
+        popup.upload_new.connect(self.upload_data)
+        if not popup.exec_():
+            del popup
 
