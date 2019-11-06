@@ -16,3 +16,6 @@ app_dawn = QSettings('dawn/initial.ini', QSettings.IniFormat)
 # page size
 HOMEPAGE_REPORT_PAGESIZE = 20
 HOMEPAGE_NOTICE_PAGESIZE = 20
+IDENTIFY = True  # 是否为管理端
+# 支持的图表类型
+CHART_TYPE = [('line', '折线图'), ('bar', '柱状图')]

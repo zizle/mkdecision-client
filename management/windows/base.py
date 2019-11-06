@@ -118,7 +118,7 @@ class Base(QWidget):
         self.setLayout(layout)
         # set icon and title
         self.setWindowIcon(QIcon("media/logo.png"))
-        self.setWindowTitle("瑞达期货研究院分析决策系统_管理端 " + config.VERSION)
+        self.setWindowTitle("瑞达期货研究院分析决策系统_管理端_0101911")
         # get menus in server
         self.get_menus()
 

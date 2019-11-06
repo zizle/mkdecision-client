@@ -5,14 +5,20 @@ from PyQt5.QtChart import QChartView
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QIcon, QPainter
 
+import config
+
 
 class ChartView(QChartView):
     clicked = pyqtSignal(dict)
 
     def __init__(self, row, column, zoom_in=False):
         super(ChartView, self).__init__()
-        # 去除水印按钮
-        self.watermark_wiped = QPushButton('去除水印', self)
+        # 管理端有去除水印按钮
+        if config.IDENTIFY:
+            self.watermark_wiped = QPushButton('去除水印', self)
+            self.watermark_wiped.setStyleSheet(
+                'color:rgb(120,120,120);border:none;font-size:10px;max-width:40px;max-height:20px}')
+            self.watermark_wiped.clicked.connect(self.wipe_watermark)
         self.has_watermark = True
         self.row = row
         self.column = column
@@ -29,11 +35,9 @@ class ChartView(QChartView):
         self.setStyleSheet("background-image: url('media/chartbg-watermark.png');")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.watermark_wiped.setStyleSheet('color:rgb(120,120,120);border:none;font-size:10px;max-width:40px;max-height:20px}')
         self.zoom_in_out.setStyleSheet('border:none')
         layout.addWidget(self.zoom_in_out, alignment=Qt.AlignTop | Qt.AlignRight)
         self.zoom_in_out.clicked.connect(self.click_chart_view)
-        self.watermark_wiped.clicked.connect(self.wipe_watermark)
 
     def click_chart_view(self):
         if self.zoom_in_out.zoom_in:
@@ -65,3 +69,8 @@ class ChartView(QChartView):
             self.setStyleSheet("background-image: url('media/chartbg-watermark.png');")
             self.has_watermark = True
             self.watermark_wiped.setText('清除水印')
+
+    def setWatermarkButtonVisible(self, b=True):
+        if not b:
+            self.zoom_in_out.hide()
+

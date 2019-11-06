@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QGridLayout, QVBoxLayout
     QComboBox, QFileDialog, QTableWidgetItem, QMessageBox, QHeaderView
 from PyQt5.QtChart import QChart, QChartView, QLineSeries, QBarSet, QBarSeries
 from PyQt5.QtGui import QPainter
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, Qt
 import config
 from thread.request import RequestThread
 
@@ -24,8 +24,12 @@ class DANewHomeChart(QDialog):
         self.name_en_edit = QLineEdit()
         option = QLabel('图表类型:')
         self.type_selection = QComboBox()
-        self.chart_type = ['line', 'bar']  # 与下面的对应
-        self.type_selection.addItems(['折线图', '柱状图'])
+        self.chart_type = list()
+        chart_type_zh = list()
+        for t in config.CHART_TYPE:
+            self.chart_type.append(t[0])
+            chart_type_zh.append(t[1])
+        self.type_selection.addItems(chart_type_zh)
         edit_layout = QGridLayout()
         edit_layout.addWidget(name, 0, 0)
         edit_layout.addWidget(self.name_edit, 0, 1)
@@ -34,6 +38,7 @@ class DANewHomeChart(QDialog):
         edit_layout.addWidget(option, 2, 0)
         edit_layout.addWidget(self.type_selection, 2, 1)
         new_data_btn = QPushButton('添加数据')
+        new_data_btn.setObjectName("addDataButton")
         upload_button = QPushButton('确认新增')
         review_label = QLabel("预览")
         edit_layout.addWidget(new_data_btn, 3, 0)
@@ -47,8 +52,37 @@ class DANewHomeChart(QDialog):
         self.setLayout(layout)
         # style
         self.setMinimumSize(800, 560)
+        new_data_btn.setCursor(Qt.PointingHandCursor)
         self.review_chart.setStyleSheet("""
             background-image: url('media/chartbg-watermark.png');
+        """)
+        self.setStyleSheet("""
+        #addDataButton{
+            border:1px solid gray;
+            min-height:22px;
+            color: rgb(20,10,220);
+            padding:0 10px;
+        }
+        QComboBox {
+            border: 1px solid gray;
+            border-radius: 2px;
+            padding: 1px 2px 1px 2px;
+            min-width: 9em;
+            min-height:18px;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 20px;
+            border-left-width: 1px;
+            border-left-color: darkgray;
+            border-left-style: solid; /* just a single line */
+            border-top-right-radius: 2px; /* same radius as the QComboBox */
+            border-bottom-right-radius: 3px;
+        }
+        QComboBox::down-arrow {
+            image: url(media/drop-dowm.png);
+        }
         """)
         # signal
         new_data_btn.clicked.connect(self.add_chart_data)
@@ -146,8 +180,12 @@ class DANewVarietyChart(QDialog):
         self.name_en_edit = QLineEdit()
         option = QLabel('图表类型:')
         self.type_selection = QComboBox()
-        self.chart_type = ['line', 'bar']  # 与下面的对应
-        self.type_selection.addItems(['折线图', '柱状图'])
+        self.chart_type = list()
+        chart_type_zh = list()
+        for t in config.CHART_TYPE:
+            self.chart_type.append(t[0])
+            chart_type_zh.append(t[1])
+        self.type_selection.addItems(chart_type_zh)
         variety_label = QLabel('所属品种:')
         self.variety_selection = QComboBox()
         edit_layout = QGridLayout()
@@ -160,6 +198,7 @@ class DANewVarietyChart(QDialog):
         edit_layout.addWidget(variety_label, 2, 2)
         edit_layout.addWidget(self.variety_selection, 2, 3)
         new_data_btn = QPushButton('添加数据')
+        new_data_btn.setObjectName("addDataButton")
         upload_button = QPushButton('确认新增')
         review_label = QLabel("预览")
         edit_layout.addWidget(new_data_btn, 3, 0)
@@ -179,6 +218,34 @@ class DANewVarietyChart(QDialog):
         self.setMinimumSize(800, 560)
         self.review_chart.setStyleSheet("""
             background-image: url('media/chartbg-watermark.png');
+        """)
+        self.setStyleSheet("""
+        #addDataButton{
+            border:1px solid gray;
+            min-height:22px;
+            color: rgb(20,10,220);
+            padding:0 10px;
+        }
+        QComboBox {
+            border: 1px solid gray;
+            border-radius: 2px;
+            padding: 1px 2px 1px 2px;
+            min-width: 9em;
+            min-height:18px;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 20px;
+            border-left-width: 1px;
+            border-left-color: darkgray;
+            border-left-style: solid; /* just a single line */
+            border-top-right-radius: 2px; /* same radius as the QComboBox */
+            border-bottom-right-radius: 3px;
+        }
+        QComboBox::down-arrow {
+            image: url(media/drop-dowm.png);
+        }
         """)
         # signal
         new_data_btn.clicked.connect(self.add_chart_data)

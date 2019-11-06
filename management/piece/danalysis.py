@@ -51,20 +51,33 @@ class VHRightWidgets(QWidget):
             return
         if response_content['error']:
             return
-        x_axes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        # 布局个数处理
         row_index = 0
         column_index = 0
-        for chart_index, chart_data in enumerate(response_content['data']):
-            y_axes = [random.randint(1, 100) for _ in range(len(x_axes))]
-            print(chart_data["name"] + "y_axes:", y_axes)
+        for chart_index, chart_item in enumerate(response_content['data']):
+            # 创建图表容器和图表控件
             chart_view = ChartView(row=row_index, column=column_index)
-            chart_view.clicked.connect(self.chart_view_clicked)
+            chart_view.clicked.connect(self.chart_view_enlarge)
             chart = QChart()
-            series = QLineSeries()
-            for idx, x in enumerate(x_axes):
-                series.append(x, y_axes[idx])
-            chart.addSeries(series)
-            chart.setTitle(chart_data['name'])
+            # 根据图表类别创建图表(默认折线图)
+            chart.setTitle(chart_item['name'])
+            chart.legend().hide()  # 单一数据隐藏图例
+            if chart_item['chart_type'] == config.CHART_TYPE[0][0]:  # 折线图
+                series = QLineSeries()
+                for data_item in chart_item['data']:
+                    series.append(float(data_item[0]), float(data_item[1]))
+                chart.addSeries(series)
+            elif chart_item['chart_type'] == config.CHART_TYPE[1][0]:  # 柱状图
+                series = QBarSeries()
+                bar = QBarSet('')
+                for data_item in chart_item['data']:
+                    bar.append(float(data_item[1]))
+                series.append(bar)
+                chart.addSeries(series)
+                chart.createDefaultAxes()
+                chart_view.setWatermarkButtonVisible(False)
+            else:
+                chart.setTitle('暂无法显示该数据图.')
             chart_view.setChart(chart)
             chart_view.setRenderHint(QPainter.Antialiasing)
             chart.createDefaultAxes()
@@ -79,11 +92,11 @@ class VHRightWidgets(QWidget):
                 column_index = 0
                 row_index += 1
 
-    def chart_view_clicked(self, data):
+    def chart_view_enlarge(self, data):
         title = data['title']
         if not hasattr(self, 'chart_view'):
             self.chart_view = ChartView(row=0, column=0, zoom_in=True)
-            self.chart_view.clicked.connect(self.chart_view_clicked)
+            self.chart_view.clicked.connect(self.chart_view_enlarge)
         if self.chart_view.zoom_in_out.zoom_in:
             # 重新实例化一个chart
             chart = QChart(title=title)
@@ -99,9 +112,6 @@ class VHRightWidgets(QWidget):
             if hasattr(self, 'new_widget'):
                 self.new_widget.deleteLater()
                 del self.new_widget
-
-
-
             # 重新设置一个widget
             self.new_widget = QWidget(self)
             # 显示数据的表格
@@ -200,16 +210,30 @@ class VDRightWidgets(VHRightWidgets):
         x_axes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         row_index = 0
         column_index = 0
-        for chart_index, chart_data in enumerate(response_content['data']):
-            y_axes = [random.randint(1, 100) for _ in range(len(x_axes))]
+        for chart_index, chart_item in enumerate(response_content['data']):
+            # 创建图表容器和图表控件
             chart_view = ChartView(row=row_index, column=column_index)
-            chart_view.clicked.connect(self.chart_view_clicked)
+            chart_view.clicked.connect(self.chart_view_enlarge)
             chart = QChart()
-            series = QLineSeries()
-            for idx, x in enumerate(x_axes):
-                series.append(x, y_axes[idx])
-            chart.addSeries(series)
-            chart.setTitle(chart_data['name'])
+            # 根据图表类别创建图表(默认折线图)
+            chart.setTitle(chart_item['name'])
+            chart.legend().hide()  # 单一数据隐藏图例
+            if chart_item['chart_type'] == config.CHART_TYPE[0][0]:  # 折线图
+                series = QLineSeries()
+                for data_item in chart_item['data']:
+                    series.append(float(data_item[0]), float(data_item[1]))
+                chart.addSeries(series)
+            elif chart_item['chart_type'] == config.CHART_TYPE[1][0]:  # 柱状图
+                series = QBarSeries()
+                bar = QBarSet('')
+                for data_item in chart_item['data']:
+                    bar.append(float(data_item[1]))
+                series.append(bar)
+                chart.addSeries(series)
+                chart.createDefaultAxes()
+                chart_view.setWatermarkButtonVisible(False)
+            else:
+                chart.setTitle('暂无法显示该数据图.')
             chart_view.setChart(chart)
             chart_view.setRenderHint(QPainter.Antialiasing)
             chart.createDefaultAxes()
