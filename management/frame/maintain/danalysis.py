@@ -4,13 +4,136 @@ import json
 import xlrd
 import requests
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,\
-    QHeaderView, QMessageBox, QFileDialog, QScrollArea
+    QHeaderView, QMessageBox, QFileDialog, QScrollArea, QLabel, QGraphicsOpacityEffect, QDialog, QFormLayout, QLineEdit
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 import config
 from piece.base import TableCheckBox
 from thread.request import RequestThread
-from popup.maintain.danalysis import DANewHomeChart, DANewVarietyChart
+from popup.maintain.danalysis import NewVarietyPopup, DANewHomeChart, DANewVarietyChart
+
+
+class VarietyMaintain(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(VarietyMaintain, self).__init__(*args, **kwargs)
+
+        # 请求数据时的遮罩层
+        cover_layout = QHBoxLayout(self, spacing=0, margin=0)
+        opacity = QGraphicsOpacityEffect()
+        opacity.setOpacity(0.4)
+        self.cover = QWidget()
+        tip_layout = QVBoxLayout(self.cover)
+        self.hold_tip = QLabel('请稍后...', styleSheet="color:#FFF;font-size:16px;font-weight:bold")
+        tip_layout.addWidget(self.hold_tip,alignment=Qt.AlignCenter)
+        self.cover.setGraphicsEffect(opacity)
+        self.cover.setStyleSheet("background-color: rgb(150,150,150);")
+        self.cover.setAutoFillBackground(True)
+        cover_layout.addWidget(self.cover)
+        # self.cover.hide()
+        self.setWidgetResizable(True)  # 控件自拉伸
+        # 请求数据
+        self.get_content()
+
+    # 线程请求数据填充
+    def get_content(self):
+        url = config.SERVER_ADDR + 'danalysis/variety/'
+        if hasattr(self, 'request_thread'):
+            del self.request_thread
+        self.request_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+            cookies=config.app_dawn.value('cookies')
+        )
+
+        self.request_thread.response_signal.connect(self.request_thread_back)
+        self.request_thread.finished.connect(self.request_thread.deleteLater)
+        self.request_thread.start()
+
+    # 请求到数据显示
+    def request_thread_back(self, content):
+        # 新建控件，防止重复渲染
+        if hasattr(self, 'container'):
+            self.container.deleteLater()
+            del self.container
+        self.container = QWidget()
+        layout = QVBoxLayout()
+        self.container.setLayout(layout)
+        self.setWidget(self.container)
+        if content['error']:
+            return
+        self.cover.hide()  # 隐藏遮罩
+        # 填充内容
+        add_new = QPushButton('新增品种')
+        add_new.clicked.connect(self.popup_new_variety)
+        # 没有数据
+        if not content['data']:
+            group_0 = QLabel('还没有品种.')
+            oplyt = QHBoxLayout()
+            oplyt.addWidget(group_0, alignment=Qt.AlignLeft)
+            oplyt.addWidget(add_new, alignment=Qt.AlignRight)
+            oplyt.addStretch()
+            table_0 = QTableWidget()
+            self.container.layout().addLayout(oplyt)
+            self.container.layout().addWidget(table_0)
+            return
+        # 有数据
+        for index, group in enumerate(content['data']):
+            group_label = QLabel(group['name'])
+            table = QTableWidget()
+            # 填充子数据到table
+            row_count = len(group['subs'])
+            table.setRowCount(row_count)
+            table.setColumnCount(4)
+            table.setFixedHeight(35 + row_count * 35)
+            table.setHorizontalHeaderLabels(['编号', '创建时间', '名称', '英文代码'])
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)  # 列自适应
+            for row, sub_item in enumerate(group['subs']):
+                if not sub_item['name_en']:
+                    sub_item['name_en'] = ''
+                table.setItem(row, 0, QTableWidgetItem(str(sub_item['id'])))
+                table.setItem(row, 1, QTableWidgetItem(str(sub_item['create_time'])))
+                table.setItem(row, 2, QTableWidgetItem(str(sub_item['name'])))
+                table.setItem(row, 3, QTableWidgetItem(sub_item['name_en']))
+
+            if index == 0:
+                oplyt = QHBoxLayout()
+                oplyt.addWidget(group_label, alignment=Qt.AlignLeft)
+                oplyt.addWidget(add_new, alignment=Qt.AlignRight)
+                self.container.layout().addLayout(oplyt)
+                self.container.layout().addWidget(table)
+            else:
+                self.container.layout().addWidget(group_label)
+                self.container.layout().addWidget(table)
+
+    # 新增品种
+    def popup_new_variety(self):
+        self.cover.show()
+        self.hold_tip.hide()
+        popup = NewVarietyPopup(parent=self)
+        popup.deleteLater()
+        if not popup.exec_():
+            self.cover.hide()
+            self.hold_tip.show()
+            del popup
+            self.get_content()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class AbstractMaintainWidget(QWidget):
@@ -108,11 +231,11 @@ class AbstractMaintainWidget(QWidget):
                     item = QTableWidgetItem(str(r + 1))  # 序号
                 else:
                     label_key = set_keys[c]
-                    if label_key == 'is_active':  # 是否启用选择框展示
-                        checkbox = TableCheckBox(row=r, col=c, option_label=label_key)
-                        checkbox.setChecked(int(data[r][label_key]))
-                        checkbox.clicked_changed.connect(self.update_item_info)
-                        self.show_table.setCellWidget(r, c, checkbox)
+                    # if label_key == 'is_active':  # 是否启用选择框展示
+                    #     checkbox = TableCheckBox(row=r, col=c, option_label=label_key)
+                    #     checkbox.setChecked(int(data[r][label_key]))
+                    #     checkbox.clicked_changed.connect(self.update_item_info)
+                    #     self.show_table.setCellWidget(r, c, checkbox)
                     if label_key == 'variety':
                         if isinstance(data[r][label_key], list):
                             # print('品种字段为列表')
@@ -171,7 +294,7 @@ class AbstractMaintainWidget(QWidget):
         # 设置，子类可重写
         self.show_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)  # 列自适应
 
-    def upload_data(self, new_list):
+    def upload_data(self, new_list, data_key):
         # 上传数据，供子类调用
         try:
             if not self.data_url:
@@ -184,7 +307,7 @@ class AbstractMaintainWidget(QWidget):
                 data=json.dumps(
                     {"machine_code": config.app_dawn.value("machine"),
                      "maintain": True,
-                     "new_data": new_list
+                     data_key: new_list
                      }),
                 cookies=config.app_dawn.value('cookies')
             )
@@ -207,15 +330,18 @@ class AbstractMaintainWidget(QWidget):
         pass
 
 
-class VarietyMenuMaintain(AbstractMaintainWidget):
-    data_url = config.SERVER_ADDR + 'danalysis/variety_menu/'
+class VarietyMaintain1(AbstractMaintainWidget):
+    data_url = config.SERVER_ADDR + 'danalysis/variety/'
 
     def data_thread_back(self, content):
-        if content['error']:
-            return
-        keys = [('serial_num', '序号'), ('create_time', '创建时间'), ("name", "名称"), ("name_en", "英文"),
-                ("parent", "父级"), ('is_active', "启用")]
-        self.fill_data_show_table(data=content['data'], keys=keys)
+        try:
+            if content['error']:
+                return
+            keys = [('serial_num', '序号'), ('create_time', '创建时间'), ("name", "名称"), ("name_en", "英文"),
+                    ("parent", "父级")]
+            self.fill_data_show_table(data=content['data'], keys=keys)
+        except Exception as e:
+            print(e)
 
     def get_header_labels(self):
         return ["名称", "英文代码", "父级"]
@@ -264,7 +390,7 @@ class VarietyMenuMaintain(AbstractMaintainWidget):
             item['name_en'] = self.review_table.item(row, 1).text()
             item['parent'] = self.review_table.item(row, 2).text()
             new_list.append(item)
-        self.upload_data(new_list)
+        self.upload_data(new_list, data_key='varieties')
 
 
 class VarietyDetailMenuMaintain(AbstractMaintainWidget):

@@ -317,7 +317,7 @@ class VarietyHome(QWidget):
         # style
         layout.setContentsMargins(0, 0, 0, 0)
         # 初始化品种菜单数据
-        self.variety_menu.get_menu(url=config.SERVER_ADDR + 'danalysis/variety_menu/')
+        self.variety_menu.get_menu(url=config.SERVER_ADDR + 'danalysis/variety/')
 
 
 # 品种详情页(索引为1的tab)
