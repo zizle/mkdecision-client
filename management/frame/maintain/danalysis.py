@@ -4,15 +4,112 @@ import json
 import xlrd
 import requests
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,\
-    QHeaderView, QMessageBox, QFileDialog, QScrollArea, QLabel, QGraphicsOpacityEffect, QDialog, QFormLayout, QLineEdit
+    QHeaderView, QMessageBox, QFileDialog, QScrollArea, QLabel, QGraphicsOpacityEffect, QDialog, QFormLayout,\
+    QLineEdit, QComboBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 import config
-from piece.base import TableCheckBox
 from thread.request import RequestThread
-from popup.maintain.danalysis import NewVarietyPopup, DANewHomeChart, DANewVarietyChart
+from popup.maintain.danalysis import NewVarietyPopup, NewTablePopup
 
 
+# 数据上传
+class UploadDataMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(UploadDataMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        opl = QHBoxLayout()  # option layout 三级联动显示数据表
+        # 三级联动下拉菜单
+        self.combox0 = QComboBox()
+        self.combox1 = QComboBox()
+        self.combox2 = QComboBox()
+        opl.addWidget(self.combox0)
+        opl.addWidget(self.combox1)
+        opl.addWidget(self.combox2)
+        opl.addStretch()
+        # 新建项目
+        opl.addWidget(QPushButton('新增数据', clicked=self.upload_new_table))
+        table_show = QTableWidget()
+        # 信号关联
+        self.combox0.currentIndexChanged.connect(self.combox0_changed)
+        self.combox1.currentIndexChanged.connect(self.combox1_changed)
+        self.combox2.currentIndexChanged.connect(self.combox2_changed)
+        layout.addLayout(opl)
+        layout.addWidget(table_show)
+        self.setLayout(layout)
+        # 初始化
+        self.get_selection_menu()
+
+    # 请求品种数据
+    def get_selection_menu(self):
+        url = config.SERVER_ADDR + 'danalysis/variety/?mc=' + config.app_dawn.value("machine")
+        if hasattr(self, 'request_thread'):
+            del self.request_thread
+        self.request_thread = RequestThread(
+            url=url,
+            method='get',
+            headers=config.CLIENT_HEADERS,
+            cookies=config.app_dawn.value('cookies')
+        )
+        self.request_thread.response_signal.connect(self.request_thread_back)
+        self.request_thread.finished.connect(self.request_thread.deleteLater)
+        self.request_thread.start()
+
+    # 线程回调，填充菜单
+    def request_thread_back(self, content):
+        if content['error']:
+            return
+        print(content)
+        for group_item in content['data']:
+            self.combox0.addItem(group_item['name'], group_item['id'])  # 在后续传入所需的数据，就是itemData
+
+    # 改变第2个
+    def combox0_changed(self):
+        gid = self.combox0.currentData()  # group id
+        self.combox1.clear()
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'danalysis/variety/' + str(gid) + '/',
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception:
+            return
+        for item in response['data']:
+            self.combox1.addItem(item['name'], item['id'])
+
+    # 改变第3个(数据表的分类)
+    def combox1_changed(self):
+        vid = self.combox1.currentData()  # variety id
+        self.combox2.clear()
+        url = config.SERVER_ADDR + 'danalysis/table_groups/' + str(vid) + '/?mc=' + config.app_dawn.value(
+            'machine')
+        try:
+            r = requests.get(
+                url=url,
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception:
+            return
+        for item in response['data']:
+            self.combox2.addItem(item['name'], item['id'])
+
+    # 数据表分类改变，改变显示的图表
+    def combox2_changed(self):
+        gid = self.combox2.currentData()  # group id 表分组(大类)
+        print('选择数据分类id', gid)
+
+    # 上传数据
+    def upload_new_table(self):
+        print('上传表')
+        popup = NewTablePopup(parent=self)
+        popup.deleteLater()
+        if not popup.exec_():
+            del popup
+
+
+# 品种管理
 class VarietyMaintain(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(VarietyMaintain, self).__init__(*args, **kwargs)
@@ -23,20 +120,33 @@ class VarietyMaintain(QScrollArea):
         opacity.setOpacity(0.4)
         self.cover = QWidget()
         tip_layout = QVBoxLayout(self.cover)
-        self.hold_tip = QLabel('请稍后...', styleSheet="color:#FFF;font-size:16px;font-weight:bold")
-        tip_layout.addWidget(self.hold_tip,alignment=Qt.AlignCenter)
+        self.hold_tip = QLabel('请稍后...', objectName='holdTip')
+        tip_layout.addWidget(self.hold_tip, alignment=Qt.AlignCenter)
         self.cover.setGraphicsEffect(opacity)
         self.cover.setStyleSheet("background-color: rgb(150,150,150);")
         self.cover.setAutoFillBackground(True)
         cover_layout.addWidget(self.cover)
         # self.cover.hide()
         self.setWidgetResizable(True)  # 控件自拉伸
+        self.setStyleSheet("""
+        /*大类分组的标签*/
+        #groupLabel {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        /*请求数据时弹窗遮罩上显示的‘请稍后’文字*/
+        #holdTip {
+            color:#FFF;
+            font-size:16px;
+            font-weight:bold;
+        }
+        """)
         # 请求数据
         self.get_content()
 
     # 线程请求数据填充
     def get_content(self):
-        url = config.SERVER_ADDR + 'danalysis/variety/'
+        url = config.SERVER_ADDR + 'danalysis/variety/?mc=' + config.app_dawn.value('machine')
         if hasattr(self, 'request_thread'):
             del self.request_thread
         self.request_thread = RequestThread(
@@ -67,7 +177,7 @@ class VarietyMaintain(QScrollArea):
         # 填充内容
         add_new = QPushButton('新增品种')
         add_new.clicked.connect(self.popup_new_variety)
-        # 没有数据
+        # 没有品种数据
         if not content['data']:
             group_0 = QLabel('还没有品种.')
             oplyt = QHBoxLayout()
@@ -78,9 +188,9 @@ class VarietyMaintain(QScrollArea):
             self.container.layout().addLayout(oplyt)
             self.container.layout().addWidget(table_0)
             return
-        # 有数据
+        # 有品种数据
         for index, group in enumerate(content['data']):
-            group_label = QLabel(group['name'])
+            group_label = QLabel(group['name'], objectName='groupLabel')
             table = QTableWidget()
             # 填充子数据到table
             row_count = len(group['subs'])
@@ -96,7 +206,6 @@ class VarietyMaintain(QScrollArea):
                 table.setItem(row, 1, QTableWidgetItem(str(sub_item['create_time'])))
                 table.setItem(row, 2, QTableWidgetItem(str(sub_item['name'])))
                 table.setItem(row, 3, QTableWidgetItem(sub_item['name_en']))
-
             if index == 0:
                 oplyt = QHBoxLayout()
                 oplyt.addWidget(group_label, alignment=Qt.AlignLeft)
@@ -106,6 +215,7 @@ class VarietyMaintain(QScrollArea):
             else:
                 self.container.layout().addWidget(group_label)
                 self.container.layout().addWidget(table)
+            self.container.layout().addStretch()
 
     # 新增品种
     def popup_new_variety(self):

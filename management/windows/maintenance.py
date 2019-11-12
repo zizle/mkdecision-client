@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt
 from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
 from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
-from frame.maintain.danalysis import VarietyMaintain, VarietyDetailMenuMaintain, DAHomeChartMaintain, DAVarietyChartMaintain
+from frame.maintain.danalysis import VarietyMaintain, UploadDataMaintain, DAHomeChartMaintain, DAVarietyChartMaintain
 from thread.request import RequestThread
 import config
 
@@ -27,7 +27,8 @@ class Maintenance(QWidget):
         self.left_tree.setHeaderHidden(True)
         # a tab show windows
         self.right_tab = QTabWidget()
-        self.right_tab.setTabsClosable(True)
+        # self.right_tab.setTabsClosable(True)
+        self.right_tab.tabBar().hide()
         # self.right_tab.setTabBarAutoHide(True)  # hide tabBar when only one tab
         self.right_tab.tabCloseRequested.connect(self.close_tab)
         hor_layout.addWidget(self.left_tree, alignment=Qt.AlignLeft)
@@ -153,6 +154,8 @@ class Maintenance(QWidget):
             elif parent_en == 'data_analysis':
                 if name_en == 'variety_manager':
                     tab = VarietyMaintain()
+                elif name_en == 'upload_data':
+                    tab = UploadDataMaintain()
 
                 # elif name_en == 'variety_detail_menu':
                 #     tab = VarietyDetailMenuMaintain()
