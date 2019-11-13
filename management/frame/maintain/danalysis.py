@@ -103,7 +103,11 @@ class UploadDataMaintain(QWidget):
     # 上传数据
     def upload_new_table(self):
         print('上传表')
-        popup = NewTablePopup(parent=self)
+        try:
+            popup = NewTablePopup(parent=self)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
         popup.deleteLater()
         if not popup.exec_():
             del popup

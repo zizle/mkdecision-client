@@ -1,11 +1,13 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
+import re
 import xlrd
 import json
 import requests
-from PyQt5.QtWidgets import QDialog,QWidget, QLabel, QLineEdit, QGridLayout, QVBoxLayout,QTreeWidget, QTreeWidgetItem,\
-    QPushButton, QComboBox, QFileDialog, QTableWidgetItem, QMessageBox, QHeaderView, QFormLayout, QHBoxLayout,\
-    QTreeWidget, QTableWidget, QGroupBox
+import datetime
+from xlrd import xldate_as_tuple
+from PyQt5.QtWidgets import QDialog,QWidget, QLabel, QLineEdit, QGridLayout, QVBoxLayout, QTreeWidget, QTreeWidgetItem,\
+    QPushButton, QComboBox, QFileDialog, QTableWidgetItem, QMessageBox, QHeaderView, QFormLayout, QHBoxLayout, QTableWidget
 from PyQt5.QtChart import QChart, QChartView, QLineSeries, QBarSet, QBarSeries
 from PyQt5.QtGui import QPainter, QIcon
 from PyQt5.QtCore import pyqtSignal, Qt
@@ -24,37 +26,49 @@ class NewTablePopup(QDialog):
         # 上传表格数据控件
         self.udwidget = QWidget()  # upload data widget
         # 右侧上传数据控件布局
-        udwlayout = QFormLayout()
+        udwlayout = QGridLayout(margin=0)
+        udwlayout.addWidget(QLabel('所属品种:'), 0, 0)
+        udwlayout.addWidget(QLabel(parent=self, objectName='VarietyError'), 1, 0, 1, 2)
         self.attach_variety = QLabel(objectName='AttachVariety')
         self.attach_variety.vid = None
+        udwlayout.addWidget(self.attach_variety, 0, 1)
+        udwlayout.addWidget(QLabel('所属组别:'), 2, 0)
+        udwlayout.addWidget(QLabel(parent=self, objectName='groupError'), 3, 0, 1, 2)
         self.attach_group = QLabel(objectName='AttachGroup')
         self.attach_group.gid = None
+        udwlayout.addWidget(self.attach_group, 2, 1)
+        udwlayout.addWidget(QLabel('数据名称:'), 4, 0)
+        udwlayout.addWidget(QLabel(parent=self, objectName='tbnameError'), 5, 0, 1, 2)
         self.tnedit = QLineEdit()  # table name edit数据组名称编辑
-        udwlayout.addRow('所属品种：', self.attach_variety)
-        udwlayout.addRow('', QLabel(parent=self, objectName='errorLabel'))
-        udwlayout.addRow('所属组别：', self.attach_group)
-        udwlayout.addRow('', QLabel(parent=self, objectName='errorLabel'))
-        udwlayout.addRow('数据名称：', self.tnedit)
-        udwlayout.addRow('', QLabel())
-        udwlayout.addRow(QPushButton('选择', objectName='selectTable'))
-        udwlayout.addRow(QTableWidget())
+        self.tnedit.textChanged.connect(self.tbname_changed)
+        udwlayout.addWidget(self.tnedit, 4, 1)
+        udwlayout.addWidget(QLabel('时间类型:'), 6, 0)
+        self.date_type = QComboBox(parent=self, objectName='dateTypeCombo')
+        self.date_type.currentTextChanged.connect(self.change_date_type)
+        udwlayout.addWidget(self.date_type, 6, 1)
+        udwlayout.addWidget(QPushButton('导入', objectName='selectTable', clicked=self.select_data_table), 7, 0)
+        self.review_table = QTableWidget()
+        udwlayout.addWidget(self.review_table, 8, 0, 1, 2)
+        # 上传添加数据表按钮布局
         addlayout = QHBoxLayout()
-        addlayout.addWidget(QPushButton('确认添加', parent=self, objectName='addTable', clicked=self.add_new_table), alignment=Qt.AlignRight)
-        udwlayout.addRow(addlayout)
+        self.add_table_btn = QPushButton('确认添加', parent=self, objectName='addTable', clicked=self.add_new_table)
+        addlayout.addWidget(self.add_table_btn, alignment=Qt.AlignRight)
         self.udwidget.setLayout(udwlayout)
         # 布局
         layout = QHBoxLayout()  # 总的左右布局
         llayout = QVBoxLayout()  # 左侧上下布局
         rlayout = QVBoxLayout()  # 右侧上下布局
         llayout.addWidget(self.variety_tree)
-        llayout.addWidget(QPushButton('新建', clicked=self.create_tgroup), alignment=Qt.AlignLeft)
+        llayout.addWidget(QPushButton('新建组别', clicked=self.create_tgroup), alignment=Qt.AlignLeft)
         rlayout.addWidget(self.udwidget)
+        rlayout.addLayout(addlayout)
         layout.addLayout(llayout)
         layout.addLayout(rlayout)
         self.setLayout(layout)
         # 样式
-        udwlayout.setLabelAlignment(Qt.AlignRight)
-        self.setFixedSize(800, 600)
+        self.setWindowTitle('新建数据')
+        self.setFixedSize(1000, 600)
+        self.review_table.horizontalHeader().hide()
         self.variety_tree.header().hide()
         self.variety_tree.setMaximumWidth(180)
         self.setObjectName('myself')
@@ -62,7 +76,7 @@ class NewTablePopup(QDialog):
         #myself{
             background-color: rgb(255,255,255);
         }
-        #AttachVariety, #AttachGroup{
+        #AttachVariety, #AttachGroup, #tgpopAttachTo{
             color:rgb(180,20,30)
         }
         #ngWidget{
@@ -78,12 +92,39 @@ class NewTablePopup(QDialog):
         #closeBtn, #addGroupBtn{
             max-width: 55px
         }
-        #errorLabel{
+        #tgpopupVError,#tgpopupNError,#tbnameError,#groupError{
             color:rgb(200,10,20)
         }
         """)
         # 初始化
         self.get_varieties()
+        self.get_date_type()
+        self.variety_tree.setCurrentIndex(self.variety_tree.model().index(0, 0))  # 最顶层设置为当前
+        self.variety_tree_clicked()  # 手动调用点击事件
+
+    # 数据时间类型选择
+    def get_date_type(self):
+        date_type = [
+            {'name': '年度（年）', 'fmt': '%Y'},
+            {'name': '月度（年-月）', 'fmt': '%Y-%m'},
+            {'name': '日度（年-月-日）', 'fmt': '%Y-%m-%d'},
+            {'name': '时度（年-月-日 时）', 'fmt': '%Y-%m-%d %H'},
+            {'name': '分度（年-月-日 时:分）', 'fmt': '%Y-%m-%d %H:%M'},
+            {'name': '秒度（年-月-日 时:分:秒）', 'fmt': '%Y-%m-%d %H:%M:%S'},
+        ]
+        for t in date_type:
+            self.date_type.addItem(t['name'], t['fmt'])
+        self.date_type.setCurrentIndex(self.date_type.count()-1)
+
+    # 该变时间类型
+    def change_date_type(self, t):
+        fmt = self.date_type.currentData()
+        for row in range(self.review_table.rowCount()):
+            for col in range(self.review_table.columnCount()):
+                item = self.review_table.item(row, 0)
+                if hasattr(item, 'date'):  # date属性是在填充表格时绑定，详见self._show_file_data函数
+                    text = item.date.strftime(fmt)
+                    item.setText(text)
 
     # 获取品种树内容
     def get_varieties(self):
@@ -98,7 +139,7 @@ class NewTablePopup(QDialog):
                 raise ValueError('')
         except Exception:
             return
-        for variety_item in response['data']:
+        for count, variety_item in enumerate(response['data']):
             variety = QTreeWidgetItem(self.variety_tree)
             variety.setText(0, variety_item['name'])
             variety.vid = variety_item['id']
@@ -109,47 +150,48 @@ class NewTablePopup(QDialog):
 
     # 新增数据大类
     def create_tgroup(self):
-        self.current_option = 1
-        if not hasattr(self, 'ng_widget'):
-            self.ng_widget = QWidget(self.udwidget, objectName='ngWidget')  # 新大类new group widget
-            self.ng_widget.setAutoFillBackground(True)
-            self.ng_widget.attach_variety = None
-            # 关闭按钮
-            closelayout = QHBoxLayout()
-            closelayout.addWidget(QPushButton('关闭', objectName='closeBtn', clicked=self.ng_widget_close), alignment=Qt.AlignRight)
-            # 新建的表单布局
-            ngwlayout = QFormLayout()  # new group widget layout
-            ngwlayout.addRow(closelayout)
-            ngwlayout.addRow('', QLabel())
-            ngwlayout.addRow('所属品种：', QLabel(parent=self.ng_widget, objectName='ngwAttachTo'))
-            ngwlayout.addRow('', QLabel(parent=self.ng_widget, objectName='errorLabel'))
-            # QLineEdit.textChanged
-            ngwlayout.addRow('大类名称：', QLineEdit(parent=self.ng_widget, objectName='ngEdit', textChanged=self.ngedit_foucs))
-            abtlayout = QHBoxLayout()
-            abtlayout.addWidget(QPushButton('增加', objectName='addGroupBtn', clicked=self.add_table_group), alignment=Qt.AlignRight)
-            ngwlayout.addRow('', QLabel())
-            ngwlayout.addRow(abtlayout)
-            self.ng_widget.setLayout(ngwlayout)
-        self.ng_widget.resize(self.udwidget.width(), self.udwidget.height())
-        self.ng_widget.show()
+        # 获取当前选择的品种
+        variety = self.attach_variety.text()
+        self.tgpopup = QDialog(parent=self)
+        self.tgpopup.deleteLater()
+        self.tgpopup.attach_variety = self.attach_variety.vid
+        playout = QGridLayout()  # table group popup layout
+        playout.addWidget(QLabel('所属品种：'), 0, 0)
+        playout.addWidget(QLabel(variety, parent=self.tgpopup, objectName='tgpopAttachTo'), 0, 1)
+        playout.addWidget(QLabel(parent=self.tgpopup, objectName='tgpopupVError'), 1, 0, 1, 2)  # variety error
+        playout.addWidget(QLabel('大类名称：'), 2, 0)
+        playout.addWidget(QLineEdit(parent=self.tgpopup, objectName='ngEdit', textChanged=self.ngedit_foucs))
+        playout.addWidget(QLabel(parent=self.tgpopup, objectName='tgpopupNError'), 3, 0, 1, 2)  # name error
+        abtlayout = QHBoxLayout()
+        abtlayout.addWidget(QPushButton('增加', objectName='addGroupBtn', clicked=self.add_table_group),
+                            alignment=Qt.AlignRight)
+        playout.addLayout(abtlayout, 4, 1, alignment=Qt.AlignRight)
+        self.tgpopup.setLayout(playout)
+        self.tgpopup.resize(400,150)
+        self.tgpopup.setWindowTitle('增加数据组')
+        if not self.tgpopup.exec_():
+            del self.tgpopup
 
     # 关闭新建数据组控件
     def ng_widget_close(self):
-        print('关闭')
         self.current_option = 0
         self.ng_widget.close()
+        self.add_table_btn.show()
 
     # 新建品种数据组别
     def add_table_group(self):
-        edit = self.ng_widget.findChild(QLineEdit, 'ngEdit')
-        group_name = edit.text().strip(' ')
-        attach_variety = self.ng_widget.attach_variety
-        error_label = self.ng_widget.findChild(QLabel, 'errorLabel')
-        if not attach_variety or not group_name:
-            error_label.setText('还没选择品种或输入组别名称.')
+        edit = self.tgpopup.findChild(QLineEdit, 'ngEdit')
+        group_name = re.sub(r'\s+', '', edit.text())
+        attach_variety = self.tgpopup.attach_variety
+        if not attach_variety:
+            el = self.tgpopup.findChild(QLabel, 'tgpopupVError')
+            el.setText('请选择品种再进行增加.')
+        if not group_name:
+            el = self.tgpopup.findChild(QLabel, 'tgpopupNError')
+            el.setText('还没输入组别名称.')
             return
         # 提交
-        commit_btn = self.ng_widget.findChild(QPushButton, 'addGroupBtn')
+        commit_btn = self.tgpopup.findChild(QPushButton, 'addGroupBtn')
         commit_btn.setEnabled(False)
         try:
             r = requests.post(
@@ -162,26 +204,131 @@ class NewTablePopup(QDialog):
                 cookies=config.app_dawn.value('cookies')
             )
             response = json.loads(r.content.decode('utf-8'))
+            if response['error']:
+                raise ValueError(response['message'])
         except Exception as e:
-            error_label.setText(str(e))
-            commit_btn.setEnabled(True)
-            return
-        if response['error']:
-            error_label.setText(response['message'])
+            el = self.tgpopup.findChild(QLabel, 'tgpopupNError')
+            el.setText(str(e))
         else:
             # 重新刷新目录树
             self.get_varieties()
-            self.ng_widget.close()
+            self.tgpopup.close()
         commit_btn.setEnabled(True)
 
+    # 新建组别的名称编辑框文字改变
     def ngedit_foucs(self, t):
-        error_label = self.ng_widget.findChild(QLabel, 'errorLabel')
+        error_label = self.tgpopup.findChild(QLabel, 'tgpopupNError')
         error_label.setText('')
+
+    # 新建表的表名称编辑框文字改变
+    def tbname_changed(self, t):
+        el = self.findChild(QLabel, 'tbnameError')
+        el.setText('')
+
+    # 选择数据表文件
+    def select_data_table(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "Excel files(*.xls *.xlsx)")
+        if not file_path:
+            return
+        # 处理文件名称填入表名称框
+        file_name_ext = file_path.rsplit('/', 1)[1]
+        file_name = file_name_ext.rsplit('.', 1)[0]
+        tbname = re.sub(r'\s+', '', file_name)
+        self.tnedit.setText(tbname)
+        # 读取文件内容预览
+        self._show_file_data(file_path)
+
+    # 读取文件内容填入预览表格
+    def _show_file_data(self, file_path):
+        # 处理Excel数据写入表格预览
+        rf = xlrd.open_workbook(filename=file_path)
+        sheet1 = rf.sheet_by_index(0)
+        # labels = sheet1.row_values(0)
+        # xlrd读取的类型ctype： 0 empty,1 string, 2 number, 3 date, 4 boolean, 5 error
+        nrows = sheet1.nrows
+        ncols = sheet1.ncols
+        self.review_table.clear()
+        self.review_table.setRowCount(nrows)
+        self.review_table.setColumnCount(ncols)
+        # self.review_table.setHorizontalHeaderLabels([str(i) for i in labels])
+        self.review_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # 时间类型约束
+        date_type = self.date_type.currentData()
+        # 数据填入预览表格
+        for row in range(0, nrows):  # skip header
+            row_content = []
+            for col in range(ncols):
+                ctype = sheet1.cell(row, col).ctype
+                cell = sheet1.cell_value(row, col)
+                if ctype == 2 and cell % 1 == 0:  # 如果是整形
+                    cell = int(cell)
+                    item = QTableWidgetItem(str(cell))
+                elif ctype == 3:
+                    # 转成datetime对象
+                    date = datetime.datetime(*xldate_as_tuple(cell, 0))
+                    cell = date.strftime(date_type)
+                    # 填入预览表格cell就是每个数据
+                    item = QTableWidgetItem(str(cell))
+                    item.date = date
+                else:
+                    item = QTableWidgetItem(str(cell))
+                item.setTextAlignment(Qt.AlignCenter)
+                self.review_table.setItem(row, col, item)
+                row_content.append(cell)
+
+    # 读取预览表格的数据
+    def _read_review_data(self):
+        row_count = self.review_table.rowCount()
+        column_count = self.review_table.columnCount()
+        data_dict = dict()
+        data_dict['value_list'] = list()
+        for row in range(row_count):
+            row_content = list()
+            for col in range(column_count):
+                item = self.review_table.item(row, col)
+                row_content.append(item.text())
+            if row == 0:
+                data_dict['header_labels'] = row_content
+            else:
+                data_dict['value_list'].append(row_content)
+        return data_dict
 
     # 新增数据表
     def add_new_table(self):
         print('所属品种id', self.attach_variety.vid)
         print('所属组id', self.attach_group.gid)
+        self.add_table_btn.setEnabled(False)
+        # vid = self.attach_variety.vid
+        gid = self.attach_group.gid
+        if not gid:
+            el = self.findChild(QLabel, 'groupError')
+            el.setText('请选择数据所属组.如需新建组,请点击左下角【新建组别】.')
+        # 表名称与正则替换空格
+        tbname = re.sub(r'\s+', '', self.tnedit.text())
+        if not tbname:
+            el = self.findChild(QLabel, 'tbnameError')
+            el.setText('请输入数据表名称.')
+        # 读取预览表格的数据
+        table_data = self._read_review_data()
+        # 数据上传
+        try:
+            r = requests.post(
+                url=config.SERVER_ADDR + 'danalysis/table/' + str(gid) + '/',
+                headers=config.CLIENT_HEADERS,
+                data=json.dumps({
+                    "machine_code": config.app_dawn.value("machine"),
+                    "table_name": tbname,
+                    "table_data": table_data
+                }),
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception as e:
+            print(e)
+            self.add_table_btn.setEnabled(True)
+            return
+        print(response)
+        self.add_table_btn.setEnabled(True)
 
     # 点击品种树
     def variety_tree_clicked(self):
@@ -199,6 +346,9 @@ class NewTablePopup(QDialog):
                 self.attach_group.gid = item.gid
                 self.attach_variety.setText(item.parent().text(0))
                 self.attach_group.setText(text)
+                # 提示消息清除
+                el = self.findChild(QLabel, 'groupError')
+                el.setText('')
 
             else:
                 # 只能在品种下创建数据组别
@@ -211,6 +361,11 @@ class NewTablePopup(QDialog):
                 # 该表所属品种(只有显示提示作用)
                 self.attach_variety.setText(text)
                 self.attach_variety.vid = item.vid
+                # 清除所属组别和提示消息
+                self.attach_group.setText('')
+                self.attach_group.gid = None
+                el = self.findChild(QLabel, 'groupError')
+                el.setText('')
             else:
                 # 显示所属品种
                 self.ng_widget.attach_variety = item.vid
