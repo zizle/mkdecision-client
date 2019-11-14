@@ -15,6 +15,216 @@ import config
 from thread.request import RequestThread
 
 
+# 新增品种弹窗
+class NewVarietyPopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(NewVarietyPopup, self).__init__(*args, **kwargs)
+        # 左侧分组树
+        self.group_tree = QTreeWidget(clicked=self.group_tree_clicked)
+        # 新增品种控件
+        self.nvwidget = QWidget()  # new variety widget
+        # 新增品种控件布局
+        nvwlayout = QGridLayout(margin=0)
+        nvwlayout.addWidget(QLabel('所属分组：'), 0, 0)
+        self.attach_group = QLabel(objectName='attachGroup')
+        self.attach_group.gid = None
+        nvwlayout.addWidget(self.attach_group, 0, 1)
+        nvwlayout.addWidget(QLabel(parent=self, objectName='groupError'), 1, 0, 1, 2)
+        nvwlayout.addWidget(QLabel('新的品种：'), 2, 0)
+        self.vnedit = QLineEdit(textChanged=self.vn_changed)  # variety name edit
+        nvwlayout.addWidget(self.vnedit, 2, 1)
+        nvwlayout.addWidget(QLabel(parent=self, objectName='nvnameError'), 3, 0, 1, 2)
+        nvwlayout.addWidget(QLabel('英文代码：'), 4, 0)
+        self.venedit = QLineEdit(textChanged=self.ven_changed)  # variety english name edit
+        nvwlayout.addWidget(self.venedit, 4, 1)
+        nvwlayout.addWidget(QLabel(parent=self, objectName='nvenameError'), 5, 0, 1, 2)
+        addlayout = QHBoxLayout()
+        self.add_variety_btn = QPushButton('确认添加', parent=self, objectName='addVariety', clicked=self.add_new_variety)
+        addlayout.addWidget(self.add_variety_btn, alignment=Qt.AlignRight)
+        # 布局
+        self.nvwidget.setLayout(nvwlayout)
+        layout = QHBoxLayout()
+        llayout = QVBoxLayout()  # left layout
+        rlayout = QVBoxLayout()  # right layout
+        llayout.addWidget(self.group_tree)
+        llayout.addWidget(QPushButton('新建组别', clicked=self.create_vgroup), alignment=Qt.AlignLeft)
+        rlayout.addWidget(self.nvwidget)
+        rlayout.addLayout(addlayout)
+        rlayout.addStretch()
+        layout.addLayout(llayout)
+        layout.addLayout(rlayout)
+        self.setLayout(layout)
+        # 样式
+        self.setWindowTitle('新增品种')
+        self.setFixedSize(800, 500)
+        self.group_tree.header().hide()
+        self.group_tree.setMaximumWidth(180)
+        self.setObjectName('myself')
+        self.setStyleSheet("""
+            
+        """)
+        # 初始化
+        self.get_groups()
+
+    # 获取分组树内容(分组+品种)
+    def get_groups(self):
+        self.group_tree.clear()
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'danalysis/groups-varieties/?mc=' + config.app_dawn.value('machine'),
+                headers=config.CLIENT_HEADERS,
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception:
+            return
+        # 填充品种树
+        for group_item in response['data']:
+            group = QTreeWidgetItem(self.group_tree)
+            group.setText(0, group_item['name'])
+            group.gid = group_item['id']
+            # 添加子节点
+            for variety_item in group_item['varieties']:
+                child = QTreeWidgetItem()
+                child.setText(0, variety_item['name'])
+                child.vid = variety_item['id']
+                group.addChild(child)
+
+    # 点击分组树
+    def group_tree_clicked(self):
+        item = self.group_tree.currentItem()
+        if item.childCount():  # has children open the root
+            if item.isExpanded():
+                item.setExpanded(False)
+            else:
+                item.setExpanded(True)
+        text = item.text(0)
+        if item.parent():
+            # 提示只能在大类下创建品种
+            el = self.findChild(QLabel, 'groupError')
+            el.setText('只能在分组下新增品种,如需新建,请点击左下角【新建组别】')
+            self.add_variety_btn.setEnabled(False)
+        else:
+            # 该表所属分组
+            self.attach_group.setText(text)
+            self.attach_group.gid = item.gid
+            # 清除提示消息
+            el = self.findChild(QLabel, 'groupError')
+            el.setText('')
+            self.add_variety_btn.setEnabled(True)
+
+    # 新增品种提交
+    def add_new_variety(self):
+        # 获取当前选择的分组
+        if not self.attach_group.gid:
+            # 提示只能在大类下创建品种
+            el = self.findChild(QLabel, 'groupError')
+            el.setText('请选择品种所属的分组,如需新建,请点击左下角【新建组别】')
+            self.add_variety_btn.setEnabled(False)
+            return
+        vname = re.sub(r'\s+', '', self.vnedit.text())
+        vname_en = re.sub(r'\s+', '', self.venedit.text())
+        vname_en = re.match('[a-z0-9]+', vname_en)
+        if not vname:
+            el = self.findChild(QLabel, 'nvnameError')
+            el.setText('还没输入品种的名称')
+            self.add_variety_btn.setEnabled(False)
+            return
+        if not vname_en:
+            el = self.findChild(QLabel, 'nvenameError')
+            el.setText('请输入正确的英文代码,小写字母和数字一种或多种组成')
+            self.add_variety_btn.setEnabled(False)
+            return
+        vname_en = vname_en.group()
+        # 提交
+        try:
+            r = requests.post(
+                url=config.SERVER_ADDR + 'danalysis/variety-groups/' + str(self.attach_group.gid) + '/',
+                headers=config.CLIENT_HEADERS,
+                data=json.dumps({
+                    'machine_code': config.app_dawn.value('machine'),
+                    "name": vname,
+                    "name_en": vname_en
+                }),
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if response['error']:
+                raise ValueError(response['message'])
+        except Exception as e:
+            el = self.findChild(QLabel, 'nvenameError')
+            el.setText(str(e))
+        else:
+            self.vnedit.clear()
+            self.venedit.clear()
+            self.get_groups()
+
+    # 品种中文编辑框的信号函数
+    def vn_changed(self):
+        el = self.findChild(QLabel, 'nvnameError')
+        el.setText('')
+        self.add_variety_btn.setEnabled(True)
+
+    # 品种英文编辑框的信号函数
+    def ven_changed(self):
+        el = self.findChild(QLabel, 'nvenameError')
+        el.setText('')
+        self.add_variety_btn.setEnabled(True)
+
+    # 新增品种分组
+    def create_vgroup(self):
+        print('新增品种分组')
+        self.vgpopup = QDialog(parent=self)  # variety group popup
+        self.vgpopup.deleteLater()
+        playout = QGridLayout()  # popup layout
+        playout.addWidget(QLabel('组名称：'), 0, 0)
+        playout.addWidget(QLineEdit(parent=self.vgpopup, objectName='nvgEdit'), 0, 1)  # nvg = new variety group
+        playout.addWidget(QLabel(parent=self.vgpopup, objectName='nvgError'), 1, 0, 1, 2)
+        abtlayout = QHBoxLayout()
+        abtlayout.addWidget(QPushButton('增加', parent=self.vgpopup, objectName='addNvgbtn',
+                                        clicked=self.add_new_vgroup),alignment=Qt.AlignRight)
+        playout.addLayout(abtlayout, 1, 1)
+        self.vgpopup.setLayout(playout)
+        self.vgpopup.resize(300, 120)
+        self.vgpopup.setWindowTitle('增加品种组')
+        if not self.vgpopup.exec_():
+            del self.vgpopup
+
+    # 新增品种大分类
+    def add_new_vgroup(self):
+        print('新增品种大类')
+        edit = self.vgpopup.findChild(QLineEdit, 'nvgEdit')
+        group_name = re.sub(r'\s+', '', edit.text())
+        if not group_name:
+            el = self.vgpopup.findChild(QLabel, 'nvgError')
+            el.setText('请输入正确的组名称.')
+            return
+        # 提交
+        commit_btn = self.vgpopup.findChild(QPushButton, 'addNvgbtn')
+        commit_btn.setEnabled(False)
+        try:
+            r = requests.post(
+                url=config.SERVER_ADDR + 'danalysis/variety-groups/',
+                headers=config.CLIENT_HEADERS,
+                data=json.dumps({
+                    'machine_code': config.app_dawn.value('machine'),
+                    "name": group_name
+                }),
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if response['error']:
+                raise ValueError(response['message'])
+        except Exception as e:
+            el = self.vgpopup.findChild(QLabel, 'nvgError')
+            el.setText(str(e))
+        else:
+            # 重新刷新目录树
+            self.get_groups()
+            self.vgpopup.close()
+        commit_btn.setEnabled(True)
+
+
 # 新建数据弹窗
 class NewTablePopup(QDialog):
     def __init__(self, *args, **kwargs):
@@ -47,6 +257,7 @@ class NewTablePopup(QDialog):
         self.date_type.currentTextChanged.connect(self.change_date_type)
         udwlayout.addWidget(self.date_type, 6, 1)
         udwlayout.addWidget(QPushButton('导入', objectName='selectTable', clicked=self.select_data_table), 7, 0)
+        udwlayout.addWidget(QLabel(parent=self, objectName='commitError'), 7, 1)
         self.review_table = QTableWidget()
         udwlayout.addWidget(self.review_table, 8, 0, 1, 2)
         # 上传添加数据表按钮布局
@@ -73,9 +284,6 @@ class NewTablePopup(QDialog):
         self.variety_tree.setMaximumWidth(180)
         self.setObjectName('myself')
         self.setStyleSheet("""
-        #myself{
-            background-color: rgb(255,255,255);
-        }
         #AttachVariety, #AttachGroup, #tgpopAttachTo{
             color:rgb(180,20,30)
         }
@@ -99,8 +307,6 @@ class NewTablePopup(QDialog):
         # 初始化
         self.get_varieties()
         self.get_date_type()
-        self.variety_tree.setCurrentIndex(self.variety_tree.model().index(0, 0))  # 最顶层设置为当前
-        self.variety_tree_clicked()  # 手动调用点击事件
 
     # 数据时间类型选择
     def get_date_type(self):
@@ -147,6 +353,9 @@ class NewTablePopup(QDialog):
                 group = QTreeWidgetItem(variety)
                 group.setText(0, group_item['name'])
                 group.gid = group_item['id']
+        # 目录树填充完毕手动设置当前第一个，并触发点击事件
+        self.variety_tree.setCurrentIndex(self.variety_tree.model().index(0, 0))  # 最顶层设置为当前
+        self.variety_tree_clicked()  # 手动调用点击事件
 
     # 新增数据大类
     def create_tgroup(self):
@@ -165,9 +374,9 @@ class NewTablePopup(QDialog):
         abtlayout = QHBoxLayout()
         abtlayout.addWidget(QPushButton('增加', objectName='addGroupBtn', clicked=self.add_table_group),
                             alignment=Qt.AlignRight)
-        playout.addLayout(abtlayout, 4, 1, alignment=Qt.AlignRight)
+        playout.addLayout(abtlayout, 4, 1)
         self.tgpopup.setLayout(playout)
-        self.tgpopup.resize(400,150)
+        self.tgpopup.setFixedSize(400, 150)
         self.tgpopup.setWindowTitle('增加数据组')
         if not self.tgpopup.exec_():
             del self.tgpopup
@@ -178,7 +387,7 @@ class NewTablePopup(QDialog):
         self.ng_widget.close()
         self.add_table_btn.show()
 
-    # 新建品种数据组别
+    # 新建数据组别
     def add_table_group(self):
         edit = self.tgpopup.findChild(QLineEdit, 'ngEdit')
         group_name = re.sub(r'\s+', '', edit.text())
@@ -289,27 +498,33 @@ class NewTablePopup(QDialog):
                 row_content.append(item.text())
             if row == 0:
                 data_dict['header_labels'] = row_content
-            else:
-                data_dict['value_list'].append(row_content)
+            data_dict['value_list'].append(row_content)
         return data_dict
 
     # 新增数据表
     def add_new_table(self):
-        print('所属品种id', self.attach_variety.vid)
-        print('所属组id', self.attach_group.gid)
         self.add_table_btn.setEnabled(False)
         # vid = self.attach_variety.vid
         gid = self.attach_group.gid
         if not gid:
             el = self.findChild(QLabel, 'groupError')
             el.setText('请选择数据所属组.如需新建组,请点击左下角【新建组别】.')
+            self.add_table_btn.setEnabled(True)
+            return
         # 表名称与正则替换空格
         tbname = re.sub(r'\s+', '', self.tnedit.text())
         if not tbname:
             el = self.findChild(QLabel, 'tbnameError')
             el.setText('请输入数据表名称.')
+            self.add_table_btn.setEnabled(True)
+            return
         # 读取预览表格的数据
         table_data = self._read_review_data()
+        if not table_data['value_list']:
+            el = self.findChild(QLabel, 'commitError')
+            el.setText('请先导入数据再上传.')
+            self.add_table_btn.setEnabled(True)
+            return
         # 数据上传
         try:
             r = requests.post(
@@ -323,12 +538,14 @@ class NewTablePopup(QDialog):
                 cookies=config.app_dawn.value('cookies')
             )
             response = json.loads(r.content.decode('utf-8'))
+            if response['error']:
+                raise ValueError(response['message'])
         except Exception as e:
-            print(e)
+            el = self.findChild(QLabel, 'commitError')
+            el.setText(str(e))
             self.add_table_btn.setEnabled(True)
             return
-        print(response)
-        self.add_table_btn.setEnabled(True)
+        self.close()
 
     # 点击品种树
     def variety_tree_clicked(self):
@@ -377,8 +594,22 @@ class NewTablePopup(QDialog):
                 addBtn.setEnabled(True)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 新建品种弹窗
-class NewVarietyPopup(QDialog):
+class NewVarietyPopup1(QDialog):
     data_url = config.SERVER_ADDR + 'danalysis/variety/?mc=' + config.app_dawn.value('machine')
 
     def __init__(self, *args, **kwargs):
@@ -555,366 +786,366 @@ class NewVarietyPopup(QDialog):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 上传数据分析首页图表
-class DANewHomeChart(QDialog):
-    upload_new = pyqtSignal(dict)
-
-    def __init__(self):
-        super(DANewHomeChart, self).__init__()
-        layout = QVBoxLayout()
-        name = QLabel('图表名称:')
-        self.name_edit = QLineEdit()
-        self.name_en = QLabel('英文名称:')
-        self.name_en_edit = QLineEdit()
-        option = QLabel('图表类型:')
-        self.type_selection = QComboBox()
-        self.chart_type = list()
-        chart_type_zh = list()
-        for t in config.CHART_TYPE:
-            self.chart_type.append(t[0])
-            chart_type_zh.append(t[1])
-        self.type_selection.addItems(chart_type_zh)
-        edit_layout = QGridLayout()
-        edit_layout.addWidget(name, 0, 0)
-        edit_layout.addWidget(self.name_edit, 0, 1)
-        edit_layout.addWidget(self.name_en, 1, 0)
-        edit_layout.addWidget(self.name_en_edit, 1, 1)
-        edit_layout.addWidget(option, 2, 0)
-        edit_layout.addWidget(self.type_selection, 2, 1)
-        new_data_btn = QPushButton('添加数据')
-        new_data_btn.setObjectName("addDataButton")
-        upload_button = QPushButton('确认新增')
-        review_label = QLabel("预览")
-        edit_layout.addWidget(new_data_btn, 3, 0)
-        edit_layout.addWidget(review_label, 4, 0)
-        layout.addLayout(edit_layout)
-        # self.review_table = QTableWidget()
-        # layout.addWidget(self.review_table)
-        self.review_chart = QChartView()
-        layout.addWidget(self.review_chart)
-        layout.addWidget(upload_button)
-        self.setLayout(layout)
-        # style
-        self.setMinimumSize(800, 560)
-        new_data_btn.setCursor(Qt.PointingHandCursor)
-        self.review_chart.setStyleSheet("""
-            background-image: url('media/chartbg-watermark.png');
-        """)
-        self.setStyleSheet("""
-        #addDataButton{
-            border:1px solid gray;
-            min-height:22px;
-            color: rgb(20,10,220);
-            padding:0 10px;
-        }
-        QComboBox {
-            border: 1px solid gray;
-            border-radius: 2px;
-            padding: 1px 2px 1px 2px;
-            min-width: 9em;
-            min-height:18px;
-        }
-        QComboBox::drop-down {
-            subcontrol-origin: padding;
-            subcontrol-position: top right;
-            width: 20px;
-            border-left-width: 1px;
-            border-left-color: darkgray;
-            border-left-style: solid; /* just a single line */
-            border-top-right-radius: 2px; /* same radius as the QComboBox */
-            border-bottom-right-radius: 3px;
-        }
-        QComboBox::down-arrow {
-            image: url(media/drop-dowm.png);
-        }
-        """)
-        # signal
-        new_data_btn.clicked.connect(self.add_chart_data)
-        self.type_selection.currentIndexChanged.connect(self.chart_type_changed)
-        upload_button.clicked.connect(self.create_new_chart)
-        # 数据源
-        self.chart_labels = list()
-        self.x1_axis = list()
-        self.x2_axis = list()
-        self.y1_axis = list()
-        self.y2_axis = list()
-        self.has_data = False
-
-    def add_chart_data(self):
-        # 获取数据
-        # 弹窗选择文件
-        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files (*.xlsx)")
-        if not file_path:
-            return
-        # 处理Excel数据写入表格预览
-        rf = xlrd.open_workbook(filename=file_path)
-        sheet1 = rf.sheet_by_index(0)
-        self.chart_labels = sheet1.row_values(0)
-        self.x1_axis.clear()
-        self.x2_axis.clear()
-        self.y1_axis.clear()
-        self.y2_axis.clear()
-        for row in range(1, sheet1.nrows):  # skip header
-            row_content = sheet1.row_values(row)
-            self.x1_axis.append(row_content[0])
-            self.y1_axis.append(row_content[1])
-            self.x2_axis.append(row_content[2])
-            self.y2_axis.append(row_content[3])
-        self.has_data = True
-        self.chart_type_changed()
-
-    def chart_type_changed(self):
-        if self.has_data:
-            if self.type_selection.currentIndex() == 0:
-                chart = QChart()
-                series = QLineSeries()
-                for idx, x in enumerate(self.x1_axis):
-                    series.append(x, self.y1_axis[idx])
-                chart.addSeries(series)
-                chart.setTitle(self.name_edit.text())
-                self.review_chart.setChart(chart)
-                self.review_chart.setRenderHint(QPainter.Antialiasing)
-                chart.createDefaultAxes()
-                chart.setBackgroundVisible(False)
-            elif self.type_selection.currentIndex() == 1:
-                chart = QChart()
-                chart.setTitle(self.name_edit.text())
-                # 添加水印背景图片
-                chart.setBackgroundVisible(False)
-                series = QBarSeries()
-                bar = QBarSet('')
-                for index in range(len(self.x1_axis)):
-                    bar.append(self.y1_axis[index])
-                series.append(bar)
-                chart.addSeries(series)
-                chart.createDefaultAxes()
-                self.review_chart.setChart(chart)
-            else:
-                pass
-
-    def create_new_chart(self):
-        # 整理数据发出信号
-        data = dict()
-        chart_name = self.name_edit.text().strip(' ')
-        chart_name_en = self.name_en_edit.text().strip(' ')
-        if not chart_name or not chart_name_en:
-            QMessageBox.information(self, '错误', '请填入图表名称和英文名称.', QMessageBox.Yes)
-            return
-        data['chart_name'] = chart_name
-        data['chart_name_en'] = chart_name_en
-        data['chart_type'] = self.chart_type[self.type_selection.currentIndex()]
-        data['chart_labels'] = self.chart_labels
-        data['x1'] = self.x1_axis
-        data['y1'] = self.y1_axis
-        data['x2'] = self.x2_axis
-        data['y2'] = self.y2_axis
-        self.upload_new.emit(data)
-
-
-# 上传某个品种的图表
-class DANewVarietyChart(QDialog):
-    upload_new = pyqtSignal(dict)
-
-    def __init__(self):
-        super(DANewVarietyChart, self).__init__()
-        layout = QVBoxLayout()
-        name = QLabel('图表名称:')
-        self.name_edit = QLineEdit()
-        name_en = QLabel('英文名称:')
-        self.name_en_edit = QLineEdit()
-        option = QLabel('图表类型:')
-        self.type_selection = QComboBox()
-        self.chart_type = list()
-        chart_type_zh = list()
-        for t in config.CHART_TYPE:
-            self.chart_type.append(t[0])
-            chart_type_zh.append(t[1])
-        self.type_selection.addItems(chart_type_zh)
-        variety_label = QLabel('所属品种:')
-        self.variety_selection = QComboBox()
-        edit_layout = QGridLayout()
-        edit_layout.addWidget(name, 0, 0, 1, 3)
-        edit_layout.addWidget(self.name_edit, 0, 1, 1, 3)
-        edit_layout.addWidget(name_en, 1, 0, 1, 3)
-        edit_layout.addWidget(self.name_en_edit, 1, 1, 1, 3)
-        edit_layout.addWidget(option, 2, 0)
-        edit_layout.addWidget(self.type_selection, 2, 1)
-        edit_layout.addWidget(variety_label, 2, 2)
-        edit_layout.addWidget(self.variety_selection, 2, 3)
-        new_data_btn = QPushButton('添加数据')
-        new_data_btn.setObjectName("addDataButton")
-        upload_button = QPushButton('确认新增')
-        review_label = QLabel("预览")
-        edit_layout.addWidget(new_data_btn, 3, 0)
-        edit_layout.addWidget(review_label, 4, 0)
-        layout.addLayout(edit_layout)
-        # self.review_table = QTableWidget()
-        # layout.addWidget(self.review_table)
-        self.review_chart = QChartView()
-        layout.addWidget(self.review_chart)
-        layout.addWidget(upload_button)
-        self.setLayout(layout)
-        # style
-        name.setMaximumWidth(60)
-        name_en.setMaximumWidth(60)
-        variety_label.setMaximumWidth(60)
-        option.setMaximumWidth(60)
-        self.setMinimumSize(800, 560)
-        self.review_chart.setStyleSheet("""
-            background-image: url('media/chartbg-watermark.png');
-        """)
-        self.setStyleSheet("""
-        #addDataButton{
-            border:1px solid gray;
-            min-height:22px;
-            color: rgb(20,10,220);
-            padding:0 10px;
-        }
-        QComboBox {
-            border: 1px solid gray;
-            border-radius: 2px;
-            padding: 1px 2px 1px 2px;
-            min-width: 9em;
-            min-height:18px;
-        }
-        QComboBox::drop-down {
-            subcontrol-origin: padding;
-            subcontrol-position: top right;
-            width: 20px;
-            border-left-width: 1px;
-            border-left-color: darkgray;
-            border-left-style: solid; /* just a single line */
-            border-top-right-radius: 2px; /* same radius as the QComboBox */
-            border-bottom-right-radius: 3px;
-        }
-        QComboBox::down-arrow {
-            image: url(media/drop-dowm.png);
-        }
-        """)
-        # signal
-        new_data_btn.clicked.connect(self.add_chart_data)
-        self.type_selection.currentIndexChanged.connect(self.chart_type_changed)
-        upload_button.clicked.connect(self.create_new_chart)
-        # 数据源
-        self.chart_labels = list()
-        self.x1_axis = list()
-        self.x2_axis = list()
-        self.y1_axis = list()
-        self.y2_axis = list()
-        self.has_data = False
-        self.variety_thread = None
-        self.varieties = list()
-        # 获取品种数据
-        self.get_variety_selection(url=config.SERVER_ADDR + 'danalysis/variety_menu/')
-        
-    def get_variety_selection(self, url):
-        if not url:
-            return
-        if self.variety_thread:
-            del self.variety_thread
-        self.variety_thread = RequestThread(
-            url=url,
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.variety_thread.response_signal.connect(self.variety_thread_back)
-        self.variety_thread.finished.connect(self.variety_thread.deleteLater)
-        self.variety_thread.start()
-
-    def variety_thread_back(self, content):
-        if content['error']:
-            return
-        for item in content['data']:
-            self.varieties += item['subs']
-        for variety_item in self.varieties:
-            self.variety_selection.addItem(variety_item['name'])
-
-    def add_chart_data(self):
-        # 弹窗选择文件，获取数据
-        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files (*.xlsx)")
-        if not file_path:
-            return
-        # 处理Excel数据写入表格预览
-        rf = xlrd.open_workbook(filename=file_path)
-        sheet1 = rf.sheet_by_index(0)
-        self.chart_labels = sheet1.row_values(0)
-        self.x1_axis.clear()
-        self.x2_axis.clear()
-        self.y1_axis.clear()
-        self.y2_axis.clear()
-        for row in range(1, sheet1.nrows):  # skip header
-            row_content = sheet1.row_values(row)
-            self.x1_axis.append(row_content[0])
-            self.y1_axis.append(row_content[1])
-            self.x2_axis.append(row_content[2])
-            self.y2_axis.append(row_content[3])
-        self.has_data = True
-        self.chart_type_changed()
-
-    def chart_type_changed(self):
-        if self.has_data:
-            if self.type_selection.currentIndex() == 0:
-                chart = QChart()
-                series = QLineSeries()
-                for idx, x in enumerate(self.x1_axis):
-                    series.append(x, self.y1_axis[idx])
-                chart.addSeries(series)
-                chart.setTitle(self.name_edit.text())
-                self.review_chart.setChart(chart)
-                self.review_chart.setRenderHint(QPainter.Antialiasing)
-                chart.createDefaultAxes()
-                chart.setBackgroundVisible(False)
-            elif self.type_selection.currentIndex() == 1:
-                chart = QChart()
-                chart.setTitle(self.name_edit.text())
-                # 添加水印背景图片
-                chart.setBackgroundVisible(False)
-                series = QBarSeries()
-                bar = QBarSet('')
-                for index in range(len(self.x1_axis)):
-                    bar.append(self.y1_axis[index])
-                series.append(bar)
-                chart.addSeries(series)
-                chart.createDefaultAxes()
-                self.review_chart.setChart(chart)
-            else:
-                pass
-
-    def create_new_chart(self):
-        # 整理数据发出信号
-        data = dict()
-        chart_name = self.name_edit.text().strip(' ')
-        chart_name_en = self.name_en_edit.text().strip(' ')
-        if not chart_name or not chart_name_en:
-            QMessageBox.information(self, '错误', '请填入图表名称和英文名称.', QMessageBox.Yes)
-            return
-        data['chart_name'] = chart_name
-        data['chart_name_en'] = chart_name_en
-        data['chart_type'] = self.chart_type[self.type_selection.currentIndex()]
-        data['chart_labels'] = self.chart_labels
-        data['variety'] = self.varieties[self.variety_selection.currentIndex()]['name_en']
-        data['x1'] = self.x1_axis
-        data['y1'] = self.y1_axis
-        data['x2'] = self.x2_axis
-        data['y2'] = self.y2_axis
-        self.upload_new.emit(data)
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+# # 上传数据分析首页图表
+# class DANewHomeChart(QDialog):
+#     upload_new = pyqtSignal(dict)
+#
+#     def __init__(self):
+#         super(DANewHomeChart, self).__init__()
+#         layout = QVBoxLayout()
+#         name = QLabel('图表名称:')
+#         self.name_edit = QLineEdit()
+#         self.name_en = QLabel('英文名称:')
+#         self.name_en_edit = QLineEdit()
+#         option = QLabel('图表类型:')
+#         self.type_selection = QComboBox()
+#         self.chart_type = list()
+#         chart_type_zh = list()
+#         for t in config.CHART_TYPE:
+#             self.chart_type.append(t[0])
+#             chart_type_zh.append(t[1])
+#         self.type_selection.addItems(chart_type_zh)
+#         edit_layout = QGridLayout()
+#         edit_layout.addWidget(name, 0, 0)
+#         edit_layout.addWidget(self.name_edit, 0, 1)
+#         edit_layout.addWidget(self.name_en, 1, 0)
+#         edit_layout.addWidget(self.name_en_edit, 1, 1)
+#         edit_layout.addWidget(option, 2, 0)
+#         edit_layout.addWidget(self.type_selection, 2, 1)
+#         new_data_btn = QPushButton('添加数据')
+#         new_data_btn.setObjectName("addDataButton")
+#         upload_button = QPushButton('确认新增')
+#         review_label = QLabel("预览")
+#         edit_layout.addWidget(new_data_btn, 3, 0)
+#         edit_layout.addWidget(review_label, 4, 0)
+#         layout.addLayout(edit_layout)
+#         # self.review_table = QTableWidget()
+#         # layout.addWidget(self.review_table)
+#         self.review_chart = QChartView()
+#         layout.addWidget(self.review_chart)
+#         layout.addWidget(upload_button)
+#         self.setLayout(layout)
+#         # style
+#         self.setMinimumSize(800, 560)
+#         new_data_btn.setCursor(Qt.PointingHandCursor)
+#         self.review_chart.setStyleSheet("""
+#             background-image: url('media/chartbg-watermark.png');
+#         """)
+#         self.setStyleSheet("""
+#         #addDataButton{
+#             border:1px solid gray;
+#             min-height:22px;
+#             color: rgb(20,10,220);
+#             padding:0 10px;
+#         }
+#         QComboBox {
+#             border: 1px solid gray;
+#             border-radius: 2px;
+#             padding: 1px 2px 1px 2px;
+#             min-width: 9em;
+#             min-height:18px;
+#         }
+#         QComboBox::drop-down {
+#             subcontrol-origin: padding;
+#             subcontrol-position: top right;
+#             width: 20px;
+#             border-left-width: 1px;
+#             border-left-color: darkgray;
+#             border-left-style: solid; /* just a single line */
+#             border-top-right-radius: 2px; /* same radius as the QComboBox */
+#             border-bottom-right-radius: 3px;
+#         }
+#         QComboBox::down-arrow {
+#             image: url(media/drop-dowm.png);
+#         }
+#         """)
+#         # signal
+#         new_data_btn.clicked.connect(self.add_chart_data)
+#         self.type_selection.currentIndexChanged.connect(self.chart_type_changed)
+#         upload_button.clicked.connect(self.create_new_chart)
+#         # 数据源
+#         self.chart_labels = list()
+#         self.x1_axis = list()
+#         self.x2_axis = list()
+#         self.y1_axis = list()
+#         self.y2_axis = list()
+#         self.has_data = False
+#
+#     def add_chart_data(self):
+#         # 获取数据
+#         # 弹窗选择文件
+#         file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files (*.xlsx)")
+#         if not file_path:
+#             return
+#         # 处理Excel数据写入表格预览
+#         rf = xlrd.open_workbook(filename=file_path)
+#         sheet1 = rf.sheet_by_index(0)
+#         self.chart_labels = sheet1.row_values(0)
+#         self.x1_axis.clear()
+#         self.x2_axis.clear()
+#         self.y1_axis.clear()
+#         self.y2_axis.clear()
+#         for row in range(1, sheet1.nrows):  # skip header
+#             row_content = sheet1.row_values(row)
+#             self.x1_axis.append(row_content[0])
+#             self.y1_axis.append(row_content[1])
+#             self.x2_axis.append(row_content[2])
+#             self.y2_axis.append(row_content[3])
+#         self.has_data = True
+#         self.chart_type_changed()
+#
+#     def chart_type_changed(self):
+#         if self.has_data:
+#             if self.type_selection.currentIndex() == 0:
+#                 chart = QChart()
+#                 series = QLineSeries()
+#                 for idx, x in enumerate(self.x1_axis):
+#                     series.append(x, self.y1_axis[idx])
+#                 chart.addSeries(series)
+#                 chart.setTitle(self.name_edit.text())
+#                 self.review_chart.setChart(chart)
+#                 self.review_chart.setRenderHint(QPainter.Antialiasing)
+#                 chart.createDefaultAxes()
+#                 chart.setBackgroundVisible(False)
+#             elif self.type_selection.currentIndex() == 1:
+#                 chart = QChart()
+#                 chart.setTitle(self.name_edit.text())
+#                 # 添加水印背景图片
+#                 chart.setBackgroundVisible(False)
+#                 series = QBarSeries()
+#                 bar = QBarSet('')
+#                 for index in range(len(self.x1_axis)):
+#                     bar.append(self.y1_axis[index])
+#                 series.append(bar)
+#                 chart.addSeries(series)
+#                 chart.createDefaultAxes()
+#                 self.review_chart.setChart(chart)
+#             else:
+#                 pass
+#
+#     def create_new_chart(self):
+#         # 整理数据发出信号
+#         data = dict()
+#         chart_name = self.name_edit.text().strip(' ')
+#         chart_name_en = self.name_en_edit.text().strip(' ')
+#         if not chart_name or not chart_name_en:
+#             QMessageBox.information(self, '错误', '请填入图表名称和英文名称.', QMessageBox.Yes)
+#             return
+#         data['chart_name'] = chart_name
+#         data['chart_name_en'] = chart_name_en
+#         data['chart_type'] = self.chart_type[self.type_selection.currentIndex()]
+#         data['chart_labels'] = self.chart_labels
+#         data['x1'] = self.x1_axis
+#         data['y1'] = self.y1_axis
+#         data['x2'] = self.x2_axis
+#         data['y2'] = self.y2_axis
+#         self.upload_new.emit(data)
+#
+#
+# # 上传某个品种的图表
+# class DANewVarietyChart(QDialog):
+#     upload_new = pyqtSignal(dict)
+#
+#     def __init__(self):
+#         super(DANewVarietyChart, self).__init__()
+#         layout = QVBoxLayout()
+#         name = QLabel('图表名称:')
+#         self.name_edit = QLineEdit()
+#         name_en = QLabel('英文名称:')
+#         self.name_en_edit = QLineEdit()
+#         option = QLabel('图表类型:')
+#         self.type_selection = QComboBox()
+#         self.chart_type = list()
+#         chart_type_zh = list()
+#         for t in config.CHART_TYPE:
+#             self.chart_type.append(t[0])
+#             chart_type_zh.append(t[1])
+#         self.type_selection.addItems(chart_type_zh)
+#         variety_label = QLabel('所属品种:')
+#         self.variety_selection = QComboBox()
+#         edit_layout = QGridLayout()
+#         edit_layout.addWidget(name, 0, 0, 1, 3)
+#         edit_layout.addWidget(self.name_edit, 0, 1, 1, 3)
+#         edit_layout.addWidget(name_en, 1, 0, 1, 3)
+#         edit_layout.addWidget(self.name_en_edit, 1, 1, 1, 3)
+#         edit_layout.addWidget(option, 2, 0)
+#         edit_layout.addWidget(self.type_selection, 2, 1)
+#         edit_layout.addWidget(variety_label, 2, 2)
+#         edit_layout.addWidget(self.variety_selection, 2, 3)
+#         new_data_btn = QPushButton('添加数据')
+#         new_data_btn.setObjectName("addDataButton")
+#         upload_button = QPushButton('确认新增')
+#         review_label = QLabel("预览")
+#         edit_layout.addWidget(new_data_btn, 3, 0)
+#         edit_layout.addWidget(review_label, 4, 0)
+#         layout.addLayout(edit_layout)
+#         # self.review_table = QTableWidget()
+#         # layout.addWidget(self.review_table)
+#         self.review_chart = QChartView()
+#         layout.addWidget(self.review_chart)
+#         layout.addWidget(upload_button)
+#         self.setLayout(layout)
+#         # style
+#         name.setMaximumWidth(60)
+#         name_en.setMaximumWidth(60)
+#         variety_label.setMaximumWidth(60)
+#         option.setMaximumWidth(60)
+#         self.setMinimumSize(800, 560)
+#         self.review_chart.setStyleSheet("""
+#             background-image: url('media/chartbg-watermark.png');
+#         """)
+#         self.setStyleSheet("""
+#         #addDataButton{
+#             border:1px solid gray;
+#             min-height:22px;
+#             color: rgb(20,10,220);
+#             padding:0 10px;
+#         }
+#         QComboBox {
+#             border: 1px solid gray;
+#             border-radius: 2px;
+#             padding: 1px 2px 1px 2px;
+#             min-width: 9em;
+#             min-height:18px;
+#         }
+#         QComboBox::drop-down {
+#             subcontrol-origin: padding;
+#             subcontrol-position: top right;
+#             width: 20px;
+#             border-left-width: 1px;
+#             border-left-color: darkgray;
+#             border-left-style: solid; /* just a single line */
+#             border-top-right-radius: 2px; /* same radius as the QComboBox */
+#             border-bottom-right-radius: 3px;
+#         }
+#         QComboBox::down-arrow {
+#             image: url(media/drop-dowm.png);
+#         }
+#         """)
+#         # signal
+#         new_data_btn.clicked.connect(self.add_chart_data)
+#         self.type_selection.currentIndexChanged.connect(self.chart_type_changed)
+#         upload_button.clicked.connect(self.create_new_chart)
+#         # 数据源
+#         self.chart_labels = list()
+#         self.x1_axis = list()
+#         self.x2_axis = list()
+#         self.y1_axis = list()
+#         self.y2_axis = list()
+#         self.has_data = False
+#         self.variety_thread = None
+#         self.varieties = list()
+#         # 获取品种数据
+#         self.get_variety_selection(url=config.SERVER_ADDR + 'danalysis/variety_menu/')
+#
+#     def get_variety_selection(self, url):
+#         if not url:
+#             return
+#         if self.variety_thread:
+#             del self.variety_thread
+#         self.variety_thread = RequestThread(
+#             url=url,
+#             method='get',
+#             headers=config.CLIENT_HEADERS,
+#             data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+#             cookies=config.app_dawn.value('cookies')
+#         )
+#         self.variety_thread.response_signal.connect(self.variety_thread_back)
+#         self.variety_thread.finished.connect(self.variety_thread.deleteLater)
+#         self.variety_thread.start()
+#
+#     def variety_thread_back(self, content):
+#         if content['error']:
+#             return
+#         for item in content['data']:
+#             self.varieties += item['subs']
+#         for variety_item in self.varieties:
+#             self.variety_selection.addItem(variety_item['name'])
+#
+#     def add_chart_data(self):
+#         # 弹窗选择文件，获取数据
+#         file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files (*.xlsx)")
+#         if not file_path:
+#             return
+#         # 处理Excel数据写入表格预览
+#         rf = xlrd.open_workbook(filename=file_path)
+#         sheet1 = rf.sheet_by_index(0)
+#         self.chart_labels = sheet1.row_values(0)
+#         self.x1_axis.clear()
+#         self.x2_axis.clear()
+#         self.y1_axis.clear()
+#         self.y2_axis.clear()
+#         for row in range(1, sheet1.nrows):  # skip header
+#             row_content = sheet1.row_values(row)
+#             self.x1_axis.append(row_content[0])
+#             self.y1_axis.append(row_content[1])
+#             self.x2_axis.append(row_content[2])
+#             self.y2_axis.append(row_content[3])
+#         self.has_data = True
+#         self.chart_type_changed()
+#
+#     def chart_type_changed(self):
+#         if self.has_data:
+#             if self.type_selection.currentIndex() == 0:
+#                 chart = QChart()
+#                 series = QLineSeries()
+#                 for idx, x in enumerate(self.x1_axis):
+#                     series.append(x, self.y1_axis[idx])
+#                 chart.addSeries(series)
+#                 chart.setTitle(self.name_edit.text())
+#                 self.review_chart.setChart(chart)
+#                 self.review_chart.setRenderHint(QPainter.Antialiasing)
+#                 chart.createDefaultAxes()
+#                 chart.setBackgroundVisible(False)
+#             elif self.type_selection.currentIndex() == 1:
+#                 chart = QChart()
+#                 chart.setTitle(self.name_edit.text())
+#                 # 添加水印背景图片
+#                 chart.setBackgroundVisible(False)
+#                 series = QBarSeries()
+#                 bar = QBarSet('')
+#                 for index in range(len(self.x1_axis)):
+#                     bar.append(self.y1_axis[index])
+#                 series.append(bar)
+#                 chart.addSeries(series)
+#                 chart.createDefaultAxes()
+#                 self.review_chart.setChart(chart)
+#             else:
+#                 pass
+#
+#     def create_new_chart(self):
+#         # 整理数据发出信号
+#         data = dict()
+#         chart_name = self.name_edit.text().strip(' ')
+#         chart_name_en = self.name_en_edit.text().strip(' ')
+#         if not chart_name or not chart_name_en:
+#             QMessageBox.information(self, '错误', '请填入图表名称和英文名称.', QMessageBox.Yes)
+#             return
+#         data['chart_name'] = chart_name
+#         data['chart_name_en'] = chart_name_en
+#         data['chart_type'] = self.chart_type[self.type_selection.currentIndex()]
+#         data['chart_labels'] = self.chart_labels
+#         data['variety'] = self.varieties[self.variety_selection.currentIndex()]['name_en']
+#         data['x1'] = self.x1_axis
+#         data['y1'] = self.y1_axis
+#         data['x2'] = self.x2_axis
+#         data['y2'] = self.y2_axis
+#         self.upload_new.emit(data)

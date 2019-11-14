@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt
 from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
 from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
-from frame.maintain.danalysis import VarietyMaintain, UploadDataMaintain, DAHomeChartMaintain, DAVarietyChartMaintain
+from frame.maintain.danalysis import VarietyMaintain, UploadDataMaintain
 from thread.request import RequestThread
 import config
 
