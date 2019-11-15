@@ -105,14 +105,16 @@ class UploadDataMaintain(QWidget):
         opl.addStretch()
         # 新建项目
         opl.addWidget(QPushButton('新增数据', clicked=self.upload_new_table))
-        table_show = QTableWidget()
+        self.show_table = QTableWidget()
         # 信号关联
         self.combox0.currentIndexChanged.connect(self.combox0_changed)
         self.combox1.currentIndexChanged.connect(self.combox1_changed)
         self.combox2.currentIndexChanged.connect(self.combox2_changed)
         layout.addLayout(opl)
-        layout.addWidget(table_show)
+        layout.addWidget(self.show_table)
         self.setLayout(layout)
+        # 样式
+
         # 初始化
         self.get_variety_group()
 
@@ -133,6 +135,8 @@ class UploadDataMaintain(QWidget):
 
     # 第一个下拉框改变联动改变第2个
     def combox0_changed(self):
+        # 清空表格
+        self.show_table.clear()
         gid = self.combox0.currentData()  # group id
         self.combox1.clear()
         # 请求组下的品种
@@ -151,6 +155,8 @@ class UploadDataMaintain(QWidget):
 
     # 第二个下来框改变联动第3个(数据表的分类)
     def combox1_changed(self):
+        # 清空表格
+        self.show_table.clear()
         vid = self.combox1.currentData()  # variety id
         self.combox2.clear()
         url = config.SERVER_ADDR + 'danalysis/table_groups/' + str(vid) + '/?mc=' + config.app_dawn.value('machine')
@@ -167,6 +173,8 @@ class UploadDataMaintain(QWidget):
 
     # 第三个下拉框改变，显示相应图表名
     def combox2_changed(self):
+        # 清空表格
+        self.show_table.clear()
         gid = self.combox2.currentData()  # group id 表分组(大类)
         try:
             r = requests.get(
@@ -178,7 +186,16 @@ class UploadDataMaintain(QWidget):
                 raise ValueError(response['message'])
         except Exception:
             return
-        print(response)
+        table_list = response['data']
+        row_count = len(table_list)
+        self.show_table.setRowCount(row_count)
+        self.show_table.setColumnCount(2)
+        self.show_table.setHorizontalHeaderLabels(['编号', '数据名称'])
+        for row, table_row in enumerate(table_list):
+            item0 = QTableWidgetItem(str(table_row['id']))
+            item1 = QTableWidgetItem(str(table_row['name']))
+            self.show_table.setItem(row, 0, item0)
+            self.show_table.setItem(row, 1, item1)
 
     # 新增数据
     def upload_new_table(self):
@@ -192,9 +209,6 @@ class UploadDataMaintain(QWidget):
 
 
 
-
-#
-#
 # class AbstractMaintainWidget(QWidget):
 #     """
 #     # 管理页面的基类

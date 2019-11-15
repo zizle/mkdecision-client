@@ -258,7 +258,7 @@ class NewTablePopup(QDialog):
         udwlayout.addWidget(self.date_type, 6, 1)
         udwlayout.addWidget(QPushButton('导入', objectName='selectTable', clicked=self.select_data_table), 7, 0)
         udwlayout.addWidget(QLabel(parent=self, objectName='commitError'), 7, 1)
-        self.review_table = QTableWidget()
+        self.review_table = QTableWidget(objectName='reviewTable')
         udwlayout.addWidget(self.review_table, 8, 0, 1, 2)
         # 上传添加数据表按钮布局
         addlayout = QHBoxLayout()
