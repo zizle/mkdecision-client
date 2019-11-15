@@ -176,9 +176,3 @@ class Maintenance(QWidget):
                 tab = NoDataWindow(name=tab_name)
             self.right_tab.addTab(tab, tab_name)
             self.right_tab.setCurrentWidget(tab)
-
-
-
-
-
-

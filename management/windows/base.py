@@ -146,28 +146,60 @@ class Base(QWidget):
     def get_menus(self):
         try:
             # 请求主菜单数据
-            response = requests.get(
-                url=config.SERVER_ADDR + "basic/module/",
+            machine_code = config.app_dawn.value('machine')
+            if machine_code:
+                url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
+            else:
+                url = config.SERVER_ADDR + 'basic/modules/'
+            r = requests.get(
+                url=url,
                 headers=config.CLIENT_HEADERS,
                 data=json.dumps({"machine_code": config.app_dawn.value('machine')})
             )
+            response = json.loads(r.content.decode("utf-8"))
         except Exception as e:
             QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
             sys.exit()  # catch exception sys exit
-        response_content = json.loads(response.content.decode("utf-8"))
-        if response.status_code != 200:
-            QMessageBox.information(self, "获取数据错误", response_content['message'], QMessageBox.Yes)
-            sys.exit()
-        for item in response_content["data"]:
+        for item in response["data"]:
             menu_btn = QPushButton(item['name'])
-            menu_btn.unum = item['id']
-            menu_btn.name_en = item['name_en']
+            menu_btn.mid = item['id']
             self.menu_bar.addMenuButton(menu_btn)
         self.menu_bar.addStretch()
 
     def menu_clicked(self, menu):
-        name_en = menu.name_en
         name = menu.text()
+        # 查询权限
+        machine_code = config.app_dawn.value('machine')
+        if machine_code:
+            url = config.SERVER_ADDR + 'basic/access-module/'+str(menu.mid)+'/?mc=' + machine_code
+        else:
+            url = config.SERVER_ADDR + 'basic/access-module/'+str(menu.mid) + '/'
+        try:
+            r = requests.get(
+                url=url,
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception as e:
+            return
+        if not response['data']['permission']:
+            popup = TipShow(parent=self)
+            popup.confirm_btn.clicked.connect(popup.close)
+            popup.information(title='无权限', message=response['message'])
+            if not popup.exec():
+                del popup
+            return
+        # 有权限
+        if name == '客户端注册':
+            tab = RegisterClient()
+        elif name == '管理维护':
+            tab = Maintenance()
+        else:
+            tab = NoDataWindow(name=name)
+        self.tab.clear()
+        self.tab.addTab(tab, name)
+
+        return
         access_modules = config.app_dawn.value('access_main_module')
         if not access_modules:
             access_modules = []

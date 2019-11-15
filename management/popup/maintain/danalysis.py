@@ -607,181 +607,181 @@ class NewTablePopup(QDialog):
 
 
 
-
-# 新建品种弹窗
-class NewVarietyPopup1(QDialog):
-    data_url = config.SERVER_ADDR + 'danalysis/variety/?mc=' + config.app_dawn.value('machine')
-
-    def __init__(self, *args, **kwargs):
-        super(NewVarietyPopup, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout()
-        tflayout = QHBoxLayout()  # tree(品种) form(添加表单) 布局
-        # 左侧品种树
-        self.variety_tree = QTreeWidget(clicked=self.variety_tree_clicked)
-        # 右侧新增品种表单控件
-        self.form_widget = QWidget()
-        qfl = QFormLayout()
-        self.attach_to = QLabel(styleSheet='color:rgb(180,20,30)')
-        self.attach_to.gid = None
-        self.variety_zh = QLineEdit()
-        self.variety_en = QLineEdit()
-        qfl.addRow("所属类别：", self.attach_to)
-        qfl.addRow("", QLabel(parent=self.form_widget, objectName='errorLabel', styleSheet='color:rgb(200,10,20)'))
-        qfl.addRow("品种名称：", self.variety_zh)
-        qfl.addRow("英文代码：", self.variety_en)
-        qfl.addRow('', QPushButton('确认添加', parent=self.form_widget, objectName='addBtn', clicked=self.add_new_variety))
-        self.form_widget.setLayout(qfl)
-        tflayout.addWidget(self.variety_tree)
-        tflayout.addWidget(self.form_widget)
-        layout.addLayout(tflayout)
-        # 新增类别按钮
-        layout.addWidget(QPushButton('新增', clicked=self.add_new_group), alignment=Qt.AlignLeft)
-        # 样式设置
-        self.setFixedSize(800, 600)
-        self.variety_tree.header().hide()
-        self.variety_tree.setMaximumWidth(180)
-        self.setStyleSheet('background-color: rgb(255,255,255)')
-        # 显示总布局
-        self.setLayout(layout)
-        # 初始数据获取
-        self.get_varieties()
-
-    # 获取品种目录树的内容
-    def get_varieties(self):
-        if hasattr(self, 'variety_thread'):
-            del self.variety_thread
-        self.variety_thread = RequestThread(
-            url=self.data_url,
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.variety_thread.finished.connect(self.variety_thread.deleteLater)
-        self.variety_thread.response_signal.connect(self.variety_thread_back)
-        self.variety_thread.start()
-
-    # 获取品种的线程回调函数
-    def variety_thread_back(self, content):
-        if content['error']:
-            return
-        self.variety_tree.clear()
-        # 填充品种树
-        for group_item in content['data']:
-            group = QTreeWidgetItem(self.variety_tree)
-            group.setText(0, group_item['name'])
-            group.gid = group_item['id']
-            # 添加子节点
-            for sub_item in group_item['subs']:
-                print(sub_item)
-                child = QTreeWidgetItem()
-                child.setText(0, sub_item['name'])
-                child.gid = sub_item['id']
-                group.addChild(child)
-
-    # 品种树节点点击
-    def variety_tree_clicked(self):
-        item = self.variety_tree.currentItem()
-        if item.childCount():  # has children open the root
-            if item.isExpanded():
-                item.setExpanded(False)
-            else:
-                item.setExpanded(True)
-        text = item.text(0)
-        # text填入右侧显示
-        self.attach_to.setText(text)
-        self.attach_to.gid = item.gid
-        el = self.form_widget.findChild(QLabel, 'errorLabel')
-        add_btn = self.form_widget.findChild(QPushButton, 'addBtn')
-        if item.parent():
-            el.setText("只允许在大类下创建品种.")
-            add_btn.setEnabled(False)
-        else:
-            el.setText("")
-            add_btn.setEnabled(True)
-
-    # 新增大类别
-    def add_new_group(self):
-        if not hasattr(self, 'ng_widget'):
-            self.ng_widget = QWidget(self.form_widget,
-                                     styleSheet='background:rgb(255,255,255)')  # 新大类new group widget
-            # 关闭按钮
-            cly = QHBoxLayout()
-            cly.addWidget(
-                QPushButton(clicked=self.ng_widget_close, icon=QIcon('media/drop-down.png')),
-                alignment=Qt.AlignTop | Qt.AlignRight
-            )
-            # 添加按钮
-            aly = QHBoxLayout()
-            aly.addWidget(QPushButton('添加', clicked=self.post_new_group), alignment=Qt.AlignTop|Qt.AlignRight)
-            # QPushButton('close', self.ng_widget)
-            gly = QFormLayout()  # 新增大类布局 group layout
-            gly.addRow(cly)
-            gly.addRow('', QLabel(''))
-            gly.addRow('', QLabel(parent=self.ng_widget, objectName='errorLabel', styleSheet='color:rgb(200,10,20)'))
-            gly.addRow('名称', QLineEdit(parent=self.ng_widget, objectName='newGroup'))
-            gly.addRow(aly)
-            self.ng_widget.setLayout(gly)
-        self.ng_widget.resize(self.form_widget.width(), self.form_widget.height())
-        self.ng_widget.show()
-
-    # 上传添加新大类
-    def post_new_group(self):
-        edit = self.ng_widget.findChild(QLineEdit, 'newGroup')
-        variety = {
-            'name': edit.text().strip(' '),
-            'parent_id': None
-        }
-        self.post_new_variety(variety=variety)
-
-    # 关闭新增大类的窗口
-    def ng_widget_close(self):
-        self.ng_widget.close()
-
-    # 新增品种
-    def add_new_variety(self):
-        variety = {
-            'name': self.variety_zh.text().strip(' '),
-            'name_en': self.variety_en.text().strip(' '),
-            'parent_id': self.attach_to.gid
-        }
-        self.post_new_variety(variety=variety, flag='variety')
-
-    # 上传新品种
-    def post_new_variety(self, variety, flag='group'):
-        try:
-            if flag != 'group':
-                if not variety['parent_id']:
-                    raise ValueError('您还没选择所属大类.')
-            if not variety['name']:
-                raise ValueError('您还没输入名称.')
-            response = requests.post(
-                url=self.data_url,
-                headers=config.CLIENT_HEADERS,
-                data=json.dumps({
-                    "machine_code": config.app_dawn.value("machine"),
-                    "variety": variety
-                }),
-                cookies=config.app_dawn.value('cookies')
-            )
-            r_data = json.loads(response.content.decode('utf-8'))
-            if r_data['error']:
-                raise ValueError(r_data['message'])
-        except Exception as e:
-            # 上传出错
-            if flag == 'group':
-                el = self.ng_widget.findChild(QLabel, 'errorLabel')  # error label
-                el.setText(str(e))
-            else:
-                el = self.form_widget.findChild(QLabel, 'errorLabel')  # error label
-                el.setText(str(e))
-        else:
-            # 上传成功
-            if flag == 'group':
-                self.ng_widget_close()
-                self.get_varieties()
-            else:
-                self.close()
+#
+# # 新建品种弹窗
+# class NewVarietyPopup1(QDialog):
+#     data_url = config.SERVER_ADDR + 'danalysis/variety/?mc=' + config.app_dawn.value('machine')
+#
+#     def __init__(self, *args, **kwargs):
+#         super(NewVarietyPopup, self).__init__(*args, **kwargs)
+#         layout = QVBoxLayout()
+#         tflayout = QHBoxLayout()  # tree(品种) form(添加表单) 布局
+#         # 左侧品种树
+#         self.variety_tree = QTreeWidget(clicked=self.variety_tree_clicked)
+#         # 右侧新增品种表单控件
+#         self.form_widget = QWidget()
+#         qfl = QFormLayout()
+#         self.attach_to = QLabel(styleSheet='color:rgb(180,20,30)')
+#         self.attach_to.gid = None
+#         self.variety_zh = QLineEdit()
+#         self.variety_en = QLineEdit()
+#         qfl.addRow("所属类别：", self.attach_to)
+#         qfl.addRow("", QLabel(parent=self.form_widget, objectName='errorLabel', styleSheet='color:rgb(200,10,20)'))
+#         qfl.addRow("品种名称：", self.variety_zh)
+#         qfl.addRow("英文代码：", self.variety_en)
+#         qfl.addRow('', QPushButton('确认添加', parent=self.form_widget, objectName='addBtn', clicked=self.add_new_variety))
+#         self.form_widget.setLayout(qfl)
+#         tflayout.addWidget(self.variety_tree)
+#         tflayout.addWidget(self.form_widget)
+#         layout.addLayout(tflayout)
+#         # 新增类别按钮
+#         layout.addWidget(QPushButton('新增', clicked=self.add_new_group), alignment=Qt.AlignLeft)
+#         # 样式设置
+#         self.setFixedSize(800, 600)
+#         self.variety_tree.header().hide()
+#         self.variety_tree.setMaximumWidth(180)
+#         self.setStyleSheet('background-color: rgb(255,255,255)')
+#         # 显示总布局
+#         self.setLayout(layout)
+#         # 初始数据获取
+#         self.get_varieties()
+#
+#     # 获取品种目录树的内容
+#     def get_varieties(self):
+#         if hasattr(self, 'variety_thread'):
+#             del self.variety_thread
+#         self.variety_thread = RequestThread(
+#             url=self.data_url,
+#             method='get',
+#             headers=config.CLIENT_HEADERS,
+#             data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
+#             cookies=config.app_dawn.value('cookies')
+#         )
+#         self.variety_thread.finished.connect(self.variety_thread.deleteLater)
+#         self.variety_thread.response_signal.connect(self.variety_thread_back)
+#         self.variety_thread.start()
+#
+#     # 获取品种的线程回调函数
+#     def variety_thread_back(self, content):
+#         if content['error']:
+#             return
+#         self.variety_tree.clear()
+#         # 填充品种树
+#         for group_item in content['data']:
+#             group = QTreeWidgetItem(self.variety_tree)
+#             group.setText(0, group_item['name'])
+#             group.gid = group_item['id']
+#             # 添加子节点
+#             for sub_item in group_item['subs']:
+#                 print(sub_item)
+#                 child = QTreeWidgetItem()
+#                 child.setText(0, sub_item['name'])
+#                 child.gid = sub_item['id']
+#                 group.addChild(child)
+#
+#     # 品种树节点点击
+#     def variety_tree_clicked(self):
+#         item = self.variety_tree.currentItem()
+#         if item.childCount():  # has children open the root
+#             if item.isExpanded():
+#                 item.setExpanded(False)
+#             else:
+#                 item.setExpanded(True)
+#         text = item.text(0)
+#         # text填入右侧显示
+#         self.attach_to.setText(text)
+#         self.attach_to.gid = item.gid
+#         el = self.form_widget.findChild(QLabel, 'errorLabel')
+#         add_btn = self.form_widget.findChild(QPushButton, 'addBtn')
+#         if item.parent():
+#             el.setText("只允许在大类下创建品种.")
+#             add_btn.setEnabled(False)
+#         else:
+#             el.setText("")
+#             add_btn.setEnabled(True)
+#
+#     # 新增大类别
+#     def add_new_group(self):
+#         if not hasattr(self, 'ng_widget'):
+#             self.ng_widget = QWidget(self.form_widget,
+#                                      styleSheet='background:rgb(255,255,255)')  # 新大类new group widget
+#             # 关闭按钮
+#             cly = QHBoxLayout()
+#             cly.addWidget(
+#                 QPushButton(clicked=self.ng_widget_close, icon=QIcon('media/drop-down.png')),
+#                 alignment=Qt.AlignTop | Qt.AlignRight
+#             )
+#             # 添加按钮
+#             aly = QHBoxLayout()
+#             aly.addWidget(QPushButton('添加', clicked=self.post_new_group), alignment=Qt.AlignTop|Qt.AlignRight)
+#             # QPushButton('close', self.ng_widget)
+#             gly = QFormLayout()  # 新增大类布局 group layout
+#             gly.addRow(cly)
+#             gly.addRow('', QLabel(''))
+#             gly.addRow('', QLabel(parent=self.ng_widget, objectName='errorLabel', styleSheet='color:rgb(200,10,20)'))
+#             gly.addRow('名称', QLineEdit(parent=self.ng_widget, objectName='newGroup'))
+#             gly.addRow(aly)
+#             self.ng_widget.setLayout(gly)
+#         self.ng_widget.resize(self.form_widget.width(), self.form_widget.height())
+#         self.ng_widget.show()
+#
+#     # 上传添加新大类
+#     def post_new_group(self):
+#         edit = self.ng_widget.findChild(QLineEdit, 'newGroup')
+#         variety = {
+#             'name': edit.text().strip(' '),
+#             'parent_id': None
+#         }
+#         self.post_new_variety(variety=variety)
+#
+#     # 关闭新增大类的窗口
+#     def ng_widget_close(self):
+#         self.ng_widget.close()
+#
+#     # 新增品种
+#     def add_new_variety(self):
+#         variety = {
+#             'name': self.variety_zh.text().strip(' '),
+#             'name_en': self.variety_en.text().strip(' '),
+#             'parent_id': self.attach_to.gid
+#         }
+#         self.post_new_variety(variety=variety, flag='variety')
+#
+#     # 上传新品种
+#     def post_new_variety(self, variety, flag='group'):
+#         try:
+#             if flag != 'group':
+#                 if not variety['parent_id']:
+#                     raise ValueError('您还没选择所属大类.')
+#             if not variety['name']:
+#                 raise ValueError('您还没输入名称.')
+#             response = requests.post(
+#                 url=self.data_url,
+#                 headers=config.CLIENT_HEADERS,
+#                 data=json.dumps({
+#                     "machine_code": config.app_dawn.value("machine"),
+#                     "variety": variety
+#                 }),
+#                 cookies=config.app_dawn.value('cookies')
+#             )
+#             r_data = json.loads(response.content.decode('utf-8'))
+#             if r_data['error']:
+#                 raise ValueError(r_data['message'])
+#         except Exception as e:
+#             # 上传出错
+#             if flag == 'group':
+#                 el = self.ng_widget.findChild(QLabel, 'errorLabel')  # error label
+#                 el.setText(str(e))
+#             else:
+#                 el = self.form_widget.findChild(QLabel, 'errorLabel')  # error label
+#                 el.setText(str(e))
+#         else:
+#             # 上传成功
+#             if flag == 'group':
+#                 self.ng_widget_close()
+#                 self.get_varieties()
+#             else:
+#                 self.close()
 
 
 

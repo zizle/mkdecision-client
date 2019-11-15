@@ -3,11 +3,11 @@
 Update: 2019-07-25
 Author: zizle
 """
-import sys
+import re
 import json
 import hashlib
 import requests
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QGridLayout
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QCursor
 
@@ -29,13 +29,15 @@ class NoDataWindow(QWidget):
         layout.addWidget(label)
         self.setLayout(layout)
 
+
+# 初始化注册客户端
 class RegisterClient(QWidget):
-    def __init__(self):
-        super(RegisterClient, self).__init__()
-        layout = QVBoxLayout()
-        self.machine_label = QLabel()
+    def __init__(self, *args, **kwargs):
+        super(RegisterClient, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=10)
+        self.machine_label = QLabel(objectName='showLabel')
         self.name_edit = QLineEdit()
-        self.submit_btn = QPushButton('提交\n注册此客户端')
+        self.submit_btn = QPushButton('提交\n注册此客户端', objectName='commitBtn')
         # style
         self.machine_label.setAlignment(Qt.AlignCenter)
         self.submit_btn.setCursor(QCursor(Qt.PointingHandCursor))
@@ -47,7 +49,7 @@ class RegisterClient(QWidget):
         layout.addWidget(self.submit_btn)
         self.setLayout(layout)
         self.setStyleSheet("""
-        QLabel{
+        #showLabel{
             max-height:100px;
             font-size:20px;
             font-weight:bold;
@@ -56,7 +58,7 @@ class RegisterClient(QWidget):
             mim-height:35px;
             max-height:35px;
         }
-        QPushButton{
+        #commitBtn{
             border:none;
             border-radius:15px;
             background-color:rgb(110,140,220);
@@ -85,18 +87,22 @@ class RegisterClient(QWidget):
 
     def register_client(self):
         # 注册客户端
-        name = self.name_edit.text().strip(' ')
+        name = re.sub(r'\s+', '', self.name_edit.text())
         try:
             if not name:
                 raise ValueError('请填写名称.')
             response = requests.post(
                 url=config.SERVER_ADDR + 'basic/client/',
                 headers=config.CLIENT_HEADERS,
-                data=json.dumps({'name': name,'machine_code': config.app_dawn.value('machine'), 'is_admin': True})
+                data=json.dumps({
+                    'name': name,
+                    'machine_code': config.app_dawn.value('machine'),
+                    'is_admin': config.ADMINISTRATOR
+                })
             )
             response_data = json.loads(response.content.decode('utf-8'))
         except Exception as error:
-            popup = TipShow()
+            popup = TipShow(parent=self)
             popup.information('错误', '客户端注册失败.\n{}'.format(error))
             popup.confirm_btn.clicked.connect(popup.close)
             popup.deleteLater()
@@ -104,7 +110,7 @@ class RegisterClient(QWidget):
             del popup
             return
         if response.status_code != 201:
-            popup = TipShow()
+            popup = TipShow(parent=self)
             popup.information('失败', response_data['message'])
             popup.confirm_btn.clicked.connect(popup.close)
             popup.deleteLater()
@@ -112,7 +118,7 @@ class RegisterClient(QWidget):
             del popup
             return
         else:
-            popup = TipShow()
+            popup = TipShow(parent=self)
             popup.information('成功', '恭喜!本客户端注册成功.\n请重启使用!')
             popup.confirm_btn.clicked.connect(popup.close)
             popup.deleteLater()

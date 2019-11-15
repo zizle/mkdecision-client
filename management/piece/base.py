@@ -273,7 +273,7 @@ class PermitBar(QWidget):
         # 获取用户名获取密码
         username = config.app_dawn.value('username')
         password = config.app_dawn.value('password')
-        auto_login = int(config.app_dawn.value('auto_login'))
+        auto_login = int(config.app_dawn.value('auto_login')) if config.app_dawn.value('auto_login') else None
         if not all([username, password]):
             return
         # 登录
