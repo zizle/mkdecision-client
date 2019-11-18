@@ -14,6 +14,7 @@ import config
 class MenuBar(QWidget):
     # 横向菜单栏
     menu_btn_clicked = pyqtSignal(QPushButton)
+
     def __init__(self, *args, **kwargs):
         super(MenuBar, self).__init__(*args, **kwargs)
         # 支持qss设置背景

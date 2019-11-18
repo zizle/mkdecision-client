@@ -6,7 +6,7 @@ import random
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTreeWidget, QTableWidget, QTreeWidgetItem,\
     QTabWidget, QGridLayout, QVBoxLayout, QTableWidgetItem, QHeaderView, QGraphicsOpacityEffect
-from PyQt5.QtChart import QChartView, QChart, QLineSeries, QBarSeries, QBarSet
+# from PyQt5.QtChart import QChartView, QChart, QLineSeries, QBarSeries, QBarSet
 from PyQt5.QtGui import QPainter
 from PyQt5.QtCore import QPropertyAnimation, QRect, Qt
 from widgets.base import MenuScrollContainer

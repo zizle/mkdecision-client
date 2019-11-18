@@ -97,7 +97,7 @@ class RegisterClient(QWidget):
                 data=json.dumps({
                     'name': name,
                     'machine_code': config.app_dawn.value('machine'),
-                    'is_admin': config.ADMINISTRATOR
+                    'is_manager': config.ADMINISTRATOR
                 })
             )
             response_data = json.loads(response.content.decode('utf-8'))

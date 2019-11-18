@@ -15,6 +15,8 @@ from PyQt5.QtCore import Qt, pyqtSignal
 import config
 from piece.base import TitleBar
 
+
+# 登录弹窗
 class Login(QDialog):
     successful_login = pyqtSignal(str)
 
@@ -116,7 +118,7 @@ class Login(QDialog):
 
     def forget_psd_clicked(self):
         # forget password button clicked signal slot function
-        popup = TipShow()
+        popup = TipShow(parent=self)
         popup.information('忘记密码', '请联系管理员修改密码.')
         popup.confirm_btn.clicked.connect(popup.close)
         popup.deleteLater()
@@ -130,7 +132,7 @@ class Login(QDialog):
         remember = 1 if self.remember_check.isChecked() else 0
         auto_login = 1 if self.auto_login.isChecked() else 0
         if not account or not password:
-            popup = TipShow()
+            popup = TipShow(parent=self)
             popup.information('错误', '请输入用户名或密码.')
             popup.confirm_btn.clicked.connect(popup.close)
             popup.exec()
@@ -138,7 +140,7 @@ class Login(QDialog):
             del popup
             return
         if auto_login and not remember:
-            popup = TipShow()
+            popup = TipShow(parent=self)
             popup.information('提示', '自动登录请记住密码.')
             popup.confirm_btn.clicked.connect(popup.close)
             popup.exec()
@@ -148,17 +150,16 @@ class Login(QDialog):
         # login
         try:
             response = requests.post(
-                url=config.SERVER_ADDR + "user/passport/?option=login",
+                url=config.SERVER_ADDR + "user/login/?mc=" + config.app_dawn.value('machine'),
                 headers=config.CLIENT_HEADERS,
                 data=json.dumps({
                     "username": account,
                     "password": password,
-                    'machine_code': config.app_dawn.value('machine'),
                 }),
                 cookies=config.app_dawn.value('cookies')
             )
         except Exception as error:
-            popup = TipShow()
+            popup = TipShow(parent=self)
             popup.information('错误', str(error))
             popup.confirm_btn.clicked.connect(popup.close)
             popup.deleteLater()
@@ -167,7 +168,7 @@ class Login(QDialog):
             return
         response_data = json.loads(response.content.decode('utf-8'))
         if response.status_code != 200:
-            popup = TipShow()
+            popup = TipShow(parent=self)
             popup.information('错误', response_data['message'])
             popup.confirm_btn.clicked.connect(popup.close)
             popup.deleteLater()
@@ -178,13 +179,14 @@ class Login(QDialog):
         user_data = response_data['data']
         config.app_dawn.setValue('cookies', response.cookies)  # save cookies
         config.app_dawn.setValue('auto_login', auto_login)  # save auto login option
-        config.app_dawn.setValue('access_main_module', user_data['access_main_module'])
+        # config.app_dawn.setValue('access_main_module', user_data['access_main_module'])
         if remember:
             config.app_dawn.setValue('username', user_data['username'])
             config.app_dawn.setValue('password', password)
         else:
             config.app_dawn.remove('password')
             config.app_dawn.remove('username')
+        print('登录成功.', response_data)
         show_name = user_data['nick_name'] if user_data["nick_name"] else user_data["username"]
         self.successful_login.emit(show_name)
         self.close()  # close dialog

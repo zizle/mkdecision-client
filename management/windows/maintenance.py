@@ -5,15 +5,164 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QLabel, QPushButton, QTabWidget, QStyleOption, QStyle
+from PyQt5.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QRect, QPoint, QSize
+from PyQt5.QtGui import QPainter
 
 from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
 from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
 from frame.maintain.danalysis import VarietyMaintain, UploadDataMaintain
+from widgets.maintain import ModuleBlock
 from thread.request import RequestThread
 import config
+
+
+# 维护管理主页
+class MaintenanceHome(QWidget):
+    BLOCK_WIDTH = 200
+    BLOCK_HEIGHT = 180
+
+    def __init__(self, *args, **kwargs):
+        super(MaintenanceHome, self).__init__(*args, **kwargs)
+        # 显示所有可维护的模块
+        self.show_maintainers = QWidget(parent=self, objectName='showMaintainers')
+        # self.show_maintainers.resize(self.parent().width(), self.parent().height())
+        # 主模块名称维护
+        module_block = ModuleBlock(parent=self, module_name='main_module')  # module_name用于判断哪个模块
+        module_block.set_module_widget(QLabel('主功能模块', styleSheet='min-width:200;min-height:180'))
+        module_block.enter_clicked.connect(self.enter_detail_maintainer)
+        # ###########品种guan
+        variety_block = ModuleBlock(parent=self, module_name='variety_maintain')  # module_name用于判断哪个模块
+        variety_block.set_module_widget(QLabel('品种管理', styleSheet='min-width:200;min-height:180'))
+        variety_block.enter_clicked.connect(self.enter_detail_maintainer)
+        # 数据分析模块维护
+        analysis_block = ModuleBlock(parent=self, module_name='danalysis')
+        analysis_block.set_module_widget(QLabel('数据分析', styleSheet='min-width:180;min-height:180'))
+        analysis_block.enter_clicked.connect(self.enter_detail_maintainer)
+        # 可维护模块布局
+        maintainers_layout = QGridLayout()
+        maintainers_layout.addWidget(module_block, 0, 0)
+        maintainers_layout.addWidget(variety_block, 0, 1)
+        maintainers_layout.addWidget(analysis_block, 1, 1)
+        self.show_maintainers.setLayout(maintainers_layout)
+        # 右侧详细维护页面
+        self.detail_maintainer = QWidget(parent=self, objectName='detailMaintainer')
+        # 详细页面布局
+        detail_layout = QVBoxLayout()
+        self.detail_maintainer.setLayout(detail_layout)
+        self.detail_tab = QTabWidget()
+        self.back_button = QPushButton('返回', clicked=self.back_to_maintainers)
+        self.back_button.maintain_name = None
+        detail_layout.addWidget(self.back_button, alignment=Qt.AlignLeft)
+        detail_layout.addWidget(self.detail_tab)
+        # 样式
+        self.detail_tab.tabBar().hide()
+        self.setObjectName('myself')
+        self.setStyleSheet("""
+        #showMaintainers{
+            background-color: rgb(255,255,255);
+        }
+        #maintainBlock{
+            background-color: rgb(240,240,240);
+        }
+        #detailMaintainer{
+            background-color: rgb(200,200,200);
+        }
+        """)
+        # 详细维护页面动画
+        self.detail_maintainer_animation = QPropertyAnimation(self.detail_maintainer, b'geometry')
+        self.detail_maintainer_animation.setDuration(500)
+        
+        # 功能块缩小动画
+        self.block_module_animation = QPropertyAnimation()
+        self.block_module_animation.setDuration(500)
+        
+        # 动画组
+        self.animation_group = QParallelAnimationGroup()
+        self.animation_group.addAnimation(self.detail_maintainer_animation)
+        self.animation_group.addAnimation(self.block_module_animation)
+        
+        # 窗口层次
+        self.detail_maintainer.raise_()
+        self.show_maintainers.raise_()
+
+    # 进入维护详情页
+    def enter_detail_maintainer(self, button):
+        module = button.parent()
+        # 详情控件位置移到功能块中心
+        self.detail_maintainer.move(module.pos().x() + self.BLOCK_WIDTH / 2,
+                                    module.pos().y() + self.BLOCK_HEIGHT / 2)
+        # 改变控件层次
+        self.show_maintainers.raise_()
+        self.detail_maintainer.raise_()
+        # 模块记录原始位置大小,供还原使用
+        module.set_original_rect(module.pos().x(), module.pos().y(), module.width(), module.height())
+        # 设置模块缩小
+        self.block_module_animation.setTargetObject(module)
+        self.block_module_animation.setPropertyName(b'geometry')
+        self.block_module_animation.setStartValue(
+            QRect(module.pos().x(), module.pos().y(), self.BLOCK_WIDTH, self.BLOCK_HEIGHT)
+        )
+        self.block_module_animation.setEndValue(
+            QRect(module.pos().x() + self.BLOCK_WIDTH/2, module.pos().y()+self.BLOCK_HEIGHT/2, 0, 0)
+        )
+        # 设置详情页
+        self.back_button.maintain_name = module.module_name
+        if module.module_name == 'main_module':
+            maintainer = QLabel('主功能维护主功能维护主功能维护主功能维护')
+        elif module.module_name == 'danalysis':
+            maintainer = UploadDataMaintain()
+        elif module.module_name == 'variety_maintain':
+            maintainer = VarietyMaintain()
+        else:
+            self.back_button.maintain_name = None
+            maintainer = QLabel('此模块暂不支持维护')
+        # 设置详情页进入动画位置和大小
+        self.detail_maintainer_animation.setStartValue(
+            QRect(self.detail_maintainer.pos().x(), self.detail_maintainer.pos().y(), 0, 0)
+        )
+        self.detail_maintainer_animation.setEndValue(
+            QRect(0, 0, self.parent().width(), self.parent().height())
+        )
+        # 清除tab，加入页面
+        self.detail_tab.clear()
+        self.detail_tab.addTab(maintainer, '详细维护界面')
+        # 开启动画组
+        self.animation_group.start()
+
+    # 退出详情维护界面
+    def back_to_maintainers(self):
+        maintain_name = self.back_button.maintain_name
+        # 找到缩小的那个功能模块
+        module_blocks = self.findChildren(ModuleBlock, 'moduleBlock')
+        show_block = None
+        for module in module_blocks:
+            if module.module_name == maintain_name:
+                show_block = module
+        if not show_block:
+            return
+        # 设置模块放大
+        self.block_module_animation.setTargetObject(show_block)
+        self.block_module_animation.setPropertyName(b'geometry')
+        self.block_module_animation.setStartValue(
+            QRect(show_block.original_x + show_block.original_width / 2, show_block.original_y + show_block.original_height / 2, 0, 0)
+        )
+        self.block_module_animation.setEndValue(
+            QRect(show_block.original_x, show_block.original_y, show_block.original_width, show_block.original_height)
+        )
+        # 设置详情页退出动画位置和大小
+        self.detail_maintainer_animation.setStartValue(
+            QRect(0, 0, self.parent().width(), self.parent().height())
+        )
+        self.detail_maintainer_animation.setEndValue(
+            QRect(show_block.original_x + show_block.original_width / 2, show_block.original_y + show_block.original_height / 2, 0, 0)
+        )
+        self.animation_group.start()
+        # 改变控件层次，由于控件最小，无需再改变层次
+        # self.detail_maintainer.raise_()
+        # self.show_maintainers.raise_()
+
 
 
 class Maintenance(QWidget):

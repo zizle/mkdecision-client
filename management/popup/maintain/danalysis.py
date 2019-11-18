@@ -8,7 +8,7 @@ import datetime
 from xlrd import xldate_as_tuple
 from PyQt5.QtWidgets import QDialog,QWidget, QLabel, QLineEdit, QGridLayout, QVBoxLayout, QTreeWidget, QTreeWidgetItem,\
     QPushButton, QComboBox, QFileDialog, QTableWidgetItem, QMessageBox, QHeaderView, QFormLayout, QHBoxLayout, QTableWidget
-from PyQt5.QtChart import QChart, QChartView, QLineSeries, QBarSet, QBarSeries
+# from PyQt5.QtChart import QChart, QChartView, QLineSeries, QBarSet, QBarSeries
 from PyQt5.QtGui import QPainter, QIcon
 from PyQt5.QtCore import pyqtSignal, Qt
 import config

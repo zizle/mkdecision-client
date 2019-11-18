@@ -14,7 +14,7 @@ from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
 
 import config
-from windows.maintenance import Maintenance
+from windows.maintenance import Maintenance, MaintenanceHome
 from popup.base import TipShow
 from piece.base import TitleBar, MenuBar, PermitBar
 from frame.base import NoDataWindow, RegisterClient
@@ -171,9 +171,9 @@ class Base(QWidget):
         # 查询权限
         machine_code = config.app_dawn.value('machine')
         if machine_code:
-            url = config.SERVER_ADDR + 'basic/access-module/'+str(menu.mid)+'/?mc=' + machine_code
+            url = config.SERVER_ADDR + 'limits/access-module/'+str(menu.mid)+'/?mc=' + machine_code
         else:
-            url = config.SERVER_ADDR + 'basic/access-module/'+str(menu.mid) + '/'
+            url = config.SERVER_ADDR + 'limits/access-module/'+str(menu.mid) + '/'
         try:
             r = requests.get(
                 url=url,
@@ -193,7 +193,7 @@ class Base(QWidget):
         if name == '客户端注册':
             tab = RegisterClient()
         elif name == '管理维护':
-            tab = Maintenance()
+            tab = MaintenanceHome(parent=self.tab)
         else:
             tab = NoDataWindow(name=name)
         self.tab.clear()

@@ -1,14 +1,14 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
-from PyQt5.QtWidgets import QPushButton, QVBoxLayout
-from PyQt5.QtChart import QChartView
+from PyQt5.QtWidgets import QPushButton, QVBoxLayout, QWidget
+# from PyQt5.QtChart import QChartView
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QIcon, QPainter
 
 import config
 
 
-class ChartView(QChartView):
+class ChartView(QWidget):
     clicked = pyqtSignal(dict)
 
     def __init__(self, row, column, zoom_in=False):
