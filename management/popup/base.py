@@ -151,7 +151,9 @@ class Login(QDialog):
         try:
             response = requests.post(
                 url=config.SERVER_ADDR + "user/login/?mc=" + config.app_dawn.value('machine'),
-                headers=config.CLIENT_HEADERS,
+                headers={
+                    "AUTHORIZATION": config.app_dawn.value('JWT')
+                },
                 data=json.dumps({
                     "username": account,
                     "password": password,

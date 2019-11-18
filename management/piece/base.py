@@ -268,7 +268,7 @@ class PermitBar(QWidget):
         layout.addWidget(self.exit_button)
         self.setLayout(layout)
         # 自动登录
-        self.auto_login()
+        # self.auto_login()
 
     def auto_login(self):
         # 获取用户名获取密码

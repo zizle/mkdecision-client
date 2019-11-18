@@ -144,26 +144,26 @@ class Base(QWidget):
         return super(Base, self).eventFilter(obj, event)
 
     def get_menus(self):
-        try:
-            # 请求主菜单数据
-            machine_code = config.app_dawn.value('machine')
-            if machine_code:
-                url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
-            else:
-                url = config.SERVER_ADDR + 'basic/modules/'
-            r = requests.get(
-                url=url,
-                headers=config.CLIENT_HEADERS,
-                data=json.dumps({"machine_code": config.app_dawn.value('machine')})
-            )
-            response = json.loads(r.content.decode("utf-8"))
-        except Exception as e:
-            QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
-            sys.exit()  # catch exception sys exit
-        for item in response["data"]:
-            menu_btn = QPushButton(item['name'])
-            menu_btn.mid = item['id']
-            self.menu_bar.addMenuButton(menu_btn)
+        # try:
+        #     # 请求主菜单数据
+        #     machine_code = config.app_dawn.value('machine')
+        #     if machine_code:
+        #         url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
+        #     else:
+        #         url = config.SERVER_ADDR + 'basic/modules/'
+        #     r = requests.get(
+        #         url=url,
+        #         headers=config.CLIENT_HEADERS,
+        #         data=json.dumps({"machine_code": config.app_dawn.value('machine')})
+        #     )
+        #     response = json.loads(r.content.decode("utf-8"))
+        # except Exception as e:
+        #     QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
+        #     sys.exit()  # catch exception sys exit
+        # for item in response["data"]:
+        #     menu_btn = QPushButton(item['name'])
+        #     menu_btn.mid = item['id']
+        #     self.menu_bar.addMenuButton(menu_btn)
         self.menu_bar.addStretch()
 
     def menu_clicked(self, menu):

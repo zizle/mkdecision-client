@@ -6,7 +6,7 @@ import json
 import requests
 from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel, QLineEdit, QPushButton
 
-SERVER = 'http://192.168.2.181:8000/'
+SERVER = 'http://127.0.0.1:8000/'
 
 
 # 注册超级管理员
@@ -19,10 +19,10 @@ class SuperUserRegister(QWidget):
         layout.addWidget(QLabel('<div>手&nbsp;&nbsp;机：</div>'), 0,0)
         layout.addWidget(self.phone, 0, 1)
         layout.addWidget(QLabel(objectName='phoneError'), 1, 0, 1, 2)
-        layout.addWidget(QLabel('<div>昵&nbsp;&nbsp;称：</div>'), 2, 0)
-        self.nick_name = QLineEdit()
-        layout.addWidget(self.nick_name, 2, 1)
-        layout.addWidget(QLabel(objectName='nicknameError'), 3, 0, 1, 2)
+        layout.addWidget(QLabel('<div>邮&nbsp;&nbsp;箱：</div>'), 2, 0)
+        self.email = QLineEdit()
+        layout.addWidget(self.email, 2, 1)
+        layout.addWidget(QLabel(objectName='emailError'), 3, 0, 1, 2)
         layout.addWidget(QLabel('<div>密&nbsp;&nbsp;码：</div>'), 4, 0)
         self.password = QLineEdit()
         layout.addWidget(self.password, 4, 1)
@@ -39,20 +39,19 @@ class SuperUserRegister(QWidget):
     # 注册
     def register_superuser(self):
         phone = self.phone.text()
-        nick_name = self.nick_name.text()
         password = self.password.text()
+        email = self.email.text()
         re_password = self.re_password.text()
         el = self.findChild(QLabel, 'registerError')
         try:
             r = requests.post(
                 url=SERVER + 'user/createsuper/',
                 data=json.dumps({
-                    'username': 'superAdministrator',
-                    'email': '',
+                    'username': '超级管理员',
+                    'email': email,
                     'phone': phone,
-                    'nick_name': nick_name,
                     'password': password,
-                    'is_maintainer': True,
+                    'is_superuser': True,
                 })
             )
             response = json.loads(r.content.decode('utf-8'))
