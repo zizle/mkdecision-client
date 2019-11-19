@@ -9,12 +9,11 @@ from PyQt5.QtWidgets import QSplashScreen
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt
 
+
+# 欢迎页面
 class StartScreen(QSplashScreen):
     def __init__(self):
         super(StartScreen, self).__init__()
-        self.__init_ui()
-
-    def __init_ui(self):
         self.setPixmap(QPixmap('media/start.png'))
         font = QFont()
         font.setPointSize(16)

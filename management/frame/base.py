@@ -5,14 +5,13 @@ Author: zizle
 """
 import re
 import json
-import hashlib
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QGridLayout
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QCursor
 
 import config
-from utils.machine import machine
+from utils.machine import get_machine_code
 from popup.base import TipShow
 
 
@@ -70,19 +69,12 @@ class RegisterClient(QWidget):
         # 获取机器码
         self.get_machine_code()
 
+    # 获取机器码
     def get_machine_code(self):
-        try:
-            md = hashlib.md5()
-            main_board = machine.main_board()
-            disk = machine.disk()
-            md.update(main_board.encode('utf-8'))
-            md.update(disk.encode('utf-8'))
-            machine_code = md.hexdigest()
-            # 在配置里保存
-            config.app_dawn.setValue("machine", machine_code)
-            self.machine_label.setText(machine_code)
-        except Exception as error:
-            self.machine_label.setText('获取机器码失败:\n{}'.format(error))
+        machine_code = get_machine_code()
+        self.machine_label.setText(machine_code)
+        if not machine_code:
+            self.machine_label.setText('获取机器码失败')
             self.submit_btn.setEnabled(False)
 
     def register_client(self):
@@ -96,7 +88,7 @@ class RegisterClient(QWidget):
                 headers=config.CLIENT_HEADERS,
                 data=json.dumps({
                     'name': name,
-                    'machine_code': config.app_dawn.value('machine'),
+                    'machine_code': self.machine_label.text(),
                     'is_manager': config.ADMINISTRATOR
                 })
             )
@@ -118,12 +110,12 @@ class RegisterClient(QWidget):
             del popup
             return
         else:
+            # 在配置里保存
+            config.app_dawn.setValue("machine", self.machine_label.text())
             popup = TipShow(parent=self)
             popup.information('成功', '恭喜!本客户端注册成功.\n请重启使用!')
             popup.confirm_btn.clicked.connect(popup.close)
             popup.deleteLater()
             popup.exec()
             del popup
-
-
 

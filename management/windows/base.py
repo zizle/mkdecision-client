@@ -21,6 +21,7 @@ from frame.base import NoDataWindow, RegisterClient
 from .home import HomePage
 from .pservice import PService
 from .danalysis import DAnalysis
+from utils.machine import get_machine_code
 # 枚举左上右下以及四个定点
 Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
 
@@ -94,6 +95,7 @@ class Base(QWidget):
         self.menu_bar.menu_btn_clicked.connect(self.menu_clicked)
         # permit bar
         permit_bar = PermitBar()
+        permit_bar.user_logout.connect(self.user_logout_event)  # 用户退出就回到【首页】
         # add tab container
         self.tab = QTabWidget()
         self.tab.setAutoFillBackground(True)  # 设置背景,否则由于受到父窗口的影响导致透明
@@ -119,51 +121,56 @@ class Base(QWidget):
         # set icon and title
         self.setWindowIcon(QIcon("media/logo.png"))
         self.setWindowTitle("瑞达期货研究院分析决策系统_管理端_0101911")
-        # get menus in server
+
+        # 在获取功能模块前先获取客户端是否已经存在
+        self.check_client_existed()
+        # 获取功能模块名
         self.get_menus()
 
-    def close(self):
-        # 注销
+    # 启动检查客户端是否存在
+    def check_client_existed(self):
+        exist_mc = config.app_dawn.value('machine')
+        if exist_mc:  # 原来就存在则不发起请求
+            print('windows.base.Base.check_client_existed 客户端没卸载')
+            return
+        # 获取机器码
+        print('windows.base.Base.check_client_existed 客户端已卸载重装,鉴定是否已注册过的')
+        machine_code = get_machine_code()
+        # 查询机器是否存在
         try:
-            response = requests.post(
-                url=config.SERVER_ADDR + "user/passport/?option=logout",
-                headers=config.CLIENT_HEADERS,
-                cookies=config.app_dawn.value('cookies')
+            r = requests.get(
+                url=config.SERVER_ADDR + 'basic/client-existed/?mc=' + machine_code
             )
+            response = json.loads(r.content.decode('utf-8'))
         except Exception:
-            pass
-        # 移除cookie和权限
-        config.app_dawn.remove('cookies')
-        config.app_dawn.remove('access_main_module')
-        super().close()
+            return
+        if response['data']['existed']:
+            # 存在,写入配置
+            print('注册过的客户端,写入配置')
+            config.app_dawn.setValue('machine', machine_code)
 
-    def eventFilter(self, obj, event):
-        """事件过滤器,用于解决鼠标进入其它控件后还原为标准鼠标样式"""
-        if isinstance(event, QEnterEvent):
-            self.setCursor(Qt.ArrowCursor)
-        return super(Base, self).eventFilter(obj, event)
-
+    # 获取模块功能按钮
     def get_menus(self):
-        # try:
-        #     # 请求主菜单数据
-        #     machine_code = config.app_dawn.value('machine')
-        #     if machine_code:
-        #         url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
-        #     else:
-        #         url = config.SERVER_ADDR + 'basic/modules/'
-        #     r = requests.get(
-        #         url=url,
-        #         headers=config.CLIENT_HEADERS,
-        #         data=json.dumps({"machine_code": config.app_dawn.value('machine')})
-        #     )
-        #     response = json.loads(r.content.decode("utf-8"))
-        # except Exception as e:
-        #     QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
-        #     sys.exit()  # catch exception sys exit
-        # for item in response["data"]:
-        #     menu_btn = QPushButton(item['name'])
-        #     menu_btn.mid = item['id']
-        #     self.menu_bar.addMenuButton(menu_btn)
+        try:
+            # 请求主菜单数据
+            machine_code = config.app_dawn.value('machine')
+            if machine_code:
+                url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
+            else:
+                url = config.SERVER_ADDR + 'basic/modules/'
+            r = requests.get(
+                url=url,
+                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({"machine_code": config.app_dawn.value('machine')})
+            )
+            response = json.loads(r.content.decode("utf-8"))
+        except Exception as e:
+            QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
+            sys.exit()  # catch exception sys exit
+        for item in response["data"]:
+            menu_btn = QPushButton(item['name'])
+            menu_btn.mid = item['id']
+            self.menu_bar.addMenuButton(menu_btn)
         self.menu_bar.addStretch()
 
     def menu_clicked(self, menu):
@@ -171,13 +178,13 @@ class Base(QWidget):
         # 查询权限
         machine_code = config.app_dawn.value('machine')
         if machine_code:
-            url = config.SERVER_ADDR + 'limits/access-module/'+str(menu.mid)+'/?mc=' + machine_code
+            url = config.SERVER_ADDR + 'limit/access-module/'+str(menu.mid)+'/?mc=' + machine_code
         else:
-            url = config.SERVER_ADDR + 'limits/access-module/'+str(menu.mid) + '/'
+            url = config.SERVER_ADDR + 'limit/access-module/'+str(menu.mid) + '/'
         try:
             r = requests.get(
                 url=url,
-                cookies=config.app_dawn.value('cookies')
+                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')}
             )
             response = json.loads(r.content.decode('utf-8'))
         except Exception as e:
@@ -190,40 +197,26 @@ class Base(QWidget):
                 del popup
             return
         # 有权限
-        if name == '客户端注册':
+        if name == u'客户端注册':
             tab = RegisterClient()
-        elif name == '管理维护':
+        elif name == u'管理维护':
             tab = MaintenanceHome(parent=self.tab)
         else:
             tab = NoDataWindow(name=name)
         self.tab.clear()
         self.tab.addTab(tab, name)
 
-        return
-        access_modules = config.app_dawn.value('access_main_module')
-        if not access_modules:
-            access_modules = []
-        if name_en not in ['machine_code','home_page', 'maintenance'] + access_modules:
-            popup = TipShow()
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.information(title='无权限', message='您还不能查看此功能，\n如已登录请联系管理员开放！')
-            if not popup.exec():
-                del popup
-            return
-        if name_en == 'machine_code':
-            tab = RegisterClient()
-        elif name_en == 'home_page':
-            tab = HomePage()
-        elif name_en == 'product_service':
-            tab = PService()
-        elif name_en == 'data_analysis':
-            tab = DAnalysis()
-        elif name_en == 'maintenance':
-            tab = Maintenance()
-        else:
-            tab = NoDataWindow(name=name)
-        self.tab.clear()
-        self.tab.addTab(tab, name)
+    # 用户退出事件,回到【首页】
+    def user_logout_event(self):
+        menu = QPushButton(u'首页')
+        menu.mid = 0
+        self.menu_clicked(menu)
+
+    def eventFilter(self, obj, event):
+        """事件过滤器,用于解决鼠标进入其它控件后还原为标准鼠标样式"""
+        if isinstance(event, QEnterEvent):
+            self.setCursor(Qt.ArrowCursor)
+        return super(Base, self).eventFilter(obj, event)
 
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
