@@ -20,6 +20,7 @@ from piece.base import TitleBar
 # 登录弹窗
 class LoginPopup(QDialog):
     user_listed = pyqtSignal(str)
+    is_superman = pyqtSignal(bool)
 
     def __init__(self, *args, **kwargs):
         super(LoginPopup, self).__init__(*args, **kwargs)
@@ -112,6 +113,8 @@ class LoginPopup(QDialog):
                 phone = user_data['phone']
                 sig_username = phone[0:3] + '****' + phone[7:11]
             self.user_listed.emit(sig_username)
+            # 发出是否是超级管理员的信号
+            self.is_superman.emit(user_data['superman'])
             return True
 
 
