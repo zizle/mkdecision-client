@@ -5,12 +5,296 @@ Update: 2019-07-26
 Author: zizle
 """
 import fitz
+import json
 import requests
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox, QCheckBox
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer
-from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap
+from PyQt5.QtWidgets import qApp, QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox, QCheckBox
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer, QSize
+from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap, QIcon
 import config
+from widgets.CAvatar import CAvatar
 
+
+# 标题栏
+class TitleBar(QWidget):
+    HEIGHT = 35
+
+    def __init__(self, *args, **kwargs):
+        super(TitleBar, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=0, spacing=0)
+        # 图标
+        self.window_icon = QLabel(parent=self)
+        pixmap = QPixmap('media/logo.png')
+        self.window_icon.setScaledContents(True)
+        self.window_icon.setPixmap(pixmap)
+        # 标题
+        self.window_title = QLabel(parent=self)
+        layout.addWidget(self.window_icon, Qt.AlignLeft)
+        layout.addWidget(self.window_title, Qt.AlignLeft)
+        # 中间伸缩
+        # layout.addStretch()
+        # 右侧控制大小
+        # 利用Webdings字体来显示图标
+        font = QFont()
+        font.setFamily('Webdings')
+        # 最小化按钮
+        self.buttonMinimum = QPushButton(
+            '0', parent=self, font=font, clicked=self.windowMinimumed, objectName='buttonMinimum')
+        layout.addWidget(self.buttonMinimum, alignment=Qt.AlignRight|Qt.AlignTop)
+        # 最大化/还原按钮
+        self.buttonMaximum = QPushButton(
+            '1', parent=self, font=font, clicked=self.windowMaximized, objectName='buttonMaximum')
+        layout.addWidget(self.buttonMaximum, alignment=Qt.AlignRight|Qt.AlignTop)
+        # 关闭按钮
+        self.buttonClose = QPushButton(
+            'r', parent=self, font=font, clicked=self.windowClosed, objectName='buttonClose')
+        layout.addWidget(self.buttonClose, alignment=Qt.AlignRight|Qt.AlignTop)
+        # 属性、样式
+        self._mouse_pos = None
+        self.setObjectName('titleBar')
+        self.setFixedHeight(self.HEIGHT)
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.window_icon.setMargin(2)
+        self.window_icon.setFixedSize(self.HEIGHT-5, self.HEIGHT-5)
+        self.window_title.setMargin(3)
+        self.buttonMinimum.setFixedSize(self.HEIGHT-5, self.HEIGHT-5)
+        self.buttonMaximum.setFixedSize(self.HEIGHT-5, self.HEIGHT-5)
+        self.buttonClose.setFixedSize(self.HEIGHT-5, self.HEIGHT-5)
+        self.window_title.setText('瑞达期货研究院分析决策系统_管理端_0101911')
+        self.setStyleSheet("""
+        #titleBar{
+            background-color: rgb(85,88,91);
+        }
+        /*最小化最大化关闭按钮通用默认背景*/
+        #buttonMinimum,#buttonMaximum,#buttonClose {
+            border: none;
+            background-color: rgb(85,88,91);
+        }
+
+        /*悬停*/
+        #buttonMinimum:hover,#buttonMaximum:hover {
+            background-color: rgb(72,75,78);
+        }
+        #buttonClose:hover {
+            color: white;
+            background-color: rgb(200,49,61);
+        }
+
+        /*鼠标按下不放*/
+        #buttonMinimum:pressed,#buttonMaximum:pressed {
+            background-color: rgb(37,39,41);
+        }
+        #buttonClose:pressed {
+            color: white;
+            background-color: rgb(161, 73, 92);
+        }
+        
+        """)
+
+        # 布局
+        self.setLayout(layout)
+
+    # 最小化
+    def windowMinimumed(self):
+        print('最小化窗口')
+        self.parent().showMinimized()
+
+    # 最大化
+    def windowMaximized(self):
+        print('最大化窗口')
+        if self.buttonMaximum.text() == '1':
+            # 最大化
+            self.buttonMaximum.setText('2')
+            self.parent().showMaximized()
+        else:  # 还原
+            self.buttonMaximum.setText('1')
+            self.parent().showNormal()
+
+    # 关闭
+    def windowClosed(self):
+        print('关闭窗口')
+        self.parent().close()
+
+    # 鼠标双击
+    def mouseDoubleClickEvent(self, event):
+        self.windowMaximized()
+
+    # 鼠标移动
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.LeftButton and self._mouse_pos:
+            self.parent().move(self.mapToGlobal(event.pos() - self._mouse_pos))
+        event.accept()  # 接受事件,不传递到父控件
+
+    # 鼠标点击
+    def mousePressEvent(self, event):
+        """鼠标点击事件"""
+        if event.button() == Qt.LeftButton:
+            self._mouse_pos = event.pos()
+        event.accept()  # 接受事件,不传递到父控件
+
+    # 鼠标弹起
+    def mouseReleaseEvent(self, event):
+        """鼠标弹起事件"""
+        self._mouse_pos = None
+        event.accept()  # 接受事件,不传递到父控件
+
+
+# 模块菜单栏
+class ModuleBar(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(ModuleBar, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=0, spacing=0)
+        layout.addWidget(QPushButton('菜单'))
+        layout.addWidget(QPushButton('菜单'))
+        layout.addWidget(QPushButton('菜单'))
+        layout.addWidget(QPushButton('菜单'))
+        self.setLayout(layout)
+        # 样式设计
+        print(self.parent().height())
+        self.setStyleSheet("""
+        QPushButton{
+            background-color:rgb(85,88,91);
+            color: rgb(255,20,150);
+            border: 1px solid rgb(180,255,250);
+            margin-left:3px;
+            padding: 0px 4px;  /*上下，左右*/
+            min-height:20px;
+            max-height:20px;
+            color: #FFFFFF
+        }
+        QPushButton:hover {
+            background-color: #CD3333;
+        }
+        """)
+
+    # 设置菜单按钮
+    def setMenus(self, menu_data):
+        # 清除所有的控件
+        print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
+        count = self.layout().count()
+        for i in range(count):
+            widget = self.layout().itemAt(i).widget()
+            widget.deleteLater()
+            if i == count - 1:
+                del widget  # 删除引用
+        for button in menu_data:
+            self.layout().addWidget(button)
+        print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
+
+    # 添加菜单按钮
+    def addMenu(self, menu):
+        print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
+        self.layout().addWidget(menu)
+        print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
+
+
+# 登录信息栏
+class PermitBar(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(PermitBar, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=0, spacing=0)
+        # 用户头像
+        self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.jpg', size=QSize(24, 24), objectName='userAvatar')
+        layout.addWidget(self.avatar, alignment=Qt.AlignRight)
+        # 用户名
+        self.username_shown = QLabel('用户名用户名', parent=self, objectName='usernameShown')
+        layout.addWidget(self.username_shown, alignment=Qt.AlignRight)
+        # 按钮
+        self.login_button = QPushButton('登录', parent=self, objectName='loginBtn')
+        layout.addWidget(self.login_button, alignment=Qt.AlignRight)
+        self.register_button = QPushButton('注册', parent=self, objectName='registerBtn')
+        layout.addWidget(self.register_button, alignment=Qt.AlignRight)
+        self.logout_button = QPushButton('注销', parent=self, objectName='logoutBtn')
+        layout.addWidget(self.logout_button, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        # 样式
+        self.login_button.setCursor(Qt.PointingHandCursor)
+        self.register_button.setCursor(Qt.PointingHandCursor)
+        self.logout_button.setCursor(Qt.PointingHandCursor)
+        self.setStyleSheet("""
+        #loginBtn,#registerBtn,#logoutBtn{
+            border:none;
+            padding-left: 2px;
+            padding-right: 4px;
+            color: #FFFFFF;
+            min-height:24px;
+            max-height:24px;
+        }
+        #logoutBtn{
+            margin-right:5px;
+        }
+        #loginBtn:hover,#registerBtn:hover,#logoutBtn:hover {
+            color: rgb(54,220,180);
+            
+        }
+        #usernameShown{
+            min-height:24px;
+            max-height:24px;
+            margin-right: 5px;
+        }
+        /*
+        #userAvatar{
+            background-color: rgb(100,255,120);
+            min-height:24px;
+            max-height:24px;
+            min-width:24px;
+            border-radius: 12px;
+            margin-right: 2px;
+        }
+        */
+        """)
+
+
+# 导航栏
+class NavigationBar(QWidget):
+    clicked_login_button = pyqtSignal()
+    clicked_register_button = pyqtSignal()
+    clicked_logout_button = pyqtSignal()
+
+    def __init__(self, *args, **kwargs):
+        super(NavigationBar, self).__init__(*args, **kwargs)
+        # 模块菜单栏
+        self.module_bar = ModuleBar(parent=self, objectName='moduleBar')
+        # 登录信息栏
+        self.permit_bar = PermitBar(parent=self, objectName='permitBar')
+        # 信号连接
+        self.permit_bar.login_button.clicked.connect(self.clicked_login_button.emit)
+        self.permit_bar.register_button.clicked.connect(self.clicked_register_button.emit)
+        self.permit_bar.logout_button.clicked.connect(self.clicked_logout_button.emit)
+        # 布局
+        layout = QHBoxLayout(margin=0)
+        layout.addWidget(self.module_bar, alignment=Qt.AlignLeft)
+        layout.addWidget(self.permit_bar, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setObjectName('navigationBar')
+        self.setMouseTracking(True)
+        self.setStyleSheet("""
+        #navigationBar{
+            background-color:rgb(200,200,200);
+            min-height: 24px;
+            max-height: 24px;
+        }
+        
+        """)
+
+    # 鼠标移动
+    def mouseMoveEvent(self, event):
+        # 接受事件不传递到父控件
+        event.accept()
+
+
+
+
+
+
+
+
+
+
+
+# 主功能菜单栏
 class MenuBar(QWidget):
     # 横向菜单栏
     menu_btn_clicked = pyqtSignal(QPushButton)
@@ -28,7 +312,7 @@ class MenuBar(QWidget):
     def addMenuButton(self, button):
         if not isinstance(button, QPushButton):
             raise ValueError('menu instance must be QPushButton QObject')
-        button.clicked.connect(lambda :self.menu_btn_clicked.emit(button))
+        button.clicked.connect(lambda: self.menu_btn_clicked.emit(button))
         self.layout().addWidget(button, alignment=Qt.AlignLeft)
 
     def addMenuButtons(self, buttons):
@@ -39,6 +323,177 @@ class MenuBar(QWidget):
 
     def addStretch(self):
         self.layout().addStretch()
+
+
+# 登录注销栏
+class PermitBar1(QWidget):
+    user_logout = pyqtSignal(bool)
+    is_superman = pyqtSignal(bool)
+
+    def __init__(self, *args, **kwargs):
+        super(PermitBar1, self).__init__(*args, **kwargs)
+        styleSheet = """
+        PermitBar {
+            background-color: rgb(85,88,91);
+        }
+        #loginBtn,#registerBtn,#exitBtn {
+            background-color: rgb(85,88,91);
+            border:none;
+            padding-left: 4px;
+            padding-right: 4px;
+            height:18px;
+            color: #FFFFFF
+        }
+        #loginBtn:hover,#registerBtn:hover,#exitBtn:hover {
+            color: rgb(54,220,180);
+        }
+        #loginMessage{
+            background-color: rgb(85,88,91);
+            height:18px;
+            color: rgb(210, 200, 205)
+        }
+        """
+        # 支持qss设置背景
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        # 设置背景颜色,否则由于受到父窗口的影响导致透明
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(palette.Window, QColor(255,255,255))
+        self.setPalette(palette)
+        layout = QHBoxLayout(spacing=0)
+        layout.setContentsMargins(0,0,0,0)
+        # widgets
+        self.login_button = QPushButton('登录', objectName='loginBtn', clicked=self.login_button_clicked)
+        self.register_button = QPushButton('注册', objectName='registerBtn', clicked=self.register_button_clicked)
+        self.exit_button = QPushButton("退出", objectName='exitBtn', clicked=self.logout)
+        # widgets styles and actions
+        self.login_message = QLabel(objectName='loginMessage')
+        self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.register_button.setCursor(QCursor(Qt.PointingHandCursor))
+        # hide message and exit button
+        self.login_message.hide()
+        self.exit_button.hide()
+        self.setStyleSheet(styleSheet)
+        self.exit_button.setStyleSheet("""
+        QPushButton {
+            background-color: rgb(85,88,91);
+            border:none;
+            padding-left: 10px;
+            padding-right: 8px;
+            height:18px;
+            font-size:11px;
+            color: rgb(210,210,210)
+        }
+        QPushButton:hover {
+            color: rgb(230,0,5);
+        }
+        """)
+        # add to layout
+        layout.addWidget(self.login_button)
+        layout.addWidget(self.register_button)
+        layout.addWidget(self.login_message)
+        layout.addWidget(self.exit_button)
+        self.setLayout(layout)
+
+    # 自动登录
+    def check_keep_online(self):
+        machine_code = config.app_dawn.value('machine')
+        token = config.app_dawn.value('AUTHORIZATION')
+        if not machine_code or not token:
+            print('piece.base.PermitBar.check_keep_online 没有机器码或token,不用自动登录')
+            return
+        print('piece.base.PermitBar.check_keep_online 有机器码或token,自动登录')
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'user/keep-online/?mc=' + machine_code,
+                headers={'AUTHORIZATION': token}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            return
+        # 用户名信息设置到登录信息栏
+        user_data = response['data']
+        sig_username = user_data['username']
+        if not user_data['username']:
+            phone = user_data['phone']
+            sig_username = phone[0:3] + '****' + phone[8:11]
+        # 判断是否是超级管理员登录
+        print('piece.base.PermitBar.check_keep_online:', user_data)
+        self.has_login(sig_username)  # 设置到信息栏
+        if user_data['superman']:
+            print('自动登录-超级管理员发出信号1')
+            self.is_superman.emit(True)
+            print('自动登录-超级管理员发出信号2')
+
+    # 点击登录
+    def login_button_clicked(self):
+        from popup.base import LoginPopup
+        popup = LoginPopup(parent=self)
+        popup.user_listed.connect(self.has_login)
+        popup.deleteLater()
+        if not popup.exec_():
+            del popup
+
+    # 已登录改变显示状态
+    def has_login(self, text):
+        self.username = text
+        # 定时器用于动态展示用户名
+        if hasattr(self, 'timer'):
+            del self.timer
+        self.timer = QTimer()
+        self.timer_finished_count = 0
+        self.login_button.hide()
+        self.register_button.hide()
+        self.exit_button.show()
+        self.login_message.setText(self.username)
+        self.login_message.show()
+        self.timer.start(500)
+        self.timer.timeout.connect(self._dynamic_user_info)
+
+    # 动态滚动展示用户信息
+    def _dynamic_user_info(self):
+        if self.timer_finished_count == len(self.username):
+            self.login_message.setText(self.username)
+            self.timer_finished_count = 0
+        else:
+            self.login_message.setText(
+                self.username[self.timer_finished_count:] + " " + self.username[:self.timer_finished_count])
+            self.timer_finished_count += 1
+
+    # 注销退出
+    def logout(self):
+        # 移除信息
+        config.app_dawn.remove('AUTHORIZATION')
+        self.login_button.show()
+        self.register_button.show()
+        self.exit_button.hide()
+        self.login_message.setText('')
+        self.login_message.hide()
+        # 停止定时器
+        if hasattr(self, 'timer'):
+            self.timer.stop()
+        # 传出信号
+        self.user_logout.emit(True)
+
+    # 点击注册
+    def register_button_clicked(self):
+        from popup.base import RegisterPopup
+        popup = RegisterPopup(parent=self)
+        popup.user_registered.connect(self.has_login)  # 注册即登录
+        popup.deleteLater()
+        if not popup.exec_():
+            del popup
+
+
+
+
+
+
+
+
+
 
 
 class PDFReaderContent(QWidget):
@@ -197,161 +652,6 @@ class PageController(QWidget):
         self.clicked.emit(skip_page)
 
 
-class PermitBar(QWidget):
-    # 登录注销栏
-    def __init__(self, *args, **kwargs):
-        super(PermitBar, self).__init__(*args, **kwargs)
-        styleSheet = """
-        PermitBar {
-            background-color: rgb(85,88,91);
-        }
-        QPushButton {
-            background-color: rgb(85,88,91);
-            border:none;
-            padding-left: 4px;
-            padding-right: 4px;
-            height:18px;
-            color: #FFFFFF
-        }
-            QPushButton:hover {
-            color: rgb(54,220,180);
-        }
-        QLabel {
-            background-color: rgb(85,88,91);
-            height:18px;
-            color: rgb(210, 200, 205)
-        }
-        """
-        # 支持qss设置背景
-        self.setAttribute(Qt.WA_StyledBackground, True)
-        # 设置背景颜色,否则由于受到父窗口的影响导致透明
-        self.setAutoFillBackground(True)
-        palette = self.palette()
-        palette.setColor(palette.Window, QColor(255,255,255))
-        self.setPalette(palette)
-        layout = QHBoxLayout(spacing=0)
-        layout.setContentsMargins(0,0,0,0)
-        # widgets
-        self.login_button = QPushButton('登录')
-        self.register_button = QPushButton('注册')
-        self.exit_button = QPushButton("退出")
-        # signal connect slot
-        self.login_button.clicked.connect(self.login_button_clicked)
-        self.register_button.clicked.connect(self.register_button_clicked)
-        self.exit_button.clicked.connect(self.exit_button_clicked)
-        # widgets styles and actions
-        self.login_message = QLabel("")
-        self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
-        self.register_button.setCursor(QCursor(Qt.PointingHandCursor))
-        # hide message and exit button
-        self.login_message.hide()
-        self.exit_button.hide()
-        self.setStyleSheet(styleSheet)
-        self.exit_button.setStyleSheet("""
-        QPushButton {
-            background-color: rgb(85,88,91);
-            border:none;
-            padding-left: 10px;
-            padding-right: 8px;
-            height:18px;
-            font-size:11px;
-            color: rgb(210,210,210)
-        }
-        QPushButton:hover {
-            color: rgb(230,0,5);
-        }
-        """)
-        # add to layout
-        layout.addWidget(self.login_button)
-        layout.addWidget(self.register_button)
-        layout.addWidget(self.login_message)
-        layout.addWidget(self.exit_button)
-        self.setLayout(layout)
-        # 自动登录
-        self.auto_login()
-
-    def auto_login(self):
-        # 获取用户名获取密码
-        username = config.app_dawn.value('username')
-        password = config.app_dawn.value('password')
-        auto_login = int(config.app_dawn.value('auto_login')) if config.app_dawn.value('auto_login') else None
-        if not all([username, password]):
-            return
-        # 登录
-        if not auto_login:
-            return
-        from popup.base import Login  # import when required because import with file top will make a circle import
-        popup = Login()
-        popup.successful_login.connect(self.has_login)
-        popup.account_edit.setText(username)
-        popup.password_edit.setText(password)
-        popup.remember_check.setChecked(True)
-        popup.auto_login.setChecked(True)
-        popup.submit_login()
-        popup.close()
-        del popup
-
-    def dynamic_user_info(self):
-        # show username dynamic
-        if self.timer_finished_count == len(self.username):
-            self.login_message.setText(self.username)
-            self.timer_finished_count = 0
-        else:
-            self.login_message.setText(self.username[self.timer_finished_count:] + " " + self.username[:self.timer_finished_count])
-            self.timer_finished_count += 1
-
-    def login_button_clicked(self):
-        # dialog for user login]
-        from popup.base import Login  # import when required because import with file top will make a circle import
-        popup = Login()
-        popup.successful_login.connect(self.has_login)
-        popup.deleteLater()
-        popup.exec()
-        del popup
-
-    def has_login(self, text):
-        self.username = text
-        self.timer_finished_count = 0
-        self.login_button.hide()
-        self.register_button.hide()
-        self.exit_button.show()
-        self.login_message.setText(self.username)
-        self.login_message.show()
-        self.timer = QTimer()  # timer would be bind to self
-        self.timer.start(500)
-        self.timer.timeout.connect(self.dynamic_user_info)
-
-    def register_button_clicked(self):
-        from popup.base import Register
-        popup = Register()
-        popup.login_signal.connect(self.has_login)
-        popup.deleteLater()
-        popup.exec()
-        del popup
-
-    def exit_button_clicked(self):
-        # 注销
-        try:
-            response = requests.post(
-                url=config.SERVER_ADDR + "user/passport/?option=logout",
-                headers=config.CLIENT_HEADERS,
-                cookies=config.app_dawn.value('cookies')
-            )
-        except Exception:
-            pass
-        # 移除cookie
-        config.app_dawn.remove('cookies')
-        config.app_dawn.remove('access_main_module')
-        # 不能再自动登录
-        config.app_dawn.setValue('auto_login', 0)
-        self.login_button.show()
-        self.register_button.show()
-        self.exit_button.hide()
-        self.login_message.setText("")
-        self.login_message.hide()
-        self.timer.stop()
-
-
 class TableCheckBox(QWidget):
     """ checkbox in client info table """
     clicked_changed = pyqtSignal(dict)
@@ -378,14 +678,14 @@ class TableCheckBox(QWidget):
         self.check_box.setChecked(tag)
 
 
-class TitleBar(QWidget):
+class TitleBar1(QWidget):
     windowMinimumed = pyqtSignal()  # 窗口最小化信号
     windowMaximumed = pyqtSignal()  # 窗口最大化信号
     windowNormaled = pyqtSignal()  # 窗口还原信号
     windowClosed = pyqtSignal()  # 窗口关闭信号
     windowMoved = pyqtSignal(QPoint)  # 窗口移动
     def __init__(self, *args, **kwargs):
-        super(TitleBar, self).__init__(*args, **kwargs)
+        super(TitleBar1, self).__init__(*args, **kwargs)
         # 样式
         StyleSheet = """
         /*标题栏*/

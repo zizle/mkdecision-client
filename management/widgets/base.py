@@ -6,14 +6,53 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import QLabel, QTableWidget, QTableWidgetItem, QWidget, QPushButton, QScrollArea, QVBoxLayout, QGridLayout,QAbstractItemView, QTextBrowser
+from PyQt5.QtWidgets import QTabWidget, QPushButton, QLabel, QTableWidget, QScrollArea, QWidget
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import QCursor, QBrush, QColor
 
 import config
 from thread.request import RequestThread
 
-__all__ = ('Loading', 'TableShow', 'MenuScrollContainer', 'NormalTable')
+
+# 自定义模块菜单的QPushButton
+class ModuleButton(QPushButton):
+    clicked_module = pyqtSignal(QPushButton)
+
+    def __init__(self, mid, text, *args, **kwargs):
+        super(ModuleButton, self).__init__(text, *args, **kwargs)
+        self.mid = mid
+        self.clicked.connect(lambda: self.clicked_module.emit(self))
+
+
+# 承载模块内容的窗口
+class LoadedTab(QTabWidget):
+    def __init__(self, *args, **kwargs):
+        super(LoadedTab, self).__init__(*args, **kwargs)
+        self.setDocumentMode(True)  # 去掉边框
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setTabBarAutoHide(True)
+        self.setMouseTracking(True)
+        self.setStyleSheet("""
+            background-color: rgb(150,150,150)
+        """)
+
+    # 鼠标移动事件
+    def mouseMoveEvent(self, event, *args, **kwargs):
+        event.accept()  # 接受事件,不传递到父控件
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class Loading(QLabel):

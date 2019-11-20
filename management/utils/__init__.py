@@ -4,7 +4,6 @@ Create: 2019-08-09
 Author: zizle
 """
 from win32com.shell import shell, shellcon
-from .machine import machine
 
 def text_content_handler(content):
     # handler content

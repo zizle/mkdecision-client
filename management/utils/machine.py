@@ -3,6 +3,7 @@
 # Date: 2019
 
 from wmi import WMI
+import hashlib
 
 
 class MachineInfo(object):
@@ -38,4 +39,15 @@ class MachineInfo(object):
             print(cpu)
 
 
-machine = MachineInfo()
+def get_machine_code():
+    machine = MachineInfo()
+    try:
+        md = hashlib.md5()
+        main_board = machine.main_board()
+        disk = machine.disk()
+        md.update(main_board.encode('utf-8'))
+        md.update(disk.encode('utf-8'))
+        machine_code = md.hexdigest()
+    except Exception:
+        machine_code = ''
+    return machine_code

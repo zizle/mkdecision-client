@@ -8,7 +8,8 @@ import re
 import fitz
 import json
 import requests
-from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QTextBrowser, QScrollArea, QVBoxLayout, QWidget, QHBoxLayout
+from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QTextBrowser, QScrollArea, QVBoxLayout,\
+    QWidget, QHBoxLayout, QGridLayout
 from PyQt5.QtGui import QCursor, QIcon, QImage, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -17,187 +18,249 @@ from piece.base import TitleBar
 
 
 # 登录弹窗
-class Login(QDialog):
-    successful_login = pyqtSignal(str)
+class LoginPopup(QDialog):
+    user_listed = pyqtSignal(str)
+    is_superman = pyqtSignal(bool)
 
-    def __init__(self):
-        super(Login, self).__init__()
-        register_forget_style = """
-        QPushButton {
-           font-size:11px;
-           color:rgb(0,0,200);
-           border:none;
-        } 
-        """
-        style_sheet = """
-        LoginDialog {
-            border:1px solid rgb(54, 157, 180)
-            }
-        QLineEdit {
-            font-size:13px;
-            border-width:0;
-            border-style:outset;
-            border-top:1px solid rgb(150,150,150);
-            border-bottom:1px solid rgb(150,150,150)
-        }
-        """
-        self.resize(480, 300)
-        # 设置无边框
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        # 添加个head
-        title_bar = TitleBar(self)
-        title_bar.setGeometry(0, 0, 480, 50)
-        # deal with window signal
-        self.windowIconChanged.connect(title_bar.setIcon)
-        self.windowTitleChanged.connect(title_bar.setTitle)
+    def __init__(self, *args, **kwargs):
+        super(LoginPopup, self).__init__(*args, **kwargs)
+        layout = QGridLayout()
+        # 手机
+        phone_label = QLabel()
+        phone_label.setPixmap(QPixmap('media/passport_icon/phone.png'))
+        layout.addWidget(phone_label, 0, 0)
+        # 填写手机
+        self.phone_edit = QLineEdit()
+        layout.addWidget(self.phone_edit, 0, 1)
+        # 手机号错误提示框
+        self.phone_error = QLabel()
+        layout.addWidget(self.phone_error, 1, 0, 1, 2)
+        # 密码
+        password_label = QLabel()
+        password_label.setPixmap(QPixmap('media/passport_icon/password.png'))
+        layout.addWidget(password_label, 2, 0)
+        # 填写密码
+        self.password_edit = QLineEdit()
+        layout.addWidget(self.password_edit, 2, 1)
+        # 密码错误提示框
+        self.password_error = QLabel()
+        layout.addWidget(self.password_error, 3, 0, 1, 2)
+        # 确认登录
+        login_button = QPushButton('登录', clicked=self.commit_login)
+        layout.addWidget(login_button, 4, 0, 1, 2)
+        # 登录错误框
+        self.login_error = QLabel()
+        layout.addWidget(self.login_error, 5, 0, 1, 2)
+        # 样式
         self.setWindowTitle('登录')
-        self.setWindowIcon(QIcon("media/logo.png"))
-        # 按钮处理
-        title_bar.buttonMinimum.hide()
-        title_bar.buttonMaximum.hide()
-        title_bar.buttonClose.setCursor(QCursor(Qt.PointingHandCursor))
-        title_bar.windowClosed.connect(self.close)  # close dialog
-        title_bar.windowMoved.connect(self.move)
-        account_label = QLabel(self)
-        account_label.setStyleSheet("image:url(media/user_icon.jpg)")
-        account_label.setGeometry(75, 100, 36, 35)
-        password_label = QLabel(self)
-        password_label.setStyleSheet("image:url(media/mima_icon.jpg)")
-        password_label.setGeometry(75, 150, 36, 35)
-        # 用户名输入
-        self.account_edit = QLineEdit(self)
-        self.account_edit.setGeometry(111, 100, 250, 35)
-        self.account_edit.setPlaceholderText("用户名/手机号")
-        # 无用户名注册账号
-        register_account = QPushButton("还没账号?", self)
-        register_account.setGeometry(365, 100, 60, 35)
-        register_account.setStyleSheet(register_forget_style)
-        register_account.setCursor(QCursor(Qt.PointingHandCursor))
-        register_account.clicked.connect(self.to_register)
-        # 密码输入
-        self.password_edit = QLineEdit(self)
-        self.password_edit.setEchoMode(QLineEdit.Password)
-        self.password_edit.setGeometry(111, 150, 250, 35)
-        self.password_edit.setPlaceholderText("请输入密码")
-        # 忘记密码
-        forget_password = QPushButton("忘记密码?", self)
-        forget_password.setGeometry(365, 150, 60, 35)
-        forget_password.setStyleSheet(register_forget_style)
-        forget_password.setCursor(QCursor(Qt.PointingHandCursor))
-        forget_password.clicked.connect(self.forget_psd_clicked)
-        # 记住密码
-        self.remember_check = QCheckBox("记住密码",self)
-        self.remember_check.setGeometry(75, 190, 80, 30)
-        # 自动登录
-        self.auto_login = QCheckBox("自动登录", self)
-        self.auto_login.setGeometry(155, 190, 120, 30)
-        self.auto_login.stateChanged.connect(self.auto_login_checked_change)
-        # 登录
-        login_button = QPushButton("登录", self)
-        login_button.setGeometry(75, 220, 286, 35)
-        login_button.setStyleSheet("color:#FFFFFF;font-size:15px;border:none;background-color:rgb(30,50,190);")
-        login_button.setCursor(QCursor(Qt.PointingHandCursor))
-        login_button.clicked.connect(self.submit_login)
-        self.setStyleSheet(style_sheet)
-        # 获取是否记住了用户名和密码
-        self.remember_username()
+        phone_label.setFixedSize(36, 35)
+        phone_label.setScaledContents(True)
+        self.phone_edit.setFixedHeight(35)
+        password_label.setScaledContents(True)
+        password_label.setFixedSize(36, 35)
+        self.password_edit.setFixedHeight(35)
+        # 布局
+        self.setLayout(layout)
 
-    def remember_username(self):
-        username = config.app_dawn.value('username')
-        password = config.app_dawn.value('password')
-        if not all([username, password]):
+    # 获取手机号和密码提交登录
+    def commit_login(self):
+        # 获取手机
+        phone = self.phone_edit.text()
+        phone = re.match(r'^[1][3-9][0-9]{9}$', phone)
+        if not phone:
+            self.phone_error.setText('请输入正确的手机号')
             return
-        self.account_edit.setText(username)
-        self.password_edit.setText(password)
-        self.remember_check.setChecked(True)
-
-    def auto_login_checked_change(self):
-        # auto login or not
-        if self.auto_login.isChecked():
-            self.remember_check.setChecked(True)
-
-    def forget_psd_clicked(self):
-        # forget password button clicked signal slot function
-        popup = TipShow(parent=self)
-        popup.information('忘记密码', '请联系管理员修改密码.')
-        popup.confirm_btn.clicked.connect(popup.close)
-        popup.deleteLater()
-        popup.exec()
-        del popup
-
-    def submit_login(self):
-        # collect login information
-        account = self.account_edit.text().strip(' ')
-        password = self.password_edit.text().strip(' ')
-        remember = 1 if self.remember_check.isChecked() else 0
-        auto_login = 1 if self.auto_login.isChecked() else 0
-        if not account or not password:
-            popup = TipShow(parent=self)
-            popup.information('错误', '请输入用户名或密码.')
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.exec()
-            popup.deleteLater()
-            del popup
+        phone = phone.group()
+        # 获取密码
+        password = self.password_edit.text()
+        password = re.sub(r'\s+', '', password)
+        if not password:
+            self.password_error.setText('请输入密码')
             return
-        if auto_login and not remember:
-            popup = TipShow(parent=self)
-            popup.information('提示', '自动登录请记住密码.')
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.exec()
-            popup.deleteLater()
-            del popup
-            return
-        # login
+        # 登录成功
+        if self._login_post(phone, password):
+            self.close()
+
+    # 提交登录
+    def _login_post(self, phone, password):
         try:
-            response = requests.post(
-                url=config.SERVER_ADDR + "user/login/?mc=" + config.app_dawn.value('machine'),
-                headers=config.CLIENT_HEADERS,
+            r = requests.post(
+                url=config.SERVER_ADDR + 'user/login/?mc=' + config.app_dawn.value('machine'),
+                headers={
+                    "AUTHORIZATION": config.app_dawn.value('AUTHORIZATION'),
+                },
                 data=json.dumps({
-                    "username": account,
+                    "phone": phone,
                     "password": password,
                 }),
-                cookies=config.app_dawn.value('cookies')
             )
-        except Exception as error:
-            popup = TipShow(parent=self)
-            popup.information('错误', str(error))
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.deleteLater()
-            popup.exec()
-            del popup
-            return
-        response_data = json.loads(response.content.decode('utf-8'))
-        if response.status_code != 200:
-            popup = TipShow(parent=self)
-            popup.information('错误', response_data['message'])
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.deleteLater()
-            popup.exec()
-            del popup
-            return
-        # login successfully
-        user_data = response_data['data']
-        config.app_dawn.setValue('cookies', response.cookies)  # save cookies
-        config.app_dawn.setValue('auto_login', auto_login)  # save auto login option
-        # config.app_dawn.setValue('access_main_module', user_data['access_main_module'])
-        if remember:
-            config.app_dawn.setValue('username', user_data['username'])
-            config.app_dawn.setValue('password', password)
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.login_error.setText(str(e))
+            # 移除token
+            config.app_dawn.remove('AUTHORIZATION')
+            return False
         else:
-            config.app_dawn.remove('password')
-            config.app_dawn.remove('username')
-        print('登录成功.', response_data)
-        show_name = user_data['nick_name'] if user_data["nick_name"] else user_data["username"]
-        self.successful_login.emit(show_name)
-        self.close()  # close dialog
+            # 保存token
+            user_data = response['data']
+            token = user_data['Authorization']
+            config.app_dawn.setValue('AUTHORIZATION', token)
+            # 发出信号
+            sig_username = user_data['username']
+            if not user_data['username']:
+                phone = user_data['phone']
+                sig_username = phone[0:3] + '****' + phone[7:11]
+            self.user_listed.emit(sig_username)
+            # 发出是否是超级管理员的信号
+            self.is_superman.emit(user_data['superman'])
+            return True
 
-    def to_register(self):
-        # close self and to register dialog widget
-        self.close()
-        popup = Register()
-        popup.deleteLater()
-        popup.exec()
-        del popup
+
+# 注册弹窗
+class RegisterPopup(QDialog):
+    user_registered = pyqtSignal(str)
+
+    def __init__(self, *args, **kwargs):
+        super(RegisterPopup, self).__init__(*args, **kwargs)
+        layout = QGridLayout()
+        # 手机号
+        phone_label = QLabel()
+        phone_label.setPixmap(QPixmap('media/passport_icon/phone.png'))
+        layout.addWidget(phone_label, 0, 0)
+        # 填写手机
+        self.phone_edit = QLineEdit()
+        layout.addWidget(self.phone_edit, 0, 1)
+        # 手机号错误提示框
+        self.phone_error = QLabel()
+        layout.addWidget(self.phone_error, 1, 0, 1, 2)
+        # 用户名
+        username_label = QLabel()
+        username_label.setPixmap(QPixmap('media/passport_icon/username.png'))
+        layout.addWidget(username_label, 2, 0)
+        # 填写用户名
+        self.username_edit = QLineEdit()
+        layout.addWidget(self.username_edit, 2, 1)
+        self.username_error = QLabel()
+        layout.addWidget(self.username_error, 3, 0, 1, 2)
+        # 密码
+        password_label = QLabel()
+        password_label.setPixmap(QPixmap('media/passport_icon/password.png'))
+        layout.addWidget(password_label, 4, 0)
+        # 填写密码
+        self.password_edit = QLineEdit()
+        layout.addWidget(self.password_edit, 4, 1)
+        # 密码错误提示框
+        self.password_error = QLabel()
+        layout.addWidget(self.password_error, 5, 0, 1, 2)
+        # 确认密码
+        re_password_label = QLabel()
+        re_password_label.setPixmap(QPixmap('media/passport_icon/password.png'))
+        layout.addWidget(re_password_label, 6, 0)
+        # 填写确认密码
+        self.re_password_edit = QLineEdit()
+        layout.addWidget(self.re_password_edit, 6, 1)
+        # 确认密码错误提示框
+        self.re_password_error = QLabel()
+        layout.addWidget(self.re_password_error, 7, 0, 1, 2)
+        # 注册
+        register_button = QPushButton('立即注册', clicked=self.commit_register)
+        layout.addWidget(register_button, 8, 0, 1, 2)
+        # 注册错误框
+        self.register_error = QLabel()
+        layout.addWidget(self.register_error, 9, 0, 1, 2)
+        # 样式
+        self.setWindowTitle('注册')
+        phone_label.setFixedSize(36, 35)
+        phone_label.setScaledContents(True)
+        self.phone_edit.setFixedHeight(35)
+        username_label.setFixedSize(36, 35)
+        self.username_edit.setFixedHeight(35)
+        password_label.setScaledContents(True)
+        password_label.setFixedSize(36, 35)
+        self.password_edit.setFixedHeight(35)
+        re_password_label.setScaledContents(True)
+        re_password_label.setFixedSize(36, 35)
+        self.re_password_edit.setFixedHeight(35)
+        # 布局
+        self.setLayout(layout)
+
+    # 获取信息提交注册
+    def commit_register(self):
+        print('提交注册')
+        # 获取手机
+        phone = self.phone_edit.text()
+        phone = re.match(r'^[1][3-9][0-9]{9}$', phone)
+        if not phone:
+            self.phone_error.setText('请输入正确的手机号')
+            return
+        phone = phone.group()
+        # 用户名
+        username = self.username_edit.text().strip()
+        if username:
+            if not re.match(r'^[\u4e00-\u9fa5_0-9a-z]{6,20}', username):
+                self.username_error.setText('用户名需由中文、数字、字母及下划线组成,6-20个字符')
+                return
+            username = username.group()
+        # 获取密码
+        password = self.password_edit.text()
+        password = re.sub(r'\s+', '', password)
+        if not password or len(password) < 6:
+            self.password_error.setText('密码至少为6位.')
+            return
+        # 确认密码
+        re_password = self.re_password_edit.text()
+        re_password = re.sub(r'\s+', '', re_password)
+        if re_password != password:
+            self.re_password_error.setText('两次输入密码不一致')
+            return
+        print('用户名:', username)
+        print('手机:', phone)
+        print('密码:', password)
+        print('确认密码:', re_password)
+        # 提交注册
+        user_data = self._register_post(phone=phone, username=username, password=password)
+        print(user_data)
+        try:
+            if user_data:
+                # 注册成功
+                # 保存token
+                token = user_data['Authorization']
+                config.app_dawn.setValue('AUTHORIZATION', token)
+                # 发出信号
+                sig_username = user_data['username']
+                if not user_data['username']:
+                    phone = user_data['phone']
+                    sig_username = phone[0:3] + '****' + phone[7:11]
+                self.user_registered.emit(sig_username)
+                self.close()
+        except Exception as e:
+            print(e)
+
+    # 提交注册
+    def _register_post(self, phone, username, password):
+        try:
+            r = requests.post(
+                url=config.SERVER_ADDR + 'user/register/?mc=' + config.app_dawn.value('machine'),
+                data=json.dumps({
+                    "phone": phone,
+                    "username": username,
+                    "password": password,
+                }),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.register_error.setText(str(e))
+            # 移除token
+            return {}
+        else:  # 登录成功
+            return response['data']
+
+
+
 
 
 class Register(QDialog):
