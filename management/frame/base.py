@@ -1,20 +1,20 @@
 # _*_ coding:utf-8 _*_
 """
-Update: 2019-07-25
+Update: 2019-11-20
 Author: zizle
 """
 import re
 import json
 import requests
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QGridLayout
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QCursor
 
 import config
 from utils.machine import get_machine_code
-from popup.base import TipShow
 
 
+# 不存在的模块
 class NoDataWindow(QWidget):
     def __init__(self, name, *args):
         super(NoDataWindow, self).__init__(*args)
@@ -34,24 +34,35 @@ class RegisterClient(QWidget):
     def __init__(self, *args, **kwargs):
         super(RegisterClient, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=10)
-        self.machine_label = QLabel(objectName='showLabel')
-        self.name_edit = QLineEdit()
-        self.submit_btn = QPushButton('提交\n注册此客户端', objectName='commitBtn')
-        # style
+        self.machine_label = QLabel(parent=self, objectName='showLabel')
+        self.name_edit = QLineEdit(parent=self)
+        self.name_error = QLabel(parent=self, objectName='nameError')
+        self.submit_btn = QPushButton('提交\n注册此客户端',parent=self, objectName='commitBtn', clicked=self.register_client)
+        self.register_error = QLabel(parent=self, objectName='registerError')
+        # 样式
+        self.name_error.setAlignment(Qt.AlignCenter)
+        self.register_error.setAlignment(Qt.AlignCenter)
         self.machine_label.setAlignment(Qt.AlignCenter)
         self.submit_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.name_edit.setPlaceholderText('请填写本客户端名称(可写个人或单位名称)')
+        # 错误的label限制大小
+        self.name_error.setFixedHeight(25)
+        self.register_error.setFixedHeight(25)
         # signal
-        self.submit_btn.clicked.connect(self.register_client)
         layout.addWidget(self.machine_label)
         layout.addWidget(self.name_edit)
+        layout.addWidget(self.name_error)
         layout.addWidget(self.submit_btn)
+        layout.addWidget(self.register_error)
         self.setLayout(layout)
         self.setStyleSheet("""
         #showLabel{
             max-height:100px;
             font-size:20px;
             font-weight:bold;
+        }
+        #nameError,#registerError{
+            color:rgb(250, 10, 10)
         }
         QLineEdit{
             mim-height:35px;
@@ -80,10 +91,11 @@ class RegisterClient(QWidget):
     def register_client(self):
         # 注册客户端
         name = re.sub(r'\s+', '', self.name_edit.text())
+        if not name:
+            self.name_error.setText('请填写名称')
+            return
         try:
-            if not name:
-                raise ValueError('请填写名称.')
-            response = requests.post(
+            r = requests.post(
                 url=config.SERVER_ADDR + 'basic/client/',
                 headers=config.CLIENT_HEADERS,
                 data=json.dumps({
@@ -92,30 +104,13 @@ class RegisterClient(QWidget):
                     'is_manager': config.ADMINISTRATOR
                 })
             )
-            response_data = json.loads(response.content.decode('utf-8'))
-        except Exception as error:
-            popup = TipShow(parent=self)
-            popup.information('错误', '客户端注册失败.\n{}'.format(error))
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.deleteLater()
-            popup.exec()
-            del popup
-            return
-        if response.status_code != 201:
-            popup = TipShow(parent=self)
-            popup.information('失败', response_data['message'])
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.deleteLater()
-            popup.exec()
-            del popup
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            print(e)
+            self.register_error.setText(str(e))
             return
         else:
-            # 在配置里保存
-            config.app_dawn.setValue("machine", self.machine_label.text())
-            popup = TipShow(parent=self)
-            popup.information('成功', '恭喜!本客户端注册成功.\n请重启使用!')
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.deleteLater()
-            popup.exec()
-            del popup
-
+            config.app_dawn.setValue("machine", self.machine_label.text())  # 在配置里保存
+            self.register_error.setText('注册成功,请重启使用.')

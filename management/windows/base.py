@@ -92,7 +92,6 @@ class BaseWindow(QWidget):
             register_popup.deleteLater()
             del register_popup
 
-
     # 用户点击【注销】
     def user_to_logout(self):
         print('用户点击注销按钮')
@@ -141,7 +140,7 @@ class BaseWindow(QWidget):
                 raise ValueError(response['message'])
         except Exception as e:
             print(e)
-            # 提示错误结果
+            # 建议弹窗提示结果
             return
         else:
             # 有权限
@@ -406,33 +405,8 @@ class Base(QWidget):
         # set icon and title
         self.setWindowIcon(QIcon("media/logo.png"))
         self.setWindowTitle("瑞达期货研究院分析决策系统_管理端_0101911")
-
-        # 在获取功能模块前先获取客户端是否已经存在
-        self.check_client_existed()
         # 获取功能模块名
         self.get_menus()
-
-    # 启动检查客户端是否存在
-    def check_client_existed(self):
-        exist_mc = config.app_dawn.value('machine')
-        if exist_mc:  # 原来就存在则不发起请求
-            print('windows.base.Base.check_client_existed 客户端没卸载')
-            return
-        # 获取机器码
-        print('windows.base.Base.check_client_existed 客户端已卸载重装,鉴定是否已注册过的')
-        machine_code = get_machine_code()
-        # 查询机器是否存在
-        try:
-            r = requests.get(
-                url=config.SERVER_ADDR + 'basic/client-existed/?mc=' + machine_code
-            )
-            response = json.loads(r.content.decode('utf-8'))
-        except Exception:
-            return
-        if response['data']['existed']:
-            # 存在,写入配置
-            print('注册过的客户端,写入配置')
-            config.app_dawn.setValue('machine', machine_code)
 
     # 获取模块功能按钮
     def get_menus(self):

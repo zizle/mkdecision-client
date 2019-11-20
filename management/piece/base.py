@@ -272,7 +272,7 @@ class NavigationBar(QWidget):
         self.setMouseTracking(True)
         self.setStyleSheet("""
         #navigationBar{
-            background-color:rgb(200,200,200);
+            background-color:rgb(100, 100, 100);
             min-height: 24px;
             max-height: 24px;
         }

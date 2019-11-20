@@ -32,8 +32,12 @@ class LoadedTab(QTabWidget):
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
         self.setTabBarAutoHide(True)
         self.setMouseTracking(True)
+        self.setObjectName('loadedTab')
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
         self.setStyleSheet("""
-            background-color: rgb(150,150,150)
+        #loadedTab{
+            background-color: rgb(230, 230, 230)
+        }
         """)
 
     # 鼠标移动事件
