@@ -7,9 +7,9 @@ Author: zizle
 import fitz
 import json
 import requests
-from PyQt5.QtWidgets import qApp, QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox, QCheckBox
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox, QCheckBox
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer, QSize
-from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap, QIcon
+from PyQt5.QtGui import QFont,  QColor, QCursor, QImage, QPixmap
 import config
 from widgets.CAvatar import CAvatar
 
@@ -144,22 +144,22 @@ class ModuleBar(QWidget):
     def __init__(self, *args, **kwargs):
         super(ModuleBar, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0, spacing=0)
-        layout.addWidget(QPushButton('菜单'))
-        layout.addWidget(QPushButton('菜单'))
-        layout.addWidget(QPushButton('菜单'))
-        layout.addWidget(QPushButton('菜单'))
         self.setLayout(layout)
         # 样式设计
-        print(self.parent().height())
+        self.setObjectName('moduleBar')
         self.setStyleSheet("""
+        #moduleBar{
+            min-height:20px;
+            max-height:20px;
+        }
         QPushButton{
             background-color:rgb(85,88,91);
             color: rgb(255,20,150);
             border: 1px solid rgb(180,255,250);
             margin-left:3px;
-            padding: 0px 4px;  /*上下，左右*/
-            min-height:20px;
-            max-height:20px;
+            padding: 0px 6px;  /*上下，左右*/
+            min-height:16px;
+            max-height:16px;
             color: #FFFFFF
         }
         QPushButton:hover {
@@ -187,6 +187,15 @@ class ModuleBar(QWidget):
         self.layout().addWidget(menu)
         print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
 
+    # 移除菜单
+    def removeMenu(self, mid):
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if isinstance(widget, QPushButton) and widget.mid == mid:
+                widget.deleteLater()
+                del widget
+                break
+
 
 # 登录信息栏
 class PermitBar(QWidget):
@@ -194,7 +203,7 @@ class PermitBar(QWidget):
         super(PermitBar, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0, spacing=0)
         # 用户头像
-        self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.jpg', size=QSize(24, 24), objectName='userAvatar')
+        self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.jpg', size=QSize(22, 22), objectName='userAvatar')
         layout.addWidget(self.avatar, alignment=Qt.AlignRight)
         # 用户名
         self.username_shown = QLabel('用户名用户名', parent=self, objectName='usernameShown')
@@ -207,18 +216,24 @@ class PermitBar(QWidget):
         self.logout_button = QPushButton('注销', parent=self, objectName='logoutBtn')
         layout.addWidget(self.logout_button, alignment=Qt.AlignRight)
         self.setLayout(layout)
-        # 样式
+        # 样式、属性
+        self.username = ''
+        self.timer_finished_count = 0
         self.login_button.setCursor(Qt.PointingHandCursor)
         self.register_button.setCursor(Qt.PointingHandCursor)
         self.logout_button.setCursor(Qt.PointingHandCursor)
+        self.initial_show()  # 初始显示的控件
+        self.setObjectName('permitBar')
         self.setStyleSheet("""
+        #permitBar{
+            min-height:22px;
+            max-height:22px;
+        }
         #loginBtn,#registerBtn,#logoutBtn{
             border:none;
             padding-left: 2px;
             padding-right: 4px;
             color: #FFFFFF;
-            min-height:24px;
-            max-height:24px;
         }
         #logoutBtn{
             margin-right:5px;
@@ -228,21 +243,62 @@ class PermitBar(QWidget):
             
         }
         #usernameShown{
-            min-height:24px;
-            max-height:24px;
-            margin-right: 5px;
+            margin-left: 3px;
         }
         /*
         #userAvatar{
             background-color: rgb(100,255,120);
-            min-height:24px;
-            max-height:24px;
-            min-width:24px;
+            min-width:22px;
             border-radius: 12px;
             margin-right: 2px;
         }
         */
         """)
+
+    def initial_show(self):
+        self.avatar.hide()
+        self.username_shown.hide()
+        self.logout_button.hide()
+
+    # 显示用户名
+    def show_username(self, username):
+        self.avatar.show()
+        self.username_shown.setText(username + " ")  # 加空格防止初始动态化的时候跳动
+        self.username = username
+        self.username_shown.show()
+        self.login_button.hide()
+        self.register_button.hide()
+        self.logout_button.show()
+        if hasattr(self, 'timer'):
+            del self.timer
+        self.timer = QTimer()
+        self.timer.start(500)
+        self.timer.timeout.connect(self._dynamic_username)
+
+    # 用户注销
+    def user_logout(self):
+        self.username_shown.setText('')
+        self.username = ''
+        self.username_shown.hide()
+        self.logout_button.hide()
+        self.avatar.hide()
+        self.login_button.show()
+        self.register_button.show()
+        if hasattr(self, 'timer'):
+            print('注销销毁定时器piece.base.PermitBar.user_logout()')
+            self.timer.stop()
+            self.timer.deleteLater()
+            del self.timer
+
+    # 设置用户名滚动显示
+    def _dynamic_username(self):
+        if self.timer_finished_count == len(self.username):
+            self.username_shown.setText(self.username + " ")
+            self.timer_finished_count = 0
+        else:
+            text = self.username[self.timer_finished_count:] + " " + self.username[:self.timer_finished_count]
+            self.username_shown.setText(text)
+            self.timer_finished_count += 1
 
 
 # 导航栏
@@ -276,7 +332,6 @@ class NavigationBar(QWidget):
             min-height: 24px;
             max-height: 24px;
         }
-        
         """)
 
     # 鼠标移动

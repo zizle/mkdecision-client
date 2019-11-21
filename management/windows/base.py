@@ -14,8 +14,8 @@ from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
 
 import config
-from windows.maintenance import Maintenance, MaintenanceHome
-from popup.base import TipShow
+from windows.maintenance import Maintenance
+from popup.tips import InformationPopup
 from piece.base import TitleBar, MenuBar, NavigationBar, PermitBar1, TitleBar1
 from frame.base import NoDataWindow, RegisterClient
 from widgets.base import ModuleButton, LoadedTab
@@ -79,9 +79,71 @@ class BaseWindow(QWidget):
         print('用户点击登录按钮')
         from popup.base import LoginPopup
         login_popup = LoginPopup(parent=self)
+        login_popup.user_listed.connect(self.user_login_successfully)
         if not login_popup.exec_():
             login_popup.deleteLater()
             del login_popup
+
+    # 启动自动登录
+    def running_auto_login(self):
+        machine_code = config.app_dawn.value('machine')
+        token = config.app_dawn.value('AUTHORIZATION')
+        print('启动客户端自动登录', token)
+        if not machine_code or not token:
+            print('windows.base.BaseWindows.running_auto_login 没有机器码或token,不用自动登录')
+            return
+        print('windows.base.BaseWindows.running_auto_login 有机器码或token,自动登录')
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'user/keep-online/?mc=' + machine_code,
+                headers={'AUTHORIZATION': token}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            return  # 自动登录失败
+        else:
+            # 用户名信息设置到登录信息栏
+            user_data = response['data']
+            sig_username = user_data['username']
+            if not user_data['username']:
+                phone = user_data['phone']
+                sig_username = phone[0:3] + '****' + phone[8:11]
+            # 登录成功
+            data_dict = {
+                'username': sig_username,
+                'auth_data': response['data']
+            }
+            self.user_login_successfully(data_dict)
+
+    # 用户登录成功
+    def user_login_successfully(self, data_dict):
+        print(data_dict)
+        username = data_dict.get('username', '')
+        auth_data = data_dict.get('auth_data', {})
+        is_superuser = auth_data.get('is_superuser', False)
+        is_maintainer = auth_data.get('is_maintainer', False)
+        is_researcher = auth_data.get('is_researcher', False)
+        client_is_manager = auth_data.get('ManagerClient', False)
+        is_inner = False
+        if is_superuser or is_maintainer or is_researcher:
+            print('用户满足内部人员条件')
+            is_inner = True
+        # 改变用户名
+        self.navigation_bar.permit_bar.show_username(username)
+        if client_is_manager and is_inner:  # 用户满足条件且为管理端
+            # 加入【管理维护-1】
+            button = ModuleButton(mid=-1, text='数据管理')
+            button.clicked_module.connect(self.module_clicked)
+            self.navigation_bar.module_bar.addMenu(button)
+            if is_superuser:  # 超管在管理端登录加入和【权限管理-9】
+                button = ModuleButton(mid=-9, text='权限管理')
+                button.clicked_module.connect(self.module_clicked)
+                self.navigation_bar.module_bar.addMenu(button)
+        else:  # 不是的话则尝试移除【管理维护-1】和【权限管理-9】
+            self.navigation_bar.module_bar.removeMenu(mid=-1)
+            self.navigation_bar.module_bar.removeMenu(mid=-9)
 
     # 用户点击【注册】
     def user_to_register(self):
@@ -95,6 +157,12 @@ class BaseWindow(QWidget):
     # 用户点击【注销】
     def user_to_logout(self):
         print('用户点击注销按钮')
+        # 如果有【数据管理-1】【权限管理-9】就移除
+        self.navigation_bar.module_bar.removeMenu(mid=-1)
+        self.navigation_bar.module_bar.removeMenu(mid=-9)
+        # 移除token
+        config.app_dawn.remove('AUTHORIZATION')
+        self.navigation_bar.permit_bar.user_logout()  # 注销
 
     # 获取模块菜单
     def get_module_menus(self):
@@ -116,7 +184,7 @@ class BaseWindow(QWidget):
         # 模块菜单填充到相应的控件中
         menus = list()
         for menu_item in response['data']:
-            button = ModuleButton(mid=menu_item['id'], text=menu_item['name'] )
+            button = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
             button.clicked_module.connect(self.module_clicked)  # 绑定模块菜单点击信号
             menus.append(button)
         self.navigation_bar.module_bar.setMenus(menus)
@@ -139,15 +207,21 @@ class BaseWindow(QWidget):
             if not response['data']['permission']:
                 raise ValueError(response['message'])
         except Exception as e:
-            print(e)
-            # 建议弹窗提示结果
+            # 弹窗提示
+            info_popup = InformationPopup(parent=self, message=str(e))
+            if not info_popup.exec_():
+                info_popup.deleteLater()
+                del info_popup
             return
         else:
-            # 有权限
-            if name == u'客户端注册':
-                tab = RegisterClient()
-            elif name == u'管理维护':
-                tab = MaintenanceHome(parent=self.tab)
+            if name == u'首页':
+                tab = HomePage(parent=self.tab_loaded)
+            elif name == u'数据管理':
+                from windows.maintenance import MaintenanceHome
+                tab = MaintenanceHome(parent=self.tab_loaded)
+            elif name == u'权限管理':
+                from windows.maintenance import AuthenticationHome
+                tab = AuthenticationHome(parent=self.tab_loaded)
             else:
                 tab = NoDataWindow(name=name)
             self.tab_loaded.clear()
@@ -307,328 +381,3 @@ class BaseWindow(QWidget):
         super(BaseWindow, self).showNormal()
         self.layout().setContentsMargins(self.MARGIN, self.MARGIN, self.MARGIN, self.MARGIN)
 
-
-class Base(QWidget):
-    # 四周边距
-    Margins = 3
-
-    def __init__(self, *args, **kwargs):
-        super(Base, self).__init__(*args, **kwargs)
-        self.resize(1280, 768)
-        # windows centered(three step)
-        myself = self.frameGeometry()  # 自身窗体信息(虚拟框架)
-        myself.moveCenter(QDesktopWidget().availableGeometry().center())  # 框架中心移动到用户桌面中心
-        self.move(myself.topLeft())  # 窗口左上角与虚拟框架左上角对齐
-        self._pressed = False  # 按住鼠标标记
-        self.Direction = None  # 方向标记
-        # 背景透明
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        # frame less
-        self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
-        # 鼠标跟踪(否则与鼠标移动有关的都无法实现)
-        self.setMouseTracking(True)
-        # 布局
-        layout = QVBoxLayout()
-        # margins for resize window
-        layout.setSpacing(0)
-        layout.setContentsMargins(self.Margins, self.Margins, self.Margins, self.Margins)
-        # menu bar and permit bar layout
-        mp_layout = QHBoxLayout(spacing=0)
-        mp_layout.setContentsMargins(0,0,0,0)
-        # window title
-        title_bar = TitleBar1()
-        # signal slot
-        # title_bar.windowMinimumed.connect(self.showMinimized)
-        title_bar.windowMaximumed.connect(self.showMaximized)
-        title_bar.windowNormaled.connect(self.showNormal)
-        title_bar.windowClosed.connect(self.close)
-        title_bar.windowMoved.connect(self.move)
-        self.windowTitleChanged.connect(title_bar.setTitle)
-        self.windowIconChanged.connect(title_bar.setIcon)
-        # menu bar
-        self.menu_bar = MenuBar()
-        self.menu_bar.installEventFilter(self)
-        # 设置背景颜色,否则由于受到父窗口的影响导致透明
-        self.menu_bar.setAutoFillBackground(True)
-        palette = self.menu_bar.palette()
-        palette.setColor(palette.Window, QColor(255,255,255))
-        self.menu_bar.setPalette(palette)
-        self.menu_bar.setContentsMargins(10, 0, 0, 4)
-        self.menu_bar.setStyleSheet("""
-        MenuBar{
-            background-color:rgb(85,88,91);
-        }
-        QPushButton{
-            background-color:rgb(85,88,91);
-            color: rgb(192,192,192);
-            border: 0.5px solid rgb(170,170,170);
-            padding:0 7px;
-            margin-left:5px;
-            height:18px;
-            color: #FFFFFF
-        }
-        QPushButton:hover {
-            background-color: #CD3333;
-        }
-        MenuWidget{
-        
-        }
-        """)
-        self.menu_bar.menu_btn_clicked.connect(self.menu_clicked)
-        # permit bar
-        self.permit_bar = PermitBar1()
-
-        self.permit_bar.is_superman.connect(self.superman_login_event)  # 超级管理员登录需有【权限管理】模块
-        self.permit_bar.user_logout.connect(self.user_logout_event)  # 用户退出就回到【首页】
-        # add tab container
-        self.tab = QTabWidget()
-        self.tab.setAutoFillBackground(True)  # 设置背景,否则由于受到父窗口的影响导致透明
-        self.tab.setTabBarAutoHide(True)
-        palette = self.tab.palette()
-        palette.setColor(palette.Window, QColor(255,255,255))
-        self.tab.setPalette(palette)
-        self.tab.installEventFilter(self)  # 事件过滤
-        # style
-        self.setStyleSheet("""
-        QTabWidget::pane{
-            border:none;
-        }
-        """)
-        # add widget to menu and permit layout
-        mp_layout.addWidget(self.menu_bar)
-        mp_layout.addWidget(self.permit_bar)
-        # add widgets and layout to main layout
-        layout.addWidget(title_bar)
-        layout.addLayout(mp_layout)
-        layout.addWidget(self.tab)
-        self.setLayout(layout)
-        # set icon and title
-        self.setWindowIcon(QIcon("media/logo.png"))
-        self.setWindowTitle("瑞达期货研究院分析决策系统_管理端_0101911")
-        # 获取功能模块名
-        self.get_menus()
-
-    # 获取模块功能按钮
-    def get_menus(self):
-        try:
-            # 请求主菜单数据
-            machine_code = config.app_dawn.value('machine')
-            if machine_code:
-                url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
-            else:
-                url = config.SERVER_ADDR + 'basic/modules/'
-            r = requests.get(
-                url=url,
-                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
-                data=json.dumps({"machine_code": config.app_dawn.value('machine')})
-            )
-            response = json.loads(r.content.decode("utf-8"))
-        except Exception as e:
-            QMessageBox.information(self, "获取数据错误", "请检查网络设置.\n{}".format(e), QMessageBox.Yes)
-            sys.exit()  # catch exception sys exit
-        for item in response["data"]:
-            menu_btn = QPushButton(item['name'])
-            menu_btn.mid = item['id']
-            self.menu_bar.addMenuButton(menu_btn)
-        self.menu_bar.addStretch()
-
-    def menu_clicked(self, menu):
-        name = menu.text()
-        # 查询权限
-        machine_code = config.app_dawn.value('machine')
-        if machine_code:
-            url = config.SERVER_ADDR + 'limit/access-module/'+str(menu.mid)+'/?mc=' + machine_code
-        else:
-            url = config.SERVER_ADDR + 'limit/access-module/'+str(menu.mid) + '/'
-        try:
-            r = requests.get(
-                url=url,
-                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')}
-            )
-            response = json.loads(r.content.decode('utf-8'))
-        except Exception as e:
-            return
-        if not response['data']['permission']:
-            popup = TipShow(parent=self)
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.information(title='无权限', message=response['message'])
-            if not popup.exec():
-                del popup
-            return
-        # 有权限
-        if name == u'客户端注册':
-            tab = RegisterClient()
-        elif name == u'管理维护':
-            tab = MaintenanceHome(parent=self.tab)
-        else:
-            tab = NoDataWindow(name=name)
-        self.tab.clear()
-        self.tab.addTab(tab, name)
-
-    # 用户退出事件,回到【首页】
-    def user_logout_event(self):
-        menu = QPushButton(u'首页')
-        menu.mid = 0
-        self.menu_clicked(menu)
-
-    # 超级管理员登录增加权限管理模块
-    def superman_login_event(self, flag):
-        print('超级管理员登录了，增加【权限管理】 windows.base.Base.superman_login_event')
-        menu = QPushButton('权限管理')
-        menu.mid = -99
-        self.menu_bar.addMenuButton(menu)
-        self.menu_bar.addStretch()
-
-    def eventFilter(self, obj, event):
-        """事件过滤器,用于解决鼠标进入其它控件后还原为标准鼠标样式"""
-        if isinstance(event, QEnterEvent):
-            self.setCursor(Qt.ArrowCursor)
-        return super(Base, self).eventFilter(obj, event)
-
-    def mouseMoveEvent(self, event):
-        """鼠标移动事件"""
-        try:
-            super(Base, self).mouseMoveEvent(event)
-            pos = event.pos()
-            xPos, yPos = pos.x(), pos.y()
-            print(xPos, yPos)
-            wm, hm = self.width() - self.Margins, self.height() - self.Margins
-            if self.isMaximized() or self.isFullScreen():
-                self.Direction = None
-                self.setCursor(Qt.ArrowCursor)
-                return
-            if event.buttons() == Qt.LeftButton and self._pressed:
-                self.resize_window(pos)
-                return
-            if xPos <= self.Margins and yPos <= self.Margins:
-                # 左上角
-                self.Direction = LeftTop
-                self.setCursor(Qt.SizeFDiagCursor)
-            elif wm <= xPos <= self.width() and hm <= yPos <= self.height():
-                # 右下角
-                self.Direction = RightBottom
-                self.setCursor(Qt.SizeFDiagCursor)
-            elif wm <= xPos and yPos <= self.Margins:
-                # 右上角
-                self.Direction = RightTop
-                self.setCursor(Qt.SizeBDiagCursor)
-            elif xPos <= self.Margins and hm <= yPos:
-                # 左下角
-                self.Direction = LeftBottom
-                self.setCursor(Qt.SizeBDiagCursor)
-            elif 0 <= xPos <= self.Margins and self.Margins <= yPos <= hm:
-                # 左边
-                self.Direction = Left
-                self.setCursor(Qt.SizeHorCursor)
-            elif wm <= xPos <= self.width() and self.Margins <= yPos <= hm:
-                # 右边
-                self.Direction = Right
-                self.setCursor(Qt.SizeHorCursor)
-            elif self.Margins <= xPos <= wm and 0 <= yPos <= self.Margins:
-                # 上面
-                self.Direction = Top
-                self.setCursor(Qt.SizeVerCursor)
-            elif self.Margins <= xPos <= wm and hm <= yPos <= self.height():
-                # 下面
-                self.Direction = Bottom
-                self.setCursor(Qt.SizeVerCursor)
-        except Exception as e:
-            print(e)
-
-    def mousePressEvent(self, event):
-        """鼠标点击事件"""
-        super(Base, self).mousePressEvent(event)
-        if event.button() == Qt.LeftButton:
-            self._mpos = event.pos()
-            self._pressed = True
-
-    def mouseReleaseEvent(self, event):
-        """鼠标弹起事件"""
-        super(Base, self).mouseReleaseEvent(event)
-        self._pressed = False
-        self.Direction = None
-
-    def move(self, pos):
-        if self.windowState() == Qt.WindowMaximized or self.windowState() == Qt.WindowFullScreen:
-            # 最大化或者全屏则不允许移动
-            return
-        super(Base, self).move(pos)
-
-    def paintEvent(self, event):
-        """由于是全透明背景窗口,重绘事件中绘制透明度为1的难以发现的边框,用于调整窗口大小"""
-        super(Base, self).paintEvent(event)
-        painter = QPainter(self)
-        painter.setPen(QPen(QColor(255, 255, 255, 1), 2 * self.Margins))
-        painter.drawRect(self.rect())
-            
-    def resize_window(self, pos):
-        """调整窗口大小"""
-        if self.Direction == None:
-            return
-        mpos = pos - self._mpos
-        xPos, yPos = mpos.x(), mpos.y()
-        geometry = self.geometry()
-        x, y, w, h = geometry.x(), geometry.y(), geometry.width(), geometry.height()
-        if self.Direction == LeftTop:  # 左上角
-            if w - xPos > self.minimumWidth():
-                x += xPos
-                w -= xPos
-            if h - yPos > self.minimumHeight():
-                y += yPos
-                h -= yPos
-        elif self.Direction == RightBottom:  # 右下角
-            if w + xPos > self.minimumWidth():
-                w += xPos
-                self._mpos = pos
-            if h + yPos > self.minimumHeight():
-                h += yPos
-                self._mpos = pos
-        elif self.Direction == RightTop:  # 右上角
-            if h - yPos > self.minimumHeight():
-                y += yPos
-                h -= yPos
-            if w + xPos > self.minimumWidth():
-                w += xPos
-                self._mpos.setX(pos.x())
-        elif self.Direction == LeftBottom:  # 左下角
-            if w - xPos > self.minimumWidth():
-                x += xPos
-                w -= xPos
-            if h + yPos > self.minimumHeight():
-                h += yPos
-                self._mpos.setY(pos.y())
-        elif self.Direction == Left:  # 左边
-            if w - xPos > self.minimumWidth():
-                x += xPos
-                w -= xPos
-            else:
-                return
-        elif self.Direction == Right:  # 右边
-            if w + xPos > self.minimumWidth():
-                w += xPos
-                self._mpos = pos
-            else:
-                return
-        elif self.Direction == Top:  # 上面
-            if h - yPos > self.minimumHeight():
-                y += yPos
-                h -= yPos
-            else:
-                return
-        elif self.Direction == Bottom:  # 下面
-            if h + yPos > self.minimumHeight():
-                h += yPos
-                self._mpos = pos
-            else:
-                return
-        self.setGeometry(x, y, w, h)
-
-    def showMaximized(self):
-        """最大化,要去除上下左右边界,如果不去除则边框地方会有空隙"""
-        super(Base, self).showMaximized()
-        self.layout().setContentsMargins(0, 0, 0, 0)
-
-    def showNormal(self):
-        """还原,要保留上下左右边界,否则没有边框无法调整"""
-        super(Base, self).showNormal()
-        self.layout().setContentsMargins(self.Margins, self.Margins, self.Margins, self.Margins)

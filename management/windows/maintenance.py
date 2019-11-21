@@ -18,7 +18,7 @@ from thread.request import RequestThread
 import config
 
 
-# 维护管理主页
+# 数据管理主页
 class MaintenanceHome(QWidget):
     BLOCK_WIDTH = 200
     BLOCK_HEIGHT = 180
@@ -162,6 +162,29 @@ class MaintenanceHome(QWidget):
         # 改变控件层次，由于控件最小，无需再改变层次
         # self.detail_maintainer.raise_()
         # self.show_maintainers.raise_()
+
+
+# 权限管理主页
+class AuthenticationHome(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(AuthenticationHome, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel('权限管理'))
+        self.setLayout(layout)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

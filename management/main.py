@@ -7,20 +7,17 @@ Author: zizle
 import sys
 from PyQt5.QtWidgets import QApplication
 
-from piece import StartScreen
-from windows.base import BaseWindow, Base
-from utils.client import check_client_existed
-
+from piece.welcome import WelcomePage
+from windows.base import BaseWindow
 
 app = QApplication(sys.argv)
-splash = StartScreen()  # welcome
+splash = WelcomePage()  # welcome
 splash.show()
 app.processEvents()  # non-blocking
-base_window = BaseWindow()  # main page
-# base_window = Base()  # main page
-check_client_existed()  # 启动检测当前客户端是否存在
+splash.make_client_existed()  # 启动使当前客户端存在
+base_window = BaseWindow()  # main window
 base_window.get_module_menus()  # 获取模块菜单信息
-# base_window.permit_bar.check_keep_online()
+base_window.running_auto_login()  # 自动登录
 base_window.show()
-splash.finish(base_window)  # close welcome when main page loaded
+splash.finish(base_window)  # close welcome when main page loaded  # 执行到这句话才会消失欢迎页
 sys.exit(app.exec_())

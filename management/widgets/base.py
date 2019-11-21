@@ -6,8 +6,9 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import QTabWidget, QPushButton, QLabel, QTableWidget, QScrollArea, QWidget
-from PyQt5.QtCore import QTimer, Qt, pyqtSignal
+from PyQt5.QtWidgets import QTabWidget, QPushButton, QLabel, QTableWidget, QScrollArea, QWidget, QHBoxLayout,\
+    QVBoxLayout, QGridLayout
+from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QPropertyAnimation, QSize
 from PyQt5.QtGui import QCursor, QBrush, QColor
 
 import config
@@ -45,7 +46,115 @@ class LoadedTab(QTabWidget):
         event.accept()  # 接受事件,不传递到父控件
 
 
+# FoldedHead(), FoldedBody()
+# 折叠盒子的头
+class FoldedHead(QWidget):
+    def __init__(self, text, *args, **kwargs):
+        super(FoldedHead, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=0)
+        self.head_label = QLabel(text, parent=self)
+        self.head_button = QPushButton('折叠', parent=self, clicked=self.body_toggle)
+        layout.addWidget(self.head_label, alignment=Qt.AlignLeft)
+        layout.addWidget(self.head_button, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        # 样式
+        self.body_hidden = False  # 显示与否
+        self.body_height = 0  # 原始高度
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.setObjectName('foldedHead')
+        self.setStyleSheet("""
+        #foldedHead{
+            background-color: rgb(20,120,200);
+            border-bottom: 1px solid rgb(200,200,200)
+        }
+        """)
 
+    # 设置身体控件(由于设置parent后用findChild没找到，用此法)
+    def setChildBody(self, body):
+        if not hasattr(self, 'bodyChild'):
+            self.bodyChild = body
+
+    def get_body(self):
+        if hasattr(self, 'bodyChild'):
+            return self.bodyChild
+
+    # 窗体折叠展开动画
+    def body_toggle(self):
+        print('头以下的身体折叠展开')
+        body = self.get_body()
+        if not body:
+            return
+        # 折叠动画
+        self.body_height = body.height()
+        self.setMinimumWidth(self.width())
+        if not self.body_hidden:
+            body.hide()
+            self.body_hidden = True
+        else:
+            body.show()
+            self.body_hidden = False
+
+
+# 折叠盒子的身体
+class FoldedBody(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(FoldedBody, self).__init__(*args, **kwargs)
+        layout = QGridLayout(margin=0)
+        self.setLayout(layout)
+        # 样式
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.setObjectName('foldedBody')
+        self.setStyleSheet("""
+        #foldedBody{
+            background-color: rgb(20,120,100)
+        }
+        """)
+
+    # 添加按钮
+    def addButtons(self, button_list, horizontal_count=3):
+        if horizontal_count < 3:
+            horizontal_count = 3
+        row_index = 0
+        col_index = 0
+        for index, button in enumerate(button_list):
+            self.layout().addWidget(button, row_index, col_index)
+            col_index += 1
+            if col_index == horizontal_count:  # 因为col_index先+1,此处应相等
+                row_index += 1
+                col_index = 0
+
+
+# 折叠盒子
+class FoldedBox(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(FoldedBox, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=0)
+        self.container = QWidget()
+        self.container.setLayout(layout)
+        self.setWidgetResizable(True)
+        self.setWidget(self.container)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+    def addHead(self, text):
+        head = FoldedHead(text, parent=self)
+        self.container.layout().addWidget(head, alignment=Qt.AlignTop)
+        return head
+
+    def addBody(self, head):
+        body = FoldedBody()
+        head.setChildBody(body)
+        # 找出head所在的位置
+        for i in range(self.container.layout().count()):
+            widget = self.container.layout().itemAt(i).widget()
+            if isinstance(widget, FoldedHead) and widget == head:
+                self.container.layout().insertWidget(i+1, body, alignment=Qt.AlignTop)
+                break
+        return body
+
+    def addStretch(self):
+        self.container.layout().addStretch()
 
 
 
