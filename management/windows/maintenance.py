@@ -5,7 +5,8 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QLabel, QPushButton, QTabWidget, QStyleOption, QStyle
+import requests
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QLabel, QPushButton, QTabWidget, QScrollArea, QStyle
 from PyQt5.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QRect, QPoint, QSize
 from PyQt5.QtGui import QPainter
 
@@ -14,6 +15,7 @@ from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMainta
 from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
 from frame.maintain.danalysis import VarietyMaintain, UploadDataMaintain
 from widgets.maintain import ModuleBlock
+from widgets.maintain.authorization import UserTable
 from thread.request import RequestThread
 import config
 
@@ -46,7 +48,7 @@ class MaintenanceHome(QWidget):
         maintainers_layout.addWidget(variety_block, 0, 1)
         maintainers_layout.addWidget(analysis_block, 1, 1)
         self.show_maintainers.setLayout(maintainers_layout)
-        # 右侧详细维护页面
+        # 详细维护页面
         self.detail_maintainer = QWidget(parent=self, objectName='detailMaintainer')
         # 详细页面布局
         detail_layout = QVBoxLayout()
@@ -165,12 +167,59 @@ class MaintenanceHome(QWidget):
 
 
 # 权限管理主页
-class AuthenticationHome(QWidget):
+class AuthorityHome(QWidget):
     def __init__(self, *args, **kwargs):
-        super(AuthenticationHome, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel('权限管理'))
-        self.setLayout(layout)
+        super(AuthorityHome, self).__init__(*args, **kwargs)
+        self.show_users = QWidget(parent=self, objectName='showUsers')
+        self.show_users.setMinimumWidth(self.parent().width())
+        # 显示用户布局
+        show_users_layout = QVBoxLayout()
+        # 显示用户表格
+        self.user_table = UserTable()
+        show_users_layout.addWidget(self.user_table, alignment=Qt.AlignTop)
+        self.show_users.setLayout(show_users_layout)
+        # 右侧用户详情控件
+        self.user_detail = QWidget(parent=self, objectName='userDetail')
+        self.user_detail.setMinimumWidth(self.parent().width())
+        # 右侧详情页布局
+        detail_layout = QVBoxLayout()
+        # 详情页容器
+        self.detail_tab = QTabWidget()
+        self.detail_tab.setDocumentMode(True)
+        detail_layout.addWidget(self.detail_tab)
+        self.user_detail.setLayout(detail_layout)
+
+        # 详情页移动到右侧窗口外
+        self.user_detail.move(self.parent().width(), 0)
+        # 样式
+        self.setStyleSheet("""
+        #showUsers{
+            background-color: rgb(80,150,89);  
+        }
+        #userDetail{
+            background-color: rgb(160,150,189);
+        }
+        """)
+        # 获取用户
+        self.get_users()
+
+    # 获取所有用户信息
+    def get_users(self):
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'user/users-management/?mc=' + config.app_dawn.value('machine'),
+                headers={
+                  'AUTHORIZATION': config.app_dawn.value('Authorization')
+                },
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception as e:
+            print(e)
+            return
+        self.user_table.addUsers(json_list=response['data'])
+        print(response)
+
+
 
 
 

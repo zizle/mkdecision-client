@@ -7,8 +7,9 @@ import sys
 import json
 import requests
 import webbrowser
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QAbstractItemView, QLabel
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTableWidget, QTableWidgetItem, QAbstractItemView, QLabel,\
+    QPushButton, QStackedWidget
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QFont, QPixmap
 
 import config
@@ -16,185 +17,70 @@ from thread.request import RequestThread
 from popup.base import ShowServerPDF, ShowHtmlContent
 
 
-class BulletinTable(QTableWidget):
-    def __init__(self, *args):
-        super(BulletinTable, self).__init__(*args)
-        # table style
-        self.setMouseTracking(True)
-        self.setShowGrid(False)  # no grid
-        self.setFocusPolicy(0)  # No empty box appears in the selection
-        self.setSelectionMode(QAbstractItemView.NoSelection)  # hold the style(exp:font color)
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)  # no edit
-        self.horizontalHeader().setVisible(False)
-        self.verticalHeader().setVisible(False)
-        self.setStyleSheet("""
-        QTableWidget{
-            background-color:rgb(255,255,255);
-            border: 1px solid rgb(220,220,220);
-        }
-        QTableWidget::item{
-            border-bottom: 1px solid rgb(200,200,200);
-            cursor:hand;
-        }
-        QScrollBar:vertical
-        {
-            width:8px;
-            background:rgba(0,0,0,0%);
-            margin:0px,0px,0px,0px;
-            /*留出8px给上面和下面的箭头*/
-            padding-top:8px;
-            padding-bottom:8px;
-        }
-        QScrollBar::handle:vertical
-        {
-            width:8px;
-            background:rgba(0,0,0,8%);
-            /*滚动条两端变成椭圆*/
-            border-radius:4px;
+# 新闻公告条目
+class NewsItem(QWidget):
+    item_clicked = pyqtSignal(int)
 
+    def __init__(self, title='', create_time='', item_id=None, *args, **kwargs):
+        super(NewsItem, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=0)
+        title_btn = QPushButton(title)
+        self.item_id = item_id
+        title_btn.clicked.connect(lambda: self.item_clicked.emit(self.item_id))
+        time = QLabel(create_time)
+        layout.addWidget(title_btn, alignment=Qt.AlignLeft)
+        layout.addWidget(time, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        # 样式
+        title_btn.setCursor(Qt.PointingHandCursor)
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.setObjectName('newsItem')
+        self.setStyleSheet("""
+        #newsItem{
+            border-bottom: 1px solid rgb(200,200,200);
+            min-height:25px;
+            max-height:25px;
         }
-        QScrollBar::handle:vertical:hover
-        {
-            width:8px;
-            /*鼠标放到滚动条上的时候，颜色变深*/
-            background:rgba(0,0,0,40%);
-            border-radius:4px;
-            min-height:20;
+        QPushButton{
+            border:none;
         }
-        QScrollBar::add-line:vertical
-        {
-            height:9px;width:8px;
-            /*设置下箭头*/
-            border-image:url(media/scroll/3.png);
-            subcontrol-position:bottom;
-        }
-        QScrollBar::sub-line:vertical 
-        {
-            height:9px;width:8px;
-            /*设置上箭头*/
-            border-image:url(media/scroll/1.png);
-            subcontrol-position:top;
-        }
-        QScrollBar::add-line:vertical:hover
-        /*当鼠标放到下箭头上的时候*/
-        {
-            height:9px;width:8px;
-            border-image:url(media/scroll/4.png);
-            subcontrol-position:bottom;
-        }
-        QScrollBar::sub-line:vertical:hover
-        /*当鼠标放到下箭头上的时候*/
-        {
-            height:9px;
-            width:8px;
-            border-image:url(media/scroll/2.png);
-            subcontrol-position:top;
+        QPushButton:hover{
+            color:rgb(100,20,240)
         }
         """)
-        # actions
-        self.ble_thread = None
-        self.cellClicked.connect(self.show_bulletin_detail)
-
-    def get_bulletin(self, url):
-        if self.ble_thread:
-            del self.ble_thread
-        self.ble_thread = RequestThread(
-            url=url,
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.ble_thread.response_signal.connect(self.ble_thread_back)
-        self.ble_thread.finished.connect(self.ble_thread.deleteLater)
-        self.ble_thread.start()
-
-    def ble_thread_back(self, signal):
-        print('piece.home.py {} 公告: '.format(str(sys._getframe().f_lineno)), signal)
-        if signal['error']:
-            return
-        # 展示数据
-        header_couple = [('title', '标题'), ('to_look', ''), ('create_time', '上传时间')]
-        self.show_content(contents=signal['data'], header_couple=header_couple)
-
-    def show_content(self, contents, header_couple):
-        row = len(contents)
-        self.setRowCount(row)
-        self.setColumnCount(len(header_couple))  # 列数
-        labels = []
-        set_keys = []
-        for key_label in header_couple:
-            set_keys.append(key_label[0])
-            labels.append(key_label[1])
-        self.setHorizontalHeaderLabels(labels)
-        self.horizontalHeader().setSectionResizeMode(1)  # 自适应大小
-        self.horizontalHeader().setSectionResizeMode(1, 3)  # 第1列随文字宽度
-        self.horizontalHeader().setSectionResizeMode(self.columnCount() - 1, 3)  # 最后1列随文字宽度
-        for row in range(self.rowCount()):
-            for col in range(self.columnCount()):
-                label_key = set_keys[col]
-                if label_key == 'to_look':
-                    item = QTableWidgetItem('查看')
-                    item.title = contents[row]['title']
-                    item.file = contents[row]['file']
-                    item.content = contents[row]["content"]
-                else:
-                    item = QTableWidgetItem(str(contents[row][label_key]))
-                font = QFont()
-                if col == self.columnCount()-1:
-                    size = 8
-                    item.setFont(QFont(font))
-                else:
-                    size = 10
-                font.setPointSize(size)
-                item.setFont(QFont(font))
-                if col == 0:
-                    pass
-                else:
-                    item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, item)
-
-    def show_bulletin_detail(self, row, col):
-        if col == 1:
-            item = self.item(row, col)
-            name_item = self.item(row, 0)
-            if item.file:
-                popup = ShowServerPDF(file_url= config.SERVER_ADDR + item.file, file_name=name_item.text())
-                popup.deleteLater()
-                popup.exec()
-                del popup
-            elif item.content:
-                popup = ShowHtmlContent(content=item.content, title=name_item.text())
-                popup.deleteLater()
-                popup.exec()
-                del popup
-
-    def leaveEvent(self, *args, **kwargs):
-        """鼠标离开控件"""
-        for row in range(self.rowCount()):
-            for col in range(self.columnCount()):
-                self.item(row, col).setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
-
-    def mouseMoveEvent(self, event):
-        """鼠标移动事件"""
-        # 获取当前这个item
-        current_item = self.itemAt(event.pos())
-        if current_item:
-            row = current_item.row()
-            for item in [self.item(row, col) for col in range(self.columnCount())]:
-                item.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
-            for other_row in range(self.rowCount()):
-                if other_row == row:
-                    continue
-                for other_item in [self.item(other_row, col) for col in range(self.columnCount())]:
-                    other_item.setForeground(QBrush(QColor(0, 0, 0)))  # 改变了其他的item字体色
 
 
-class CarouselLabel(QLabel):
+# 轮播图控件
+class ImageSlider(QStackedWidget):
+    def __init__(self, *args, **kwargs):
+        super(ImageSlider, self).__init__(*args, **kwargs)
+        self.setObjectName('imageSlider')
+        self.setStyleSheet("""
+        #imageSlider{
+            background-color: rgb(120,150,120)
+        }
+        """)
+
+    # 添加图片
+    def addImages(self, url_list):
+        for img_path in url_list:
+            pix_map = QPixmap(img_path)
+            image_container = QLabel()
+            image_container.setScaledContents(True)
+            image_container.setPixmap(pix_map)
+            self.addWidget(image_container)
+        print(self.count())
+
+
+
+
+# 轮播图控件
+class ImageSlider1(QLabel):
     pixmap_list = list()
 
-    def __init__(self):
-        super(CarouselLabel, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(ImageSlider1, self).__init__(*args, **kwargs)
         # timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.change_carousel_pixmap)
@@ -207,59 +93,45 @@ class CarouselLabel(QLabel):
         self.setScaledContents(True)
         # actions
         self.carousel_thread = None
+        self.setObjectName('imageSlider')
+        self.setStyleSheet("""
+        #imageSlider{
+            background-color: rgb(120,150,120)
+        }
+        """)
 
-    def get_carousel(self, url):
-        # get advertisement carousel data
-        if self.carousel_thread:
-            del self.carousel_thread
-        self.carousel_thread = RequestThread(
-            url=url,
-            method='get',
-            headers=config.CLIENT_HEADERS,
-            data=json.dumps({"machine_code": config.app_dawn.value("machine")}),
-            cookies=config.app_dawn.value('cookies')
-        )
-        self.carousel_thread.finished.connect(self.carousel_thread.deleteLater)
-        self.carousel_thread.response_signal.connect(self.carousel_thread_back)
-        self.carousel_thread.start()
-
-    def carousel_thread_back(self, signal):
-        # set advertisement carousel
-        print('piece.home.py {} 轮播数据: '.format(str(sys._getframe().f_lineno)), signal)
-        if signal['error']:
-            return
-        self.show_carousel(contents=signal['data'])
-
-    def show_carousel(self, contents):
-        self.pixmap_list.clear()
-        for index, item in enumerate(contents):
-            rep = requests.get(config.SERVER_ADDR + item['image'])
-            pixmap = QPixmap()
-            pixmap.loadFromData(rep.content)
-            # add property
-            pixmap.index = index  # index in self.pixmap
-            pixmap.name = item['name']
-            pixmap.file = item['file']
-            pixmap.redirect = item['redirect']
-            pixmap.content = item['content']
+    def addImages(self, pixmap_list):
+        self.pixmap_list = pixmap_list
+        # for index, item in enumerate(pixmap_list):
+            # rep = requests.get(config.SERVER_ADDR + item['image'])
+            # pixmap = QPixmap()
+            # pixmap.loadFromData(rep.content)
+            # # add property
+            # pixmap.index = index  # index in self.pixmap
+            # pixmap.name = item['name']
+            # pixmap.file = item['file']
+            # pixmap.redirect = item['redirect']
+            # pixmap.content = item['content']
             # append list
-            self.pixmap_list.append(pixmap)
+            # self.pixmap_list.append(pixmap)
         # set pixmap
-        initial_pixmap = self.pixmap_list[self.pixmap_flag]
-        self.setPixmap(initial_pixmap)
-        self.ad_name = initial_pixmap.name
-        self.ad_file = initial_pixmap.file
-        self.ad_content = initial_pixmap.content
-        self.ad_redirect = initial_pixmap.redirect
-        # start timer change pixmap
-        if len(self.pixmap_list) > 1:
-            self.timer.start(5000)
+        if len(self.pixmap_list)>0:
+            initial_pixmap = self.pixmap_list[self.pixmap_flag]
+            self.setPixmap(initial_pixmap)
+            self.ad_name = initial_pixmap.name
+            self.ad_file = initial_pixmap.file
+            self.ad_content = initial_pixmap.content
+            self.ad_redirect = initial_pixmap.redirect
+            # start timer change pixmap
+            if len(self.pixmap_list) > 1:
+                self.timer.start(5000)
 
+    # 轮播改变图片显示
     def change_carousel_pixmap(self):
         # self.animation.start()
         self.pixmap_flag += 1
         if self.pixmap_flag >= len(self.pixmap_list):
-            self.pixmap_flag=0
+            self.pixmap_flag = 0
         pixmap = self.pixmap_list[self.pixmap_flag]
         # change self property
         self.ad_name = pixmap.name
@@ -268,8 +140,11 @@ class CarouselLabel(QLabel):
         self.ad_redirect = pixmap.redirect
         self.setPixmap(self.pixmap_list[self.pixmap_flag])
 
+    # 鼠标点击
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            print('鼠标点击了广告轮播')
+            return
             if self.ad_file:
                 popup = ShowServerPDF(file_url=config.SERVER_ADDR + self.ad_file, file_name=self.ad_name)
                 popup.deleteLater()
@@ -285,3 +160,4 @@ class CarouselLabel(QLabel):
                 return
             else:
                 return
+

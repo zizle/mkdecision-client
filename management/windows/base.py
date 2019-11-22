@@ -164,69 +164,6 @@ class BaseWindow(QWidget):
         config.app_dawn.remove('AUTHORIZATION')
         self.navigation_bar.permit_bar.user_logout()  # 注销
 
-    # 获取模块菜单
-    def get_module_menus(self):
-        try:
-            # 请求主菜单数据
-            machine_code = config.app_dawn.value('machine')
-            if machine_code:
-                url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
-            else:
-                url = config.SERVER_ADDR + 'basic/modules/'
-            r = requests.get(
-                url=url,
-                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
-                data=json.dumps({"machine_code": config.app_dawn.value('machine')})
-            )
-            response = json.loads(r.content.decode("utf-8"))
-        except Exception:
-            sys.exit()  # catch exception sys exit
-        # 模块菜单填充到相应的控件中
-        menus = list()
-        for menu_item in response['data']:
-            button = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
-            button.clicked_module.connect(self.module_clicked)  # 绑定模块菜单点击信号
-            menus.append(button)
-        self.navigation_bar.module_bar.setMenus(menus)
-
-    # 点击模块菜单事件
-    def module_clicked(self, menu):
-        name = menu.text()
-        # 查询权限
-        machine_code = config.app_dawn.value('machine')
-        if machine_code:
-            url = config.SERVER_ADDR + 'limit/access-module/' + str(menu.mid) + '/?mc=' + machine_code
-        else:
-            url = config.SERVER_ADDR + 'limit/access-module/' + str(menu.mid) + '/'
-        try:
-            r = requests.get(
-                url=url,
-                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')}
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if not response['data']['permission']:
-                raise ValueError(response['message'])
-        except Exception as e:
-            # 弹窗提示
-            info_popup = InformationPopup(parent=self, message=str(e))
-            if not info_popup.exec_():
-                info_popup.deleteLater()
-                del info_popup
-            return
-        else:
-            if name == u'首页':
-                tab = HomePage(parent=self.tab_loaded)
-            elif name == u'数据管理':
-                from windows.maintenance import MaintenanceHome
-                tab = MaintenanceHome(parent=self.tab_loaded)
-            elif name == u'权限管理':
-                from windows.maintenance import AuthenticationHome
-                tab = AuthenticationHome(parent=self.tab_loaded)
-            else:
-                tab = NoDataWindow(name=name)
-            self.tab_loaded.clear()
-            self.tab_loaded.addTab(tab, name)
-
     # 事件过滤器, 用于解决鼠标进入其它控件后还原为标准鼠标样式
     def eventFilter(self, obj, event):
         if isinstance(event, QEnterEvent):
@@ -380,4 +317,67 @@ class BaseWindow(QWidget):
     def showNormal(self):
         super(BaseWindow, self).showNormal()
         self.layout().setContentsMargins(self.MARGIN, self.MARGIN, self.MARGIN, self.MARGIN)
+
+    # 获取模块菜单
+    def get_module_menus(self):
+        try:
+            # 请求主菜单数据
+            machine_code = config.app_dawn.value('machine')
+            if machine_code:
+                url = config.SERVER_ADDR + 'basic/modules/?mc=' + machine_code
+            else:
+                url = config.SERVER_ADDR + 'basic/modules/'
+            r = requests.get(
+                url=url,
+                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({"machine_code": config.app_dawn.value('machine')})
+            )
+            response = json.loads(r.content.decode("utf-8"))
+        except Exception:
+            sys.exit()  # catch exception sys exit
+        # 模块菜单填充到相应的控件中
+        menus = list()
+        for menu_item in response['data']:
+            button = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
+            button.clicked_module.connect(self.module_clicked)  # 绑定模块菜单点击信号
+            menus.append(button)
+        self.navigation_bar.module_bar.setMenus(menus)
+
+    # 点击模块菜单事件
+    def module_clicked(self, menu):
+        name = menu.text()
+        # 查询权限
+        machine_code = config.app_dawn.value('machine')
+        if machine_code:
+            url = config.SERVER_ADDR + 'limit/access-module/' + str(menu.mid) + '/?mc=' + machine_code
+        else:
+            url = config.SERVER_ADDR + 'limit/access-module/' + str(menu.mid) + '/'
+        try:
+            r = requests.get(
+                url=url,
+                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if not response['data']['permission']:
+                raise ValueError(response['message'])
+        except Exception as e:
+            # 弹窗提示
+            info_popup = InformationPopup(parent=self, message=str(e))
+            if not info_popup.exec_():
+                info_popup.deleteLater()
+                del info_popup
+            return
+        else:
+            if name == u'首页':
+                tab = HomePage(parent=self.tab_loaded)
+            elif name == u'数据管理':
+                from windows.maintenance import MaintenanceHome
+                tab = MaintenanceHome(parent=self.tab_loaded)
+            elif name == u'权限管理':
+                from windows.maintenance import AuthorityHome
+                tab = AuthorityHome(parent=self.tab_loaded)
+            else:
+                tab = NoDataWindow(name=name)
+            self.tab_loaded.clear()
+            self.tab_loaded.addTab(tab, name)
 

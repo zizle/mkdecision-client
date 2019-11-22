@@ -6,12 +6,100 @@ Author: zizle
 """
 import sys
 import json
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget, QPushButton, QTableWidget, QLabel
 from PyQt5.QtGui import QFont, QColor, QBrush, QPixmap, QCursor
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QDate, QRect
 
 import config
 from thread.request import RequestThread
+
+
+# 新闻公告板块
+class NewsBox(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(NewsBox, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0,spacing=0)  # spacing会影响子控件的高度，控件之间有间隔，视觉就影响高度
+        # 更多按钮
+        self.more_button = QPushButton('更多>>', objectName='moreNews')
+        self.more_button.setCursor(Qt.PointingHandCursor)
+        self.setLayout(layout)
+        self.setObjectName('newsBox')
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.setStyleSheet("""
+        #newsBox{
+            background-color: rgb(100,180,200)
+        }
+        #moreNews{
+            border:none;
+            color:rgb(3,96,147);
+            min-height:25px;
+            max-height:25px;
+        }
+        """)
+
+    # 添加新闻条目
+    def addItems(self, item_list):
+        for item in item_list:
+            self.layout().addWidget(item, alignment=Qt.AlignTop)
+
+    # 设置更多按钮
+    def setMoreNewsButton(self):
+        count = self.layout().count()
+        self.layout().insertWidget(count, self.more_button, alignment=Qt.AlignRight)
+        return self.more_button
+
+
+# 轮播图控件
+class ImageSlider(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(ImageSlider, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout()
+        self.image_stacked = QStackedWidget(parent=self)
+        layout.addWidget(self.image_stacked)
+        self.pre_button = QPushButton('前', parent=self)
+        self.next_button = QPushButton('后', parent=self)
+        self.setLayout(layout)
+        self.addImages()
+        print(self.image_stacked.widget(0).width())
+        print(self.pos().x(), self.pos().y())
+        print(self.width(),self.height())
+        print(self.sizeIncrement())
+        print(layout.contentsRect().getRect())
+
+    # 添加图片
+    def addImages(self):
+        pixmap = QPixmap('media/start.png')
+        label = QLabel()
+        label.setPixmap(pixmap)
+        label.setScaledContents(True)
+        self.image_stacked.addWidget(label)
+
+
+
+
+        # 前后按钮的布局
+
+        pre_next_layout = QHBoxLayout(self)
+        pre_button = QPushButton('前', parent=self)
+        next_button = QPushButton('后', parent=self)
+        pre_next_layout.addWidget(pre_button, alignment=Qt.AlignLeft)
+        pre_next_layout.addWidget(next_button, alignment=Qt.AlignRight)
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.setObjectName('imageSlider')
+        self.setStyleSheet("""
+        #imageSlider{
+            background-color: rgb(120,130,130)
+        }
+
+        """)
+
+
+
+
+
+
 
 
 class Calendar(QWidget):
