@@ -121,7 +121,7 @@ class LoginPopup(QDialog):
 
 # 注册弹窗
 class RegisterPopup(QDialog):
-    user_registered = pyqtSignal(str)
+    user_registered = pyqtSignal(dict)
 
     def __init__(self, *args, **kwargs):
         super(RegisterPopup, self).__init__(*args, **kwargs)
@@ -200,8 +200,9 @@ class RegisterPopup(QDialog):
         # 用户名
         username = self.username_edit.text().strip()
         if username:
-            if not re.match(r'^[\u4e00-\u9fa5_0-9a-z]{6,20}', username):
-                self.username_error.setText('用户名需由中文、数字、字母及下划线组成,6-20个字符')
+            username = re.match(r'^[\u4e00-\u9fa5_0-9a-z]{2,20}', username)
+            if not username:
+                self.username_error.setText('用户名需由中文、数字、字母及下划线组成,2-20个字符')
                 return
             username = username.group()
         # 获取密码
@@ -223,21 +224,22 @@ class RegisterPopup(QDialog):
         # 提交注册
         user_data = self._register_post(phone=phone, username=username, password=password)
         print(user_data)
-        try:
-            if user_data:
-                # 注册成功
-                # 保存token
-                token = user_data['Authorization']
-                config.app_dawn.setValue('AUTHORIZATION', token)
-                # 发出信号
-                sig_username = user_data['username']
-                if not user_data['username']:
-                    phone = user_data['phone']
-                    sig_username = phone[0:3] + '****' + phone[7:11]
-                self.user_registered.emit(sig_username)
-                self.close()
-        except Exception as e:
-            print(e)
+        if user_data:
+            # 注册成功
+            # 保存token
+            token = user_data['Authorization']
+            config.app_dawn.setValue('AUTHORIZATION', token)
+            # 发出信号
+            sig_username = user_data['username']
+            if not user_data['username']:
+                phone = user_data['phone']
+                sig_username = phone[0:3] + '****' + phone[7:11]
+            data_dict = {
+                'username': sig_username,
+                'auth_data': user_data
+            }
+            self.user_registered.emit(data_dict)
+            self.close()
 
     # 提交注册
     def _register_post(self, phone, username, password):

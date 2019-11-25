@@ -150,6 +150,7 @@ class BaseWindow(QWidget):
         print('用户点击注册按钮')
         from popup.base import RegisterPopup
         register_popup = RegisterPopup(parent=self)
+        register_popup.user_registered.connect(self.user_login_successfully)
         if not register_popup.exec_():
             register_popup.deleteLater()
             del register_popup
@@ -163,6 +164,10 @@ class BaseWindow(QWidget):
         # 移除token
         config.app_dawn.remove('AUTHORIZATION')
         self.navigation_bar.permit_bar.user_logout()  # 注销
+        # 返回首页
+        menu = QPushButton('首页')
+        menu.mid = 0
+        self.module_clicked(menu)
 
     # 事件过滤器, 用于解决鼠标进入其它控件后还原为标准鼠标样式
     def eventFilter(self, obj, event):
