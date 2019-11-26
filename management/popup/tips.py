@@ -14,4 +14,5 @@ class InformationPopup(QDialog):
         self.message = QLabel(message)
         layout.addWidget(self.message, alignment=Qt.AlignCenter)
         self.setWindowTitle(title)
+        self.setFixedSize(250,200)
         self.setLayout(layout)

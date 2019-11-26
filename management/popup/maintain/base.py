@@ -15,6 +15,67 @@ from PyQt5.QtGui import QIntValidator
 import config
 from utils import get_desktop_path
 
+
+# 新增系统主模块
+class NewModulePopup(QDialog):
+
+    def __init__(self, *args, **kwargs):
+        super(NewModulePopup, self).__init__(*args, **kwargs)
+        layout = QGridLayout()
+        layout.addWidget(QLabel('名称:', parent=self), 0, 0)
+        self.name_edit = QLineEdit(parent=self)
+        layout.addWidget(self.name_edit, 0, 1)
+        self.name_error_label = QLabel(parent=self, objectName='nameError')
+        layout.addWidget(self.name_error_label, 1, 0, 1, 2)
+        self.commit_button = QPushButton('确定提交', parent=self, clicked=self.commit_new_module)
+        layout.addWidget(self.commit_button, 2, 1)
+        self.network_result = QLabel()
+        layout.addWidget(self.network_result, 3, 0, 1, 2)
+        self.setLayout(layout)
+        self.setWindowTitle('增加模块')
+
+    # 提交新增
+    def commit_new_module(self):
+        name = self.name_edit.text()
+        name = re.sub(r'\s+', '', name)
+        if not name:
+            self.name_error_label.setText('请填入模块名称')
+            return
+        # 提交
+        try:
+            r = requests.post(
+                url=config.SERVER_ADDR + 'basic/modules-maintain/?mc=' + config.app_dawn.value('machine'),
+                headers={
+                    'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION'),
+                },
+                data=json.dumps({
+                  'name': name
+                })
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.setText(str(e))
+        else:
+            self.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class CreateNewClient(QDialog):
     new_data_signal = pyqtSignal(dict)
     def __init__(self, *args):

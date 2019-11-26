@@ -7,16 +7,15 @@ import re
 import sys
 import json
 import requests
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout,QHBoxLayout, QLabel, QPushButton, QTabWidget, QScrollArea,\
-    QStyle, QLineEdit, QListWidget, QListWidgetItem
-from PyQt5.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QRect, QPoint, QModelIndex
-from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout,QHBoxLayout, QLabel, QPushButton, QTabWidget, QLineEdit,\
+    QListWidget
+from PyQt5.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QRect, QPoint
 
 from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
 from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
 from frame.maintain.danalysis import VarietyMaintain, UploadDataMaintain
-from widgets.maintain import ModuleBlock
+from widgets.maintain.maintenance import ModuleBlock, ModuleMaintainTable
 from widgets.maintain.authorization import UserTable
 from thread.request import RequestThread
 import config
@@ -37,7 +36,7 @@ class MaintenanceHome(QWidget):
         module_block = ModuleBlock(parent=self, module_name='main_module')  # module_name用于判断哪个模块
         module_block.set_module_widget(QLabel('主功能模块', styleSheet='min-width:200;min-height:180'))
         module_block.enter_clicked.connect(self.enter_detail_maintainer)
-        # ###########品种guan
+        # 品种管理维护
         variety_block = ModuleBlock(parent=self, module_name='variety_maintain')  # module_name用于判断哪个模块
         variety_block.set_module_widget(QLabel('品种管理', styleSheet='min-width:200;min-height:180'))
         variety_block.enter_clicked.connect(self.enter_detail_maintainer)
@@ -59,7 +58,18 @@ class MaintenanceHome(QWidget):
         self.detail_tab = QTabWidget()
         self.back_button = QPushButton('返回', clicked=self.back_to_maintainers)
         self.back_button.maintain_name = None
-        detail_layout.addWidget(self.back_button, alignment=Qt.AlignLeft)
+        self.detail_tab.setDocumentMode(True)
+        # 返回按钮和信息提示布局和增加按钮
+        back_message_layout = QHBoxLayout()
+        # 信息提示
+        self.network_message = QLabel(parent=self.detail_maintainer)
+        # 增加按钮
+        self.new_module_button = QPushButton('新增模块', parent=self.detail_maintainer)
+        self.new_module_button.is_clicked_connected = False
+        back_message_layout.addWidget(self.back_button, alignment=Qt.AlignLeft)
+        back_message_layout.addWidget(self.network_message, alignment=Qt.AlignLeft)
+        back_message_layout.addWidget(self.new_module_button, alignment=Qt.AlignRight)
+        detail_layout.addLayout(back_message_layout)
         detail_layout.addWidget(self.detail_tab)
         # 样式
         self.detail_tab.tabBar().hide()
@@ -115,7 +125,13 @@ class MaintenanceHome(QWidget):
         # 设置详情页
         self.back_button.maintain_name = module.module_name
         if module.module_name == 'main_module':
-            maintainer = QLabel('主功能维护主功能维护主功能维护主功能维护')
+            maintainer = ModuleMaintainTable(parent=self)
+            if not self.new_module_button.is_clicked_connected:  # 未连接信号才连接
+                self.new_module_button.clicked.connect(maintainer.addNewModulePopup)  # 新增模块信号
+                self.new_module_button.is_clicked_connected = True
+            maintainer.getModules()
+
+
         elif module.module_name == 'danalysis':
             maintainer = UploadDataMaintain()
         elif module.module_name == 'variety_maintain':
@@ -194,14 +210,15 @@ class AuthorityHome(QWidget):
         detail_header_layout = QHBoxLayout(spacing=0)
         self.detail_user_phone = QLabel(parent=self.user_detail, objectName='textLabel')
         self.detail_user_role = QLabel(parent=self.user_detail, objectName='textLabel')
-        self.detail_user_note = QLineEdit(parent=self.user_detail, objectName='textLabel')
+        self.detail_user_note = QLineEdit(parent=self.user_detail, objectName='noteEdit')
         detail_header_layout.addWidget(QLabel('手机:', parent=self.user_detail, objectName='tipsLabel'), alignment=Qt.AlignLeft)
         detail_header_layout.addWidget(self.detail_user_phone, alignment=Qt.AlignLeft)
         detail_header_layout.addWidget(QLabel('角色:', parent=self.user_detail, objectName='tipsLabel'), alignment=Qt.AlignLeft)
         detail_header_layout.addWidget(self.detail_user_role, alignment=Qt.AlignLeft)
         detail_header_layout.addWidget(QLabel('备注名:', parent=self.user_detail, objectName='tipsLabel'), alignment=Qt.AlignLeft)
         detail_header_layout.addWidget(self.detail_user_note, alignment=Qt.AlignLeft)
-        detail_header_layout.addWidget(QPushButton('设置', parent=self.user_detail, clicked=self.set_note_name))
+        detail_header_layout.addWidget(QPushButton('设置', parent=self.user_detail, objectName='noteButton',
+                                                   cursor=Qt.PointingHandCursor, clicked=self.set_note_name))
         self.note_name_error = QLabel(parent=self.user_detail, objectName='noteError')
         self.detail_user_note.textChanged.connect(lambda: self.note_name_error.setText(''))
         detail_header_layout.addWidget(self.note_name_error)
@@ -237,22 +254,33 @@ class AuthorityHome(QWidget):
             font-weight: bold;
             font-size:12px;
         }
-        #textLabel{
+        #textLabel,#noteEdit{
             color: rgb(100,130,200);
             font-size:12px;
         }
+        #noteEdit{
+            max-width:70px;
+            min-width:70px;
+        }
         #noteError{
             color: rgb(200,100,110)
+        }
+        #noteButton{
+            margin-left:5px;
+            min-width:40px;
+            min-height:22px;
+            max-width:40px;
+            max-height:22px;
         }
         """)
         # 获取用户
         self.get_users()
         # 进入详情管理动画
         self.detail_authority_animation = QPropertyAnimation(self.user_detail, b'pos')
-        self.detail_authority_animation.setDuration(500)
+        self.detail_authority_animation.setDuration(300)
         # 当前用户列表页退出动画
         self.show_users_animation = QPropertyAnimation(self.show_users, b'pos')
-        self.show_users_animation.setDuration(500)
+        self.show_users_animation.setDuration(300)
         # 串行动画组
         self.animation_group = QParallelAnimationGroup()
         self.animation_group.addAnimation(self.detail_authority_animation)
@@ -268,8 +296,7 @@ class AuthorityHome(QWidget):
                 },
             )
             response = json.loads(r.content.decode('utf-8'))
-        except Exception as e:
-            print(e)
+        except Exception:
             return
         self.user_table.addUsers(json_list=response['data'])
 
@@ -314,7 +341,6 @@ class AuthorityHome(QWidget):
 
     # 设置用户的备注名
     def set_note_name(self):
-        print('设置备注名：', self.detail_user_note.text())
         note_name = self.detail_user_note.text()
         note_name = re.sub(r'\s+', '', note_name)
         note_name = re.match(r'^[\u4e00-\u9fa5a-z]{2,20}', note_name)
@@ -329,7 +355,6 @@ class AuthorityHome(QWidget):
                 'note': note_name
             }
         )
-        print(result)
         self.note_name_error.setText(result)
 
     # 返回用户列表页
@@ -345,28 +370,33 @@ class AuthorityHome(QWidget):
         # 开启动画组动画
         self.animation_group.start()
 
+    # 使用备注名后面的错误显示框显示网络错误信息
+    def network_error(self, error_message):
+        self.note_name_error.setText(error_message)
+
     # 详情页权限设置列表点击
     def authority_list_clicked(self):
         item = self.authority_list.currentItem()
         if item.text() == u'客户端权限':
             from widgets.maintain.authorization import UserClientTable
             auth_tab = UserClientTable(uid=self.user_detail.user_id, parent=self.detail_tab)
-            auth_tab.get_all_clients()
+            auth_tab.network_result.connect(self.network_error)
+            # 获取客户端信息
+            try:
+                r = requests.get(
+                    url=config.SERVER_ADDR + 'basic/clients/?mc=' + config.app_dawn.value('machine'),
+                    data=json.dumps({'uid': self.user_detail.user_id})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+            except Exception:
+                return
+            print('请求可登录客户端成功', response)
+            # 展示信息
+            auth_tab.addClients(response['data'])
         else:
             return
         self.detail_tab.clear()
         self.detail_tab.addTab(auth_tab, item.text())
-
-
-
-
-
-
-
-
-
-
-
 
 
 

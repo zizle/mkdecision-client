@@ -101,7 +101,8 @@ class BaseWindow(QWidget):
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
-        except Exception:
+        except Exception as e:
+            config.app_dawn.remove('AUTHORIZATION')  # 状态保持失败移除token
             return  # 自动登录失败
         else:
             # 用户名信息设置到登录信息栏

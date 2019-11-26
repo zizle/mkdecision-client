@@ -23,4 +23,4 @@ def change_user_information(uid, data_dict):
     except Exception as e:
         return str(e)
     else:
-        return '设置成功!'
+        return response['message']
