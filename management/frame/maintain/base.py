@@ -15,7 +15,77 @@ import config
 from thread.request import RequestThread
 from piece.maintain import TableCheckBox
 from popup.maintain import CreateNewClient
+from popup.maintain.base import NewVarietyPopup
+from widgets.maintain.base import VarietyManagerTable
 
+
+# 品种管理
+class VarietyMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(VarietyMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        opl = QHBoxLayout()  # option layout 三级联动显示数据表
+        # 大类选择下拉菜单
+        self.combox_0 = QComboBox(parent=self, objectName='combo')
+        opl.addWidget(self.combox_0, alignment=Qt.AlignLeft)
+        # 新建项目
+        opl.addWidget(QPushButton('新增品种', clicked=self.create_variety), alignment=Qt.AlignRight)
+        self.show_table = VarietyManagerTable()  # 品种管理表格
+        self.show_table.verticalHeader().hide()  # 隐藏竖直表头
+        # 信号关联
+        self.combox_0.currentIndexChanged.connect(self.combox_0_changed)
+        layout.addLayout(opl)
+        layout.addWidget(self.show_table)
+        self.setLayout(layout)
+        self.setStyleSheet("""
+        #combo QAbstractItemView::item{
+            height: 22px;
+        }
+        """)
+        self.combox_0.setView(QListView())  # comboBox的高度设置生效
+    
+    # 获取品种组别
+    def getVarietyGroups(self):
+        self.combox_0.clear()
+        # 此方法在表格单元格控件中也使用
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'basic/variety-groups/?mc=' + config.app_dawn.value('machine'),
+                headers=config.CLIENT_HEADERS,
+                cookies=config.app_dawn.value('cookies')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            print(response)
+        except Exception:
+            return
+        for group_item in response['data']:
+            self.combox_0.addItem(group_item['name'], group_item['id'])  # 在后续传入所需的数据，就是itemData
+
+    # 请求当前组别下的品种
+    def combox_0_changed(self):
+        gid = self.combox_0.currentData()
+        self.show_table.clear()
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'basic/variety-groups/' + str(gid) + '/?mc=' + config.app_dawn.value(
+                    'machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            print(response)
+        except Exception:
+            return
+        self.show_table.addVarieties(response['data'])
+
+    # 新增品种
+    def create_variety(self):
+        try:
+            popup = NewVarietyPopup(parent=self)
+            popup.deleteLater()
+            if not popup.exec_():
+                del popup
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
 
 
 

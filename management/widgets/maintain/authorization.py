@@ -287,3 +287,117 @@ class UserClientTable(QTableWidget):
 
 
 # 设置用户-模块权限的表格
+class UserModuleTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    def __init__(self, uid, *args, **kwargs):
+        super(UserModuleTable, self).__init__(*args, **kwargs)
+        self.uid = uid
+        self.verticalHeader().hide()
+
+    # 获取所有模块
+    def getModules(self):
+        # 获取模块信息
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'basic/modules-authorization/?mc=' + config.app_dawn.value('machine'),
+                data=json.dumps({'uid': self.uid})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception as e:
+            print(e)
+            return
+        print('请求可进入模块成功', response)
+        self.addModules(response['data'])
+
+    # 展示所有模块和当前用户可进入状态(可进入含有效期)
+    def addModules(self, module_list):
+        self.clear()
+        self.setRowCount(len(module_list))
+        self.setColumnCount(4)
+        self.setHorizontalHeaderLabels(['序号', '模块名称', '可进入', '有效期'])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, module_item in enumerate(module_list):
+            item_0 = QTableWidgetItem(str(row + 1))
+            item_1 = QTableWidgetItem()
+            item_2 = QTableWidgetItem()
+            item_3 = QTableWidgetItem()
+            item_0.setTextAlignment(Qt.AlignCenter)
+            item_1.setTextAlignment(Qt.AlignCenter)
+            item_2.setTextAlignment(Qt.AlignCenter)
+            item_3.setTextAlignment(Qt.AlignCenter)
+
+            if module_item['accessed'] == 0 or module_item['accessed'] == 1:  # 勾选可进入的情况
+                # 创建选择框
+                accessed_box = CheckBox(cid=module_item['id'], checked=module_item['accessed'], row_index=row)
+                accessed_box.check_changed.connect(self.change_user_access_module)
+                self.setCellWidget(row, 2, accessed_box)  # 可登录选择框
+                # 创建【有效期】时间编辑框item2
+                if module_item['accessed'] == 0:  # 是勾选框，但是为不可登录状态
+                    item_3.setText('不可进入')
+                    self.setItem(row, 3, item_3)
+                else:  # 是勾选框，为可登录状态
+                    expire_date_box = ExpireDateBox(client_id=module_item['id'], expire_date=module_item['expire_date'])
+                    expire_date_box.expire_date_setting.connect(self.setting_expire_date)
+                    self.setCellWidget(row, 3, expire_date_box)
+            else:  # 都可登录的情况
+                item_2.setText(str(module_item['accessed']))
+                item_3.setText('长期')
+            item_1.setText(str(module_item['name']))
+            self.setItem(row, 0, item_0)
+            self.setItem(row, 1, item_1)
+            self.setItem(row, 2, item_2)
+            self.setItem(row, 3, item_3)
+
+    # 改变用户可进入模块的状态
+    def change_user_access_module(self, check_button):
+        try:
+            # 发起请求
+            r = requests.post(
+                url=config.SERVER_ADDR + 'limit/user-module/?mc=' + config.app_dawn.value('machine'),
+                headers={"AUTHORIZATION": config.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({
+                    'uid': self.uid,
+                    'mid': check_button.cid,
+                    'accessed': check_button.isChecked()
+                })
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            if check_button.isChecked():  # 改变有效期的设置
+                expire_date_box = ExpireDateBox(client_id=check_button.cid, expire_date=None)
+                expire_date_box.expire_date_setting.connect(self.setting_expire_date)  # 连接设置有效期信号
+                self.item(check_button.row_index, 3).setText('')  # 改变原先的‘不可进入’
+                self.removeCellWidget(check_button.row_index, 3)  # 移除单元格上的控件
+                self.setCellWidget(check_button.row_index, 3, expire_date_box)  # 设置控件
+            else:
+                self.removeCellWidget(check_button.row_index, 3)  # 移除单元格上的控件
+                self.item(check_button.row_index, 3).setText('不可进入')    # 改回原先的‘不可进入’
+            self.network_result.emit(response['message'])
+
+    # 设置用户可进入模块的有效期
+    def setting_expire_date(self, data_list):
+        # 发起请求
+        try:
+            r = requests.put(
+                url=config.SERVER_ADDR + 'limit/user-module/?mc=' + config.app_dawn.value('machine'),
+                headers={"AUTHORIZATION": config.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({
+                    'uid': self.uid,
+                    'mid': data_list[0],
+                    'expire_date': data_list[1]
+                })
+
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.network_result.emit(response['message'])

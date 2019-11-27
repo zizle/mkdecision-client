@@ -270,6 +270,7 @@ class PermitBar(QWidget):
         self.register_button.hide()
         self.logout_button.show()
         if hasattr(self, 'timer'):
+            self.timer.deleteLater()
             del self.timer
         self.timer = QTimer()
         self.timer.start(500)

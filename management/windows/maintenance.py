@@ -14,8 +14,8 @@ from PyQt5.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QRect,
 from frame.maintain.base import NoDataWindow
 from frame.maintain.home import BulletinMaintain, CarouselMaintain, ReportMaintain, NoticeMaintain, CommodityMaintain, FinanceMaintain
 from frame.maintain.pservice import MessageCommMaintain, MarketAnalysisMaintain, TopicalStudyMaintain, ResearchReportMaintain, AdviserMaintain
-from frame.maintain.danalysis import VarietyMaintain, UploadDataMaintain
-from widgets.maintain.maintenance import ModuleBlock, ModuleMaintainTable
+from frame.maintain.danalysis import UploadDataMaintain
+from widgets.maintain.maintenance import ModuleBlock
 from widgets.maintain.authorization import UserTable
 from thread.request import RequestThread
 import config
@@ -104,6 +104,7 @@ class MaintenanceHome(QWidget):
 
     # 进入维护详情页
     def enter_detail_maintainer(self, button):
+        self.network_message.setText('')  # 网络提示置空
         module = button.parent()
         # 详情控件位置移到功能块中心
         self.detail_maintainer.move(module.pos().x() + self.BLOCK_WIDTH / 2,
@@ -124,18 +125,26 @@ class MaintenanceHome(QWidget):
         )
         # 设置详情页
         self.back_button.maintain_name = module.module_name
+        self.new_module_button.hide()  # 隐藏新增模块按钮(避免进入其他界面也存在)
+        # 主模块管理
         if module.module_name == 'main_module':
+            from widgets.maintain.maintenance import ModuleMaintainTable
             maintainer = ModuleMaintainTable(parent=self)
+            maintainer.network_result.connect(self.network_message_show_message)  # 网络请求结果信号
             if not self.new_module_button.is_clicked_connected:  # 未连接信号才连接
                 self.new_module_button.clicked.connect(maintainer.addNewModulePopup)  # 新增模块信号
                 self.new_module_button.is_clicked_connected = True
+            self.new_module_button.show()  # 显示新增模块按钮
             maintainer.getModules()
-
+        # 品种管理
+        elif module.module_name == 'variety_maintain':
+            from frame.maintain.base import VarietyMaintain
+            maintainer = VarietyMaintain()
+            maintainer.getVarietyGroups()  # 获取品种组别
 
         elif module.module_name == 'danalysis':
             maintainer = UploadDataMaintain()
-        elif module.module_name == 'variety_maintain':
-            maintainer = VarietyMaintain()
+
         else:
             self.back_button.maintain_name = None
             maintainer = QLabel('此模块暂不支持维护')
@@ -183,6 +192,10 @@ class MaintenanceHome(QWidget):
         # 改变控件层次，由于控件最小，无需再改变层次
         # self.detail_maintainer.raise_()
         # self.show_maintainers.raise_()
+
+    # 显示提示信息
+    def network_message_show_message(self, text):
+        self.network_message.setText(text)
 
 
 # 权限管理主页
@@ -393,6 +406,12 @@ class AuthorityHome(QWidget):
             print('请求可登录客户端成功', response)
             # 展示信息
             auth_tab.addClients(response['data'])
+        elif item.text() == u'模块权限':
+            from widgets.maintain.authorization import UserModuleTable
+            auth_tab = UserModuleTable(uid=self.user_detail.user_id, parent=self.detail_tab)
+            auth_tab.network_result.connect(self.network_error)
+            # 获取与展示信息
+            auth_tab.getModules()
         else:
             return
         self.detail_tab.clear()

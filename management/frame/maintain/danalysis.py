@@ -10,85 +10,16 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 import config
 from thread.request import RequestThread
-from popup.maintain.danalysis import NewVarietyPopup, NewTablePopup
+from popup.maintain.danalysis import NewTablePopup
 
 
-# 品种管理
-class VarietyMaintain(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(VarietyMaintain, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
-        opl = QHBoxLayout()  # option layout 三级联动显示数据表
-        # 大类选择下拉菜单
-        self.combox0 = QComboBox()
-        opl.addWidget(self.combox0, alignment=Qt.AlignLeft)
-        # 新建项目
-        opl.addWidget(QPushButton('新增品种', clicked=self.create_variety), alignment=Qt.AlignRight)
-        self.show_table = QTableWidget()
-        # 信号关联
-        self.combox0.currentIndexChanged.connect(self.combox0_changed)
-        layout.addLayout(opl)
-        layout.addWidget(self.show_table)
-        self.setLayout(layout)
-        # 初始化
-        self.get_variety_group()
 
-    # 请求品种大类
-    def get_variety_group(self):
-        self.combox0.clear()
-        try:
-            r = requests.get(
-                url=config.SERVER_ADDR + 'danalysis/variety-groups/?mc=' + config.app_dawn.value('machine'),
-                headers=config.CLIENT_HEADERS,
-                cookies=config.app_dawn.value('cookies')
-            )
-            response = json.loads(r.content.decode('utf-8'))
-        except Exception:
-            return
-        for group_item in response['data']:
-            self.combox0.addItem(group_item['name'], group_item['id'])  # 在后续传入所需的数据，就是itemData
 
-    def combox0_changed(self):
-        gid = self.combox0.currentData()
-        # 请求当前组下的品种
-        self.show_table.clear()
-        try:
-            r = requests.get(
-                url=config.SERVER_ADDR + 'danalysis/variety-groups/'+str(gid)+'?mc=' + config.app_dawn.value('machine'),
-                headers=config.CLIENT_HEADERS,
-                cookies=config.app_dawn.value('cookies')
-            )
-            response = json.loads(r.content.decode('utf-8'))
-        except Exception:
-            return
-        self._table_show_data(response['data'])
 
-    # 展示表格展示数据
-    def _table_show_data(self, varieties):
-        rows = len(varieties)
-        self.show_table.setRowCount(rows)
-        self.show_table.setColumnCount(3)
-        self.show_table.setHorizontalHeaderLabels(['编号', '名称', '英文代码'])
-        self.show_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        for row, variety_item in enumerate(varieties):
-            item0 = QTableWidgetItem(str(variety_item['id']))
-            item1 = QTableWidgetItem(str(variety_item['name']))
-            item2 = QTableWidgetItem(str(variety_item['name_en']) if variety_item['name_en'] else '')
-            item0.setTextAlignment(Qt.AlignCenter)
-            self.show_table.setItem(row, 0, item0)
-            self.show_table.setItem(row, 1, item1)
-            self.show_table.setItem(row, 2, item2)
 
-    # 新增品种
-    def create_variety(self):
-        try:
-            popup = NewVarietyPopup(parent=self)
-            popup.deleteLater()
-            if not popup.exec_():
-                del popup
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+
+
+
 
 
 # 数据管理
