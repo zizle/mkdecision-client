@@ -4,7 +4,7 @@ import json
 import requests
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QStyleOption, QStyle, QTableWidget, QTableWidgetItem,\
     QCheckBox, QHBoxLayout, QHeaderView
-from PyQt5.QtCore import QPropertyAnimation, pyqtSignal, Qt, QSize
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPainter
 from popup.maintain.base import NewModulePopup
 import config
@@ -101,7 +101,8 @@ class ModuleMaintainTable(QTableWidget):
             if r.status_code != 200:
                 raise ValueError(response['message'])
             print(response)
-        except Exception:
+        except Exception as e:
+            self.network_result.emit(str(e))
             return
         module_list = response['data']
         self.setRowCount(len(module_list))
@@ -122,10 +123,10 @@ class ModuleMaintainTable(QTableWidget):
             self.setItem(row, 0, item_0)
             self.setItem(row, 1, item_1)
             self.setItem(row, 2, item_2)
+        self.network_result.emit('')
 
     # 改变模块的开放状态
     def changed_module_active(self, check_button):
-        print('模块%d开放改变:' % check_button.mid, check_button.isChecked())
         try:
             r = requests.patch(
                 url=config.SERVER_ADDR + 'basic/modules-maintain/?mc=' + config.app_dawn.value('machine'),
@@ -151,6 +152,3 @@ class ModuleMaintainTable(QTableWidget):
             del popup
             # 刷新模块数据
             self.getModules()
-
-
-

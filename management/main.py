@@ -1,9 +1,6 @@
 # _*_ coding:utf-8 _*_
-"""
-client for management
-Create: 2019-07-22
-Author: zizle
-"""
+# Author: zizle  QQ:462894999
+
 import sys
 from PyQt5.QtWidgets import QApplication
 

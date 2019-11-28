@@ -7,8 +7,9 @@ Author: zizle
 import sys
 import json
 import requests
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, \
+    QListView, QHeaderView, QLabel
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
 import config
@@ -16,7 +17,40 @@ from thread.request import RequestThread
 from piece.maintain import TableCheckBox
 from popup.maintain import CreateNewClient
 from popup.maintain.base import NewVarietyPopup
-from widgets.maintain.base import VarietyManagerTable
+from widgets.maintain.base import ClientManagerTable, VarietyManagerTable
+
+
+# 客户端管理
+class ClientMaintain(QWidget):
+    network_result = pyqtSignal(str)
+
+    def __init__(self, *args, **kwargs):
+        super(ClientMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        self.show_table = ClientManagerTable(parent=self)
+        self.show_table.network_result.connect(self.emit_network_message)
+        layout.addWidget(self.show_table)
+        self.setLayout(layout)
+
+    # 踢皮球，丢出控件发出来的信号
+    def emit_network_message(self, message):
+        self.network_result.emit(message)
+
+    # 获取所有客户端
+    def getClients(self):
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'basic/clients-maintain/?mc=' + config.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            # 填充表格内容
+            self.show_table.addClients(response['data'])
+            self.network_result.emit('')
 
 
 # 品种管理
@@ -28,11 +62,16 @@ class VarietyMaintain(QWidget):
         # 大类选择下拉菜单
         self.combox_0 = QComboBox(parent=self, objectName='combo')
         opl.addWidget(self.combox_0, alignment=Qt.AlignLeft)
+        # 网络请求结果显示
+        self.network_message = QLabel(parent=self, objectName='networkMessage')
+        opl.addWidget(self.network_message, alignment=Qt.AlignLeft)
+        opl.addStretch()  # 伸缩
         # 新建项目
         opl.addWidget(QPushButton('新增品种', clicked=self.create_variety), alignment=Qt.AlignRight)
         self.show_table = VarietyManagerTable()  # 品种管理表格
         self.show_table.verticalHeader().hide()  # 隐藏竖直表头
         # 信号关联
+        self.show_table.network_result.connect(self.network_message_show_message)
         self.combox_0.currentIndexChanged.connect(self.combox_0_changed)
         layout.addLayout(opl)
         layout.addWidget(self.show_table)
@@ -40,6 +79,9 @@ class VarietyMaintain(QWidget):
         self.setStyleSheet("""
         #combo QAbstractItemView::item{
             height: 22px;
+        }
+        #networkMessage{
+            color: rgb(230,50,50);
         }
         """)
         self.combox_0.setView(QListView())  # comboBox的高度设置生效
@@ -51,12 +93,12 @@ class VarietyMaintain(QWidget):
         try:
             r = requests.get(
                 url=config.SERVER_ADDR + 'basic/variety-groups/?mc=' + config.app_dawn.value('machine'),
-                headers=config.CLIENT_HEADERS,
-                cookies=config.app_dawn.value('cookies')
             )
             response = json.loads(r.content.decode('utf-8'))
-            print(response)
-        except Exception:
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message.setText(str(e))
             return
         for group_item in response['data']:
             self.combox_0.addItem(group_item['name'], group_item['id'])  # 在后续传入所需的数据，就是itemData
@@ -71,10 +113,13 @@ class VarietyMaintain(QWidget):
                     'machine'),
             )
             response = json.loads(r.content.decode('utf-8'))
-            print(response)
-        except Exception:
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message.setText(str(e))
             return
         self.show_table.addVarieties(response['data'])
+        self.network_message.setText('')
 
     # 新增品种
     def create_variety(self):
@@ -87,6 +132,9 @@ class VarietyMaintain(QWidget):
             import traceback
             traceback.print_exc()
 
+    # 显示网络请求的结果
+    def network_message_show_message(self, message):
+        self.network_message.setText(message)
 
 
 

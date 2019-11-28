@@ -118,8 +118,6 @@ class NewVarietyPopup(QDialog):
         try:
             r = requests.get(
                 url=config.SERVER_ADDR + 'basic/groups-varieties/?mc=' + config.app_dawn.value('machine'),
-                headers=config.CLIENT_HEADERS,
-                cookies=config.app_dawn.value('cookies')
             )
             response = json.loads(r.content.decode('utf-8'))
         except Exception as e:

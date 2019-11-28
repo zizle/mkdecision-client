@@ -12,9 +12,87 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
 import config
+from popup.maintain.home import NewHomeDataPopup
+
+
 from popup.maintain import CreateNewBulletin, CreateNewCarousel, CreateNewReport, CreateNewNotice, CreateNewCommodity, CreateNewFinance
 from piece.maintain import TableCheckBox
 from thread.request import RequestThread
+
+
+# 首页数据管理维护
+class HomepageMaintain(QWidget):
+
+    def __init__(self, *args, **kwargs):
+        super(HomepageMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        # 上端显示操作结果与新增布局
+        option_layout = QHBoxLayout(margin=0)
+        self.network_message_label = QLabel(parent=self)
+        self.create_new_button = QPushButton('新增数据', parent=self, clicked=self.upload_new_data)
+        option_layout.addWidget(self.network_message_label)
+        option_layout.addWidget(self.create_new_button, alignment=Qt.AlignRight)
+        # 中间横向布局
+        show_layout = QHBoxLayout(margin=0)
+        self.left_group_list = QListWidget()
+        self.left_group_list.clicked.connect(self.left_list_clicked)
+        self.tab_show = QTabWidget()
+        show_layout.addWidget(self.left_group_list, alignment=Qt.AlignLeft)
+        show_layout.addWidget(self.tab_show)
+        layout.addLayout(option_layout)
+        layout.addLayout(show_layout)
+        self.setLayout(layout)
+        self.get_groups()  # 初始化
+
+    # 获取左侧分类数据(只要组不要内部分类)
+    def get_groups(self):
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'home/data-groups/?mc=' + config.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+            return
+        else:
+            self.left_group_list.clear()
+            # 填充分组列表
+            for group_item in response['data']:
+                item = QListWidgetItem(group_item['name'])
+                item.gid = group_item['id']
+                self.left_group_list.addItem(item)
+            self.network_message_label.setText('')
+
+    # 点击左侧列表
+    def left_list_clicked(self):
+        current_item = self.left_group_list.currentItem()
+        print(current_item.gid)
+
+    # 显示网络请求的结果
+    def show_network_message(self, message):
+        if message == 'hasNewGroup':  # 新增了分组
+            self.get_groups()
+
+    # 新增上传数据
+    def upload_new_data(self):
+        popup = NewHomeDataPopup(parent=self)
+        popup.network_result.connect(self.show_network_message)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+
+
+
+
+
+
+
+
+
 
 class BulletinMaintain(QWidget):
     # 维护【公告栏】数据

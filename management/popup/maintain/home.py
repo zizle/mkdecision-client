@@ -1,17 +1,146 @@
 # _*_ coding:utf-8 _*_
-"""
-all dialog of data-maintenance module, in the home page
-Update: 2019-07-25
-Author: zizle
-"""
+# Author: zizle QQ:462894999
+import re
 import sys
+import json
 import xlrd
 import datetime
-from PyQt5.QtWidgets import *
+import requests
+from PyQt5.QtWidgets import QWidget, QDialog, QHBoxLayout, QVBoxLayout, QPushButton, QTreeWidget, QGridLayout,\
+    QLineEdit, QLabel, QTreeWidgetItem
+
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QIcon, QFont
 
+import config
 from utils import get_desktop_path
+
+
+# 新增分组数据弹窗
+class NewHomeDataPopup(QDialog):
+    network_result = pyqtSignal(str)
+
+    def __init__(self, *args, **kwargs):
+        super(NewHomeDataPopup, self).__init__(*args, **kwargs)
+        self.setWindowTitle('新增数据')
+        # 总左右布局
+        layout = QHBoxLayout()
+        # 左侧上下布局
+        llayout = QVBoxLayout()
+        # 左侧分类树
+        self.left_tree = QTreeWidget(parent=self)
+        self.left_tree.header().hide()
+        self.add_group_button = QPushButton('新增大组', parent=self, clicked=self.add_new_group)
+        llayout.addWidget(self.left_tree, alignment=Qt.AlignLeft)
+        llayout.addWidget(self.add_group_button, alignment=Qt.AlignLeft)
+        # 右侧上下布局
+        rlayout = QVBoxLayout()
+        # 右侧控件
+        self.right_widget = QWidget(parent=self)
+        # 控件布局
+        right_widget_layout = QGridLayout()
+        self.right_widget.setLayout(right_widget_layout)
+        rlayout.addWidget(self.right_widget)
+        # 加入总布局显示
+        layout.addLayout(llayout)
+        layout.addLayout(rlayout)
+        self.setFixedSize(800, 500)
+        self.setLayout(layout)
+        # 初始化数据分类
+        self.get_groups_categories()
+
+    # 获取数据分组(含分组内的类别)
+    def get_groups_categories(self):
+        self.left_tree.clear()
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'home/groups-categories/?mc=' + config.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+            return
+        else:
+            # 填充分组树
+            for group_item in response['data']:
+                group = QTreeWidgetItem(self.left_tree)
+                group.setText(0, group_item['name'])
+                group.gid = group_item['id']
+                # 添加子节点
+                for category_item in group_item['categories']:
+                    child = QTreeWidgetItem()
+                    child.setText(0, category_item['name'])
+                    child.vid = category_item['id']
+                    group.addChild(child)
+            self.network_result.emit('')
+
+    # 新增数据大分组
+    def add_new_group(self):
+        print('新增大组')
+        new_popup = QDialog(parent=self)
+
+        # 提交新建大组
+        def commit_new_group():
+            print('提交新建大组')
+            name = re.sub(r'\s+', '', new_popup.name_edit.text())
+            if not name:
+                new_popup.name_error.setText('请输入名称')
+                return
+            try:
+                r = requests.post(
+                    url=config.SERVER_ADDR + 'home/data-groups/?mc=' + config.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({
+                        'name': name
+                    })
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                new_popup.name_error.setText(str(e))
+            else:
+                new_popup.close()
+                self.get_groups_categories()  # 重新请求分组数据
+                self.network_result.emit('hasNewGroup')
+
+        new_popup.setWindowTitle('新增大组')
+        nglayout = QGridLayout()
+        # 加入编辑名称
+        new_popup.name_edit = QLineEdit(parent=new_popup)
+        new_popup.name_error = QLabel(parent=new_popup, objectName='nameError')
+        nglayout.addWidget(QLabel('名称:', parent=new_popup), 0, 0)
+        nglayout.addWidget(new_popup.name_edit, 0, 1)
+        nglayout.addWidget(new_popup.name_error, 1, 0, 1, 2)
+        abtlayout = QHBoxLayout()
+        abtlayout.addWidget(QPushButton('确定提交', parent=new_popup, objectName='addNdgbtn',
+                                        clicked=commit_new_group), alignment=Qt.AlignRight)
+        nglayout.addLayout(abtlayout, 1, 1)
+        new_popup.setLayout(nglayout)
+        new_popup.setFixedSize(250, 110)
+
+
+        if not new_popup.exec_():
+            new_popup.deleteLater()
+            del new_popup
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class CreateNewBulletin(QDialog):

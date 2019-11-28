@@ -1,5 +1,6 @@
 # _*_ coding:utf-8 _*_
-# __Author__： zizle
+# Author:zizle QQ:462894999
+
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTableWidget, QLabel, QTableWidgetItem, QPushButton, QHeaderView,\
@@ -7,6 +8,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTableWidget, QLabel, QTableWi
 from PyQt5.QtCore import Qt, pyqtSignal, QDateTime
 import config
 from utils.maintain import change_user_information
+from popup.tips import InformationPopup
 
 
 # 【进入】按钮
@@ -167,12 +169,17 @@ class UserTable(QTableWidget):
     # 该变用户的有效
     def change_user_active(self, check_box):
         # 发起设置请求
-        change_user_information(
+        request_result = change_user_information(
             uid=check_box.cid,
             data_dict={
                 'is_active': check_box.isChecked()
             }
         )
+        # 弹窗提示结果
+        info_popup = InformationPopup(parent=self, message=request_result)
+        if not info_popup.exec_():
+            info_popup.deleteLater()
+            del info_popup
 
 
 # 设置用户-客户端权限的表格

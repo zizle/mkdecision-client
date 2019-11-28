@@ -1,36 +1,26 @@
 # _*_ coding:utf-8 _*_
-"""
-the base window of project
-Update: 2019-07-25
-Author: zizle
-"""
-import os
+# Author: zizle QQ:462894999
+
 import sys
 import json
 import requests
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import QWidget, QPushButton, QDesktopWidget, QVBoxLayout
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
-
 import config
-from windows.maintenance import Maintenance
 from popup.tips import InformationPopup
-from piece.base import TitleBar, MenuBar, NavigationBar, PermitBar1, TitleBar1
-from frame.base import NoDataWindow, RegisterClient
+from piece.base import TitleBar, NavigationBar
+from frame.base import NoDataWindow
 from widgets.base import ModuleButton, LoadedTab
 from .home import HomePage
-from .pservice import PService
-from .danalysis import DAnalysis
-from utils.machine import get_machine_code
-# 枚举左上右下以及四个定点
-Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
 
 
 # 主窗体
 class BaseWindow(QWidget):
+    # 枚举左上右下以及四个定点
     Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
-    MARGIN = 3
+    MARGIN = 3  # 边缘宽度小用于调整窗口大小
 
     def __init__(self, *args, **kwargs):
         super(BaseWindow, self).__init__(*args, **kwargs)
@@ -229,7 +219,6 @@ class BaseWindow(QWidget):
             self.setCursor(Qt.SizeBDiagCursor)
         elif 0 <= pos_x <= self.MARGIN <= pos_y <= hm:
             # 左边
-
             self._direction = self.Left
             self.setCursor(Qt.SizeHorCursor)
         elif wm <= pos_x <= self.width() and self.MARGIN <= pos_y <= hm:
@@ -260,53 +249,53 @@ class BaseWindow(QWidget):
         xPos, yPos = mpos.x(), mpos.y()
         geometry = self.geometry()
         x, y, w, h = geometry.x(), geometry.y(), geometry.width(), geometry.height()
-        if self._direction == LeftTop:  # 左上角
+        if self._direction == self.LeftTop:  # 左上角
             if w - xPos > self.minimumWidth():
                 x += xPos
                 w -= xPos
             if h - yPos > self.minimumHeight():
                 y += yPos
                 h -= yPos
-        elif self._direction == RightBottom:  # 右下角
+        elif self._direction == self.RightBottom:  # 右下角
             if w + xPos > self.minimumWidth():
                 w += xPos
                 self._mouse_pos = pos
             if h + yPos > self.minimumHeight():
                 h += yPos
                 self._mouse_pos = pos
-        elif self._direction == RightTop:  # 右上角
+        elif self._direction == self.RightTop:  # 右上角
             if h - yPos > self.minimumHeight():
                 y += yPos
                 h -= yPos
             if w + xPos > self.minimumWidth():
                 w += xPos
                 self._mouse_pos.setX(pos.x())
-        elif self._direction == LeftBottom:  # 左下角
+        elif self._direction == self.LeftBottom:  # 左下角
             if w - xPos > self.minimumWidth():
                 x += xPos
                 w -= xPos
             if h + yPos > self.minimumHeight():
                 h += yPos
                 self._mouse_pos.setY(pos.y())
-        elif self._direction == Left:  # 左边
+        elif self._direction == self.Left:  # 左边
             if w - xPos > self.minimumWidth():
                 x += xPos
                 w -= xPos
             else:
                 return
-        elif self._direction == Right:  # 右边
+        elif self._direction == self.Right:  # 右边
             if w + xPos > self.minimumWidth():
                 w += xPos
                 self._mouse_pos = pos
             else:
                 return
-        elif self._direction == Top:  # 上面
+        elif self._direction == self.Top:  # 上面
             if h - yPos > self.minimumHeight():
                 y += yPos
                 h -= yPos
             else:
                 return
-        elif self._direction == Bottom:  # 下面
+        elif self._direction == self.Bottom:  # 下面
             if h + yPos > self.minimumHeight():
                 h += yPos
                 self._mouse_pos = pos
@@ -386,4 +375,3 @@ class BaseWindow(QWidget):
                 tab = NoDataWindow(name=name)
             self.tab_loaded.clear()
             self.tab_loaded.addTab(tab, name)
-

@@ -1,9 +1,6 @@
 # _*_ coding:utf-8 _*_
-"""
-首页窗口
-Update: 2019-11-22
-Author: zizle
-"""
+# Author: zizle QQ:462894999
+
 import os
 import chardet
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QTabWidget, QScrollArea
@@ -84,4 +81,3 @@ class HomePage(QScrollArea):
     # 点更多新闻按钮
     def read_more_news(self):
         print('点击了新闻【更多>>】')
-
