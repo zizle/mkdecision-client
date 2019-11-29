@@ -6,14 +6,275 @@ import json
 import xlrd
 import datetime
 import requests
+from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import QWidget, QDialog, QHBoxLayout, QVBoxLayout, QPushButton, QTreeWidget, QGridLayout,\
-    QLineEdit, QLabel, QTreeWidgetItem
+    QLineEdit, QLabel, QTreeWidgetItem, QTabWidget, QTableWidget, QTableWidgetItem, QFileDialog, QComboBox, QCompleter,\
+    QHeaderView, QDateEdit
 
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QThread, QDate
 from PyQt5.QtGui import QIcon, QFont
 
 import config
 from utils import get_desktop_path
+
+
+# 上传【常规报告文件】的线程
+class UploadReportThread(QThread):
+    response_signal = pyqtSignal(list)
+    
+    def __init__(self, file_list, machine_code, token, *args, **kwargs):
+        super(UploadReportThread, self).__init__(*args, **kwargs)
+        self.file_list = file_list
+        self.machine_code = machine_code
+        self.token = token
+
+    def run(self):
+        for file_item in self.file_list:
+            # 读取文件
+            print('上传常规报告文件', file_item['file_path'])
+            try:
+                data_file = dict()
+                # 增加其他字段
+                data_file['name'] = file_item['file_name']
+                data_file['date'] = file_item['file_date']
+                data_file['category_id'] = file_item['category_id']
+                data_file['variety_id'] = file_item['variety_id']
+                # 读取文件
+                file = open(file_item['file_path'], "rb")
+                file_content = file.read()
+                file.close()
+                # 文件内容字段
+                data_file["file"] = (file_item['file_name'], file_content)
+                encode_data = encode_multipart_formdata(data_file)
+                data_file = encode_data[0]
+                # 发起上传请求
+                r = requests.post(
+                    url=config.SERVER_ADDR + 'home/normal-report/?mc=' + self.machine_code,
+                    headers={
+                        'AUTHORIZATION': self.token,
+                        'Content-Type': encode_data[1]
+                    },
+                    data=data_file
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.response_signal.emit([file_item['row_index'], str(e)])
+            else:
+                self.response_signal.emit([file_item['row_index'], response['message']])
+
+
+# 维护【常规报告】的Tab Frame
+class NormalReportMaintain(QWidget):
+    network_result = pyqtSignal(bool)
+    group_error = pyqtSignal(str)
+
+    def __init__(self, group_id, category_id, category_text, *args, **kwargs):
+        super(NormalReportMaintain, self).__init__(*args, **kwargs)
+        self.group_id = group_id
+        self.category_id = category_id
+        layout = QVBoxLayout(margin=0)
+        # 所属分类布局（含新建）
+        attach_category_layout = QHBoxLayout()
+        attach_category_label = QLabel('所属分类:', parent=self)
+        self.attach_category = QLabel(category_text, parent=self)
+        self.attach_category_tips = QLabel('不选则归类为【其他】。' if not category_id else '', objectName='categoryError')
+        self.new_category_label = QLabel('当前没有的分类?')
+        self.new_category_edit = QLineEdit()
+        self.new_category_edit.hide()  # 隐藏编辑框
+        self.new_category_button = QPushButton('新建', parent=self, clicked=self.add_new_category,
+                                               objectName='newCategoryBtn', cursor=Qt.PointingHandCursor)
+        attach_category_layout.addWidget(attach_category_label, alignment=Qt.AlignLeft)
+        attach_category_layout.addWidget(self.attach_category)
+        attach_category_layout.addStretch()  # 中间伸缩
+        attach_category_layout.addWidget(self.attach_category_tips)
+        attach_category_layout.addWidget(self.new_category_label)
+        attach_category_layout.addWidget(self.new_category_edit)
+        attach_category_layout.addWidget(self.new_category_button)
+        # 选择品种导入报告和信息提示布局
+        self.variety_combo = QComboBox(parent=self)
+        self.variety_combo.setEditable(True)
+        button_message_layout = QHBoxLayout()
+        self.select_report_button = QPushButton('添加', parent=self, clicked=self.select_report_files)
+        self.show_tips_label = QLabel(parent=self)
+        button_message_layout.addWidget(QLabel('所属品种:'))
+        button_message_layout.addWidget(self.variety_combo)
+        button_message_layout.addWidget(self.select_report_button)
+        button_message_layout.addStretch()
+        button_message_layout.addWidget(self.show_tips_label)
+        # 显示带操作表格
+        self.report_table_show = QTableWidget()
+        self.report_table_show.verticalHeader().hide()
+        layout.addLayout(attach_category_layout)
+        layout.addLayout(button_message_layout)
+        layout.addWidget(self.report_table_show)
+        self.commit_button = QPushButton('确认上传',parent=self, clicked=self.upload_reports)
+        layout.addWidget(self.commit_button, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        self.setStyleSheet("""
+        #categoryError{
+            color: rgb(220,20,10)
+        }
+        #newCategoryBtn{
+            min-width:35px;
+            max-width:35px;
+            border:none;
+            color: rgb(100,50,200)
+        }
+        #newCategoryBtn:hover{
+            color:rgb(240,120,120)
+        }
+        #dateEdit{
+            border:none;
+        }
+        """)
+        # 初始化，获取所有品种数据
+        self.get_varieties()
+
+    # 请求获取所有品种数据
+    def get_varieties(self):
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'basic/variety/?mc=' + config.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception as e:
+            self.show_tips_label.setText(str(e))
+            return
+        else:
+            name_en_list = list()
+            for variety_item in response['data']:
+                name_en_list.append(variety_item['name_en'])
+                self.variety_combo.addItem(variety_item['name'], variety_item['id'])
+                name_en_list.append(variety_item['name'])
+            self.variety_combo.setCompleter(QCompleter(name_en_list))
+
+    # 选择常规报告文件
+    def select_report_files(self):
+        # 获取当前品种名称和报告类型
+        report_category = self.attach_category.text() if self.attach_category.text() else '其他'
+        current_variety_text = self.variety_combo.currentText()  + '(' + report_category + ')'
+        file_path_list, _ = QFileDialog.getOpenFileNames(self, '选择文件', '', 'PDF files (*.pdf)')
+        if not file_path_list:
+            return
+        print('数量', len(file_path_list))
+        # 数据在表格中展示
+        self.report_table_show.setColumnCount(5)
+        self.report_table_show.setRowCount(len(file_path_list))
+        self.report_table_show.setHorizontalHeaderLabels(['序号', '文件名', '品种(报告类型)', '报告日期', '状态'])
+        self.report_table_show.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.report_table_show.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.report_table_show.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        for row, file_path in enumerate(file_path_list):
+            print(file_path)
+            item_0 = QTableWidgetItem(str(row + 1))
+            item_0.setTextAlignment(Qt.AlignCenter)
+            # 处理文件名
+            item_1 = QTableWidgetItem(file_path.rsplit('/', 1)[1])
+            item_1.file_abspath = file_path  # 保存好绝对路径
+            item_1.setTextAlignment(Qt.AlignCenter)
+            item_2 = QTableWidgetItem(current_variety_text)
+            item_2.setTextAlignment(Qt.AlignCenter)
+            item_3 = QDateEdit(QDate.currentDate(), objectName='dateEdit')
+            item_3.setCalendarPopup(True)
+            item_3.setDisplayFormat('yyyy-MM-dd')
+            item_3.setAlignment(Qt.AlignCenter)
+            item_4 = QTableWidgetItem('等待上传')
+            item_4.setTextAlignment(Qt.AlignCenter)
+            self.report_table_show.setItem(row, 0, item_0)
+            self.report_table_show.setItem(row, 1, item_1)
+            self.report_table_show.setItem(row, 2, item_2)
+            self.report_table_show.setCellWidget(row, 3, item_3)
+            self.report_table_show.setItem(row, 4, item_4)
+        self.commit_button.setEnabled(True)
+
+    # 确认上传常规报告文件
+    def upload_reports(self):
+        # 获取当前品种id
+        current_variety_id = self.variety_combo.currentData()
+        if not current_variety_id:
+            self.show_tips_label.setText('您还未选择品种')
+            return
+        # 遍历表格打包文件信息(上传线程处理，每上传一个发个信号过来修改上传状态)
+        file_message_list = list()
+        for row in range(self.report_table_show.rowCount()):
+            message_item = self.report_table_show.item(row, 4)  # 设置上传状态
+            message_item.setText('正在上传...')
+            file_message_list.append({
+                'file_name': self.report_table_show.item(row, 1).text(),
+                'file_path': self.report_table_show.item(row, 1).file_abspath,
+                'category_id': self.category_id,
+                'variety_id': current_variety_id,
+                'file_date': self.report_table_show.cellWidget(row, 3).text(),
+                'row_index': row
+            })
+        # 开启线程
+        if hasattr(self, 'uploading_thread'):
+            del self.uploading_thread
+        self.uploading_thread = UploadReportThread(
+            file_list=file_message_list,
+            machine_code=config.app_dawn.value('machine'),
+            token=config.app_dawn.value('AUTHORIZATION'),
+        )
+        self.uploading_thread.finished.connect(self.uploading_thread.deleteLater)
+        self.uploading_thread.response_signal.connect(self.change_loading_state)
+        self.uploading_thread.start()
+        self.commit_button.setEnabled(False)
+
+    # 改变上传状态
+    def change_loading_state(self, row_message):
+        self.report_table_show.item(row_message[0], 4).setText(row_message[1])
+
+    # 新建数据组别下的分类
+    def add_new_category(self):
+        # 获取分组id
+        if not self.group_id:
+            self.group_error.emit('请先选择所属模块再创建分类.')
+            return
+        print('在组id为%d下创建分类' % self.group_id)
+        # 显示编辑框
+        if self.new_category_edit.isHidden():
+            self.new_category_label.hide()
+            self.new_category_edit.show()
+            self.new_category_button.setText('确定')
+        else:
+            print('发起新建分类的请求。')
+            if self._commit_new_category():
+                self.new_category_edit.hide()
+                self.new_category_label.show()
+                self.new_category_button.setText('新建')
+
+    # 新建分类的请求
+    def _commit_new_category(self):
+        # 获取name,去除空格
+        name = re.sub(r'\s+', '', self.new_category_edit.text())
+        if not name:
+            self.attach_category_tips.setText('请输入分类名称')
+            return
+        try:
+            r = requests.post(
+                url=config.SERVER_ADDR + 'home/group-categories/?mc=' + config.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({
+                    'gid': self.group_id,
+                    'name': name
+                })
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.attach_category_tips.setText(str(e))
+            return False
+        else:
+            # 重新获取左侧列表
+            self.network_result.emit(True)
+            # 根据返回的数据，写入选择的分类
+            self.category_id = response['data']['id']
+            self.attach_category.setText(response['data']['name'])
+            self.attach_category_tips.setText('')
+            return True
 
 
 # 新增分组数据弹窗
@@ -30,22 +291,41 @@ class NewHomeDataPopup(QDialog):
         # 左侧分类树
         self.left_tree = QTreeWidget(parent=self)
         self.left_tree.header().hide()
-        self.add_group_button = QPushButton('新增大组', parent=self, clicked=self.add_new_group)
+        self.left_tree.clicked.connect(self.left_tree_clicked)
+        self.add_group_button = QPushButton('新增模块', parent=self, clicked=self.add_new_group)
         llayout.addWidget(self.left_tree, alignment=Qt.AlignLeft)
         llayout.addWidget(self.add_group_button, alignment=Qt.AlignLeft)
         # 右侧上下布局
         rlayout = QVBoxLayout()
-        # 右侧控件
-        self.right_widget = QWidget(parent=self)
+        # 右侧所属模块布局
+        attach_group_layout = QHBoxLayout()
+        attach_group_label = QLabel('维护模块:', parent=self)
+        self.attach_group = QLabel(parent=self)
+        self.attach_group.gid = None
+        attach_group_layout.addWidget(attach_group_label, alignment=Qt.AlignLeft)
+        attach_group_layout.addWidget(self.attach_group)
+        attach_group_layout.addStretch()  # 右侧伸缩使显示靠左
+        # 维护模块错误提示
+        self.attach_group_error = QLabel(parent=self, objectName='groupError')
+        attach_group_layout.addWidget(self.attach_group_error)
+        rlayout.addLayout(attach_group_layout)
+
+        # 右侧显示维护数据frame的控件
+        self.right_tab = QTabWidget(parent=self)
+        self.right_tab.tabBar().hide()
+        self.right_tab.setDocumentMode(True)
         # 控件布局
-        right_widget_layout = QGridLayout()
-        self.right_widget.setLayout(right_widget_layout)
-        rlayout.addWidget(self.right_widget)
+        rlayout.addWidget(self.right_tab)
         # 加入总布局显示
         layout.addLayout(llayout)
         layout.addLayout(rlayout)
-        self.setFixedSize(800, 500)
+        self.setFixedSize(1000, 500)
         self.setLayout(layout)
+        self.setStyleSheet("""
+        #groupError{
+            color: rgb(220,20,10)
+        }
+        """)
         # 初始化数据分类
         self.get_groups_categories()
 
@@ -72,7 +352,7 @@ class NewHomeDataPopup(QDialog):
                 for category_item in group_item['categories']:
                     child = QTreeWidgetItem()
                     child.setText(0, category_item['name'])
-                    child.vid = category_item['id']
+                    child.cid = category_item['id']
                     group.addChild(child)
             self.network_result.emit('')
 
@@ -121,10 +401,41 @@ class NewHomeDataPopup(QDialog):
         new_popup.setLayout(nglayout)
         new_popup.setFixedSize(250, 110)
 
-
         if not new_popup.exec_():
             new_popup.deleteLater()
             del new_popup
+
+    # 显示子控件中组错误的信息
+    def show_group_error_message(self, message):
+        self.attach_group_error.setText(message)
+
+    # 点击左侧分组树
+    def left_tree_clicked(self):
+        self.attach_group_error.setText('')  # 清空组错误
+        current_item = self.left_tree.currentItem()
+        parent = current_item.parent()
+        if parent:
+            self.attach_group.gid = parent.gid
+            group_text = parent.text(0)
+            category_id = current_item.cid  # 有父类的是cid，详见函数self.get_groups_categories
+            category_text = current_item.text(0)
+        else:
+            self.attach_group.gid = current_item.gid
+            group_text = current_item.text(0)
+            category_id = 0
+            category_text = ''
+        # 改变所属分组的显示
+        self.attach_group.setText(group_text)
+        # 没有父级时改变tab内的显示
+        if group_text == u'常规报告':
+            maintain_tab = NormalReportMaintain(parent=self, group_id=self.attach_group.gid, category_id=category_id, category_text=category_text)
+            maintain_tab.network_result.connect(self.get_groups_categories)
+            maintain_tab.group_error.connect(self.show_group_error_message)
+        else:
+            maintain_tab = QLabel('该模块还不支持新增数据。', alignment=Qt.AlignCenter)
+        self.right_tab.clear()
+        self.right_tab.addTab(maintain_tab, '')
+
 
 
 

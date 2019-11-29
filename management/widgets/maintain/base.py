@@ -141,23 +141,21 @@ class ClientManagerTable(QTableWidget):
         self.setHorizontalHeaderLabels(['序号', '名称', '机器码', '客户端类型', '有效'])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        own_machine_code = config.app_dawn.value('machine') # 获取本机机器码
         for row, client_item in enumerate(client_list):
-
             item_0 = QTableWidgetItem(str(row + 1))
             item_0.setTextAlignment(Qt.AlignCenter)
             item_1 = ClientTableTextEdit(cid=client_item['id'], text=client_item['name'], edit_property='name')
             # 控件网络信号连接
             item_1.network_result.connect(self.emit_network_message)
-            # 十分注意!!!本机不能进行有效与机器码修改，否则一切就无作用
-            if client_item['machine_code'] == own_machine_code:
+            # 十分注意!!!管理端不能进行有效与机器码修改，避免超级管理员与数据搜集员之间互相修改，致使客户端无效
+            if client_item['is_manager'] is True:
                 item_2 = QTableWidgetItem(str(client_item['machine_code']))
-                item_4 = QTableWidgetItem('本机禁止操作')
+                item_4 = QTableWidgetItem('管理端不作修改')
                 item_2.setTextAlignment(Qt.AlignCenter)
                 item_4.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, 2, item_2)
                 self.setItem(row, 4, item_4)
-            else:  # 非本机
+            else:  # 非管理端
                 item_2 = ClientTableTextEdit(cid=client_item['id'], text=client_item['machine_code'], edit_property='machine_code')
                 item_4 = ClientTableCheckBox(cid=client_item['id'], checked=client_item['is_active'])
                 # 控件网络信号连接
