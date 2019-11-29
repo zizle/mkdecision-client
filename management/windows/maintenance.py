@@ -255,7 +255,7 @@ class AuthorityHome(QWidget):
         # 详情页权限设置布局
         detail_authority_layout = QHBoxLayout()
         self.authority_list = QListWidget()
-        self.authority_list.addItems(['客户端权限', '模块权限', ])  # 添加左侧权限管理菜单
+        self.authority_list.addItems(['客户端权限', '模块权限', '品种权限'])  # 添加左侧权限管理菜单
         self.authority_list.clicked.connect(self.authority_list_clicked)
         detail_authority_layout.addWidget(self.authority_list, alignment=Qt.AlignLeft)
         # 详情权限右侧容器
@@ -428,6 +428,10 @@ class AuthorityHome(QWidget):
             auth_tab.network_result.connect(self.network_error)
             # 获取与展示信息
             auth_tab.getModules()
+        elif item.text() == u'品种权限':
+            from widgets.maintain.authorization import UserVarietyTable
+            auth_tab = UserVarietyTable(uid=self.user_detail.user_id, parent=self.detail_tab)
+            auth_tab.network_result.connect(self.network_error)
         else:
             return
         self.detail_tab.clear()
