@@ -429,9 +429,10 @@ class AuthorityHome(QWidget):
             # 获取与展示信息
             auth_tab.getModules()
         elif item.text() == u'品种权限':
-            from widgets.maintain.authorization import UserVarietyTable
-            auth_tab = UserVarietyTable(uid=self.user_detail.user_id, parent=self.detail_tab)
+            from piece.maintain.authorization import UserVarietyAuth
+            auth_tab = UserVarietyAuth(uid=self.user_detail.user_id, parent=self.detail_tab)
             auth_tab.network_result.connect(self.network_error)
+            auth_tab.getVarietyGroup()
         else:
             return
         self.detail_tab.clear()

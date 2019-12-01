@@ -408,13 +408,3 @@ class UserModuleTable(QTableWidget):
             self.network_result.emit(str(e))
         else:
             self.network_result.emit(response['message'])
-
-
-# 设置用户-品种权限的表格
-class UserVarietyTable(QTableWidget):
-    network_result = pyqtSignal(str)
-
-    def __init__(self, uid, *args, **kwargs):
-        super(UserVarietyTable, self).__init__(*args, **kwargs)
-        self.uid = uid
-        self.verticalHeader().hide()
