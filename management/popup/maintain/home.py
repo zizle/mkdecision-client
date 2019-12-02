@@ -254,10 +254,9 @@ class NormalReportMaintain(QWidget):
             return
         try:
             r = requests.post(
-                url=config.SERVER_ADDR + 'home/group-categories/?mc=' + config.app_dawn.value('machine'),
+                url=config.SERVER_ADDR + 'home/group-categories/' + str(self.group_id) + '/?mc=' + config.app_dawn.value('machine'),
                 headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
                 data=json.dumps({
-                    'gid': self.group_id,
                     'name': name
                 })
             )
@@ -354,13 +353,12 @@ class NewHomeDataPopup(QDialog):
                     child.setText(0, category_item['name'])
                     child.cid = category_item['id']
                     group.addChild(child)
+            self.left_tree.expandAll()
             self.network_result.emit('')
 
     # 新增数据大分组
     def add_new_group(self):
-        print('新增大组')
         new_popup = QDialog(parent=self)
-
         # 提交新建大组
         def commit_new_group():
             print('提交新建大组')

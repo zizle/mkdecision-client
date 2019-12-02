@@ -7,7 +7,8 @@ Author: zizle
 import sys
 import json
 import datetime
-from PyQt5.QtWidgets import *
+import requests
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QComboBox,QTableWidget,QTableWidgetItem, QHeaderView
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor
 
@@ -16,6 +17,93 @@ from thread.request import RequestThread
 from widgets.base import TableShow, NormalTable
 from piece.home import Calendar
 from popup.base import ShowServerPDF
+
+
+# 常规报告显示窗口
+class HomeNormalReport(QWidget):
+    def __init__(self, group_id, category_id, *args, **kwargs):
+        super(HomeNormalReport, self).__init__(*args, **kwargs)
+        self.group_id = group_id
+        self.category_id = category_id
+        layout = QVBoxLayout(margin=0)
+        # 上方类别选择
+        self.variety_combo = QComboBox()
+        self.variety_combo.currentTextChanged.connect(self.report_variety_changed)
+        # 下方表格展示
+        self.report_table = QTableWidget(parent=self)
+        self.report_table.verticalHeader().hide()
+        layout.addWidget(self.variety_combo, alignment=Qt.AlignLeft)
+        layout.addWidget(self.report_table)
+        self.setLayout(layout)
+
+    # 获取所有品种
+    def getVarieties(self):
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'basic/variety/?mc=' + config.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            print(e)
+        else:
+            print(response['data'])
+            # 先加入一个全部,id=0
+            self.variety_combo.addItem('全部', 0)
+            for variety_item in response['data']:
+                self.variety_combo.addItem(variety_item['name'], variety_item['id'])
+
+    # 选择某个类别显示当前的报告
+    def report_variety_changed(self):
+        variety_id = self.variety_combo.currentData()
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'home/normal-report/?mc=' + config.app_dawn.value('machine'),
+                data=json.dumps({
+                    'category': self.category_id,
+                    'variety': variety_id
+                })
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            return
+        else:
+            self._table_show_reports(response['data'])
+
+    # 表格显示结果
+    def _table_show_reports(self, report_list):
+        self.report_table.clear()
+        self.report_table.setRowCount(len(report_list))
+        self.report_table.setColumnCount(6)
+        self.report_table.setHorizontalHeaderLabels(['序号', '名称', '品种', '报告类型', '报告日期', ''])
+        self.report_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.report_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.report_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        if report_list:
+            self.report_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+
+        for row, report_item in enumerate(report_list):
+            print(report_item)
+            item_0 = QTableWidgetItem(str(row + 1))
+            item_0.setTextAlignment(Qt.AlignCenter)
+            self.report_table.setItem(row, 0, item_0)
+            item_1 = QTableWidgetItem(str(report_item['name']))
+            item_1.setTextAlignment(Qt.AlignCenter)
+            self.report_table.setItem(row, 1, item_1)
+            item_2 = QTableWidgetItem(str(report_item['variety']))
+            item_2.setTextAlignment(Qt.AlignCenter)
+            self.report_table.setItem(row, 2, item_2)
+            category_name = report_item['category'] if report_item['category'] else '其他'
+            item_3 = QTableWidgetItem(category_name)
+            item_3.setTextAlignment(Qt.AlignCenter)
+            self.report_table.setItem(row, 3, item_3)
+            item_4 = QTableWidgetItem(str(report_item['date']))
+            item_4.setTextAlignment(Qt.AlignCenter)
+            self.report_table.setItem(row, 4, item_4)
+
 
 
 class Commodity(QWidget):

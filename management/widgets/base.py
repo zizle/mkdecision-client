@@ -47,6 +47,26 @@ class LoadedTab(QTabWidget):
         event.accept()  # 接受事件,不传递到父控件
 
 
+# 折叠盒子的按钮
+class FoldedBodyButton(QPushButton):
+    mouse_clicked = pyqtSignal(dict)
+
+    def __init__(self, text, group_text, gid, bid, *args, **kwargs):
+        super(FoldedBodyButton, self).__init__(*args, **kwargs)
+        self.setText(text)
+        self.group_text = group_text
+        self.gid = gid
+        self.bid = bid
+        self.clicked.connect(self.left_mouse_clicked)
+
+    def left_mouse_clicked(self):
+        self.mouse_clicked.emit({
+            'group_id': self.gid,
+            'group_text': self.group_text,
+            'category_id': self.bid,
+        })
+
+
 # FoldedHead(), FoldedBody()
 # 折叠盒子的头
 class FoldedHead(QWidget):
@@ -86,7 +106,6 @@ class FoldedHead(QWidget):
         body = self.get_body()
         if not body:
             return
-        # 折叠动画
         self.body_height = body.height()
         self.setMinimumWidth(self.width())
         if not self.body_hidden:
@@ -99,6 +118,8 @@ class FoldedHead(QWidget):
 
 # 折叠盒子的身体
 class FoldedBody(QWidget):
+    mouse_clicked = pyqtSignal(dict)
+
     def __init__(self, *args, **kwargs):
         super(FoldedBody, self).__init__(*args, **kwargs)
         layout = QGridLayout(margin=0)
@@ -114,21 +135,35 @@ class FoldedBody(QWidget):
         """)
 
     # 添加按钮
-    def addButtons(self, button_list, horizontal_count=3):
+    def addButtons(self, group_text, button_list, horizontal_count=3):
         if horizontal_count < 3:
             horizontal_count = 3
         row_index = 0
         col_index = 0
-        for index, button in enumerate(button_list):
+        for index, button_item in enumerate(button_list):
+            button = FoldedBodyButton(
+                text=button_item['name'],
+                group_text=group_text,
+                gid=button_item['group'],
+                bid=button_item['id'],
+                parent=self
+            )
+            button.mouse_clicked.connect(self.left_mouse_clicked)
             self.layout().addWidget(button, row_index, col_index)
             col_index += 1
             if col_index == horizontal_count:  # 因为col_index先+1,此处应相等
                 row_index += 1
                 col_index = 0
 
+    # 踢皮球，将信号直接传出
+    def left_mouse_clicked(self, signal):
+        self.mouse_clicked.emit(signal)
+
 
 # 滚动折叠盒子
 class ScrollFoldedBox(QScrollArea):
+    left_mouse_clicked = pyqtSignal(dict)
+
     def __init__(self, *args, **kwargs):
         super(ScrollFoldedBox, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=0)
@@ -136,7 +171,7 @@ class ScrollFoldedBox(QScrollArea):
         self.container.setLayout(layout)
         self.setWidgetResizable(True)
         self.setWidget(self.container)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
         # 样式
         self.setObjectName('foldedBox')
         with open("media/ScrollBar.qss", "rb") as fp:
@@ -160,10 +195,20 @@ class ScrollFoldedBox(QScrollArea):
             if isinstance(widget, FoldedHead) and widget == head:
                 self.container.layout().insertWidget(i+1, body, alignment=Qt.AlignTop)
                 break
+        # 连接信号
+        body.mouse_clicked.connect(self.body_button_clicked)
         return body
 
     def addStretch(self):
         self.container.layout().addStretch()
+
+    # 设置竖直滚动条一直显示
+    def setVerticalScrollBarAlwayOn(self):
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+    # 踢皮球，直接将信号传出
+    def body_button_clicked(self, signal):
+        self.left_mouse_clicked.emit(signal)
 
 
 # 非滚动折叠盒子

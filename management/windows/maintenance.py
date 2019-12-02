@@ -157,7 +157,6 @@ class MaintenanceHome(QWidget):
         elif module.module_name == 'homepage':
             from frame.maintain.home import HomepageMaintain
             maintainer = HomepageMaintain(parent=self)
-
         elif module.module_name == 'danalysis':
             maintainer = UploadDataMaintain()
 

@@ -1,15 +1,11 @@
 # _*_ coding:utf-8 _*_
-"""
-all tabs of data-maintenance module, in the home page
-Create: 2019-07-25
-Author: zizle
-"""
+# Author: zizle QQ:462894999
 import sys
 import json
 import requests
 from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 
 import config
 from popup.maintain.home import NewHomeDataPopup
@@ -18,6 +14,121 @@ from popup.maintain.home import NewHomeDataPopup
 from popup.maintain import CreateNewBulletin, CreateNewCarousel, CreateNewReport, CreateNewNotice, CreateNewCommodity, CreateNewFinance
 from piece.maintain import TableCheckBox
 from thread.request import RequestThread
+
+
+# 【常规报告管理删除按钮】
+class DeleteButton(QPushButton):
+    mouse_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, rid, *args, **kwargs):
+        super(DeleteButton, self).__init__(*args, **kwargs)
+        self.setText('删除')
+        self.rid = rid
+        self.clicked.connect(lambda: self.mouse_clicked.emit(self))
+
+
+# 【常规报告管理】
+class NormalReportMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(NormalReportMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        # 选择条件
+        option_layout = QHBoxLayout()
+        self.category_combo = QComboBox(parent=self)  # 类型选择
+        self.variety_combo = QComboBox(parent=self)  # 品种选择
+        # 信息提示
+        self.message_label = QLabel(parent=self)
+        option_layout.addWidget(self.category_combo)
+        option_layout.addWidget(self.variety_combo)
+        option_layout.addWidget(self.message_label)
+        option_layout.addStretch()  # 伸缩
+        # 管理表格
+        self.maintain_table = QTableWidget(parent=self)
+        self.maintain_table.verticalHeader().hide()
+        layout.addLayout(option_layout)
+        layout.addWidget(self.maintain_table)
+        self.setLayout(layout)
+
+    # 获取分类，获取品种
+    def getGroups(self):
+        pass
+
+    # 获取常规报告列表
+    def getReports(self):
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'home/normal-report/?mc=' + config.app_dawn.value('machine'),
+                data=json.dumps({
+
+                })
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.message_label.setText(str(e))
+        else:
+            # 表格展示数据
+            self._show_reports(response['data'])
+
+    # 维护表格展示数据
+    def _show_reports(self, report_list):
+        self.maintain_table.setRowCount(len(report_list))
+        self.maintain_table.setColumnCount(6)
+        self.maintain_table.setHorizontalHeaderLabels(['序号', '名称', '报告类型', '所属品种', '报告日期', ''])
+        self.maintain_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.maintain_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.maintain_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        if report_list:
+            self.maintain_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        for row, report_item in enumerate(report_list):
+            item_0 = QTableWidgetItem(str(row + 1))
+            item_0.setTextAlignment(Qt.AlignCenter)
+            self.maintain_table.setItem(row, 0, item_0)
+            # 名称
+            item_1 = QTableWidgetItem(report_item['name'])
+            item_1.setTextAlignment(Qt.AlignCenter)
+            self.maintain_table.setItem(row, 1, item_1)
+            # 报告类型
+            item_2 = QTableWidgetItem(report_item['category'])
+            item_2.setTextAlignment(Qt.AlignCenter)
+            self.maintain_table.setItem(row, 2, item_2)
+            # 所属品种
+            item_3 = QTableWidgetItem(report_item['variety'])
+            item_3.setTextAlignment(Qt.AlignCenter)
+            self.maintain_table.setItem(row, 3, item_3)
+            # 报告日期
+            item_4 = QTableWidgetItem(report_item['date'])
+            item_4.setTextAlignment(Qt.AlignCenter)
+            self.maintain_table.setItem(row, 4, item_4)
+            # 删除按钮
+            item_5 = DeleteButton(rid=report_item['id'])
+            item_5.mouse_clicked.connect(self.report_deleted)
+            self.maintain_table.setCellWidget(row, 5, item_5)
+
+    # 删除某个报告
+    def report_deleted(self, button):
+        # 获取cellWidget所在的行
+        table_index = self.maintain_table.indexAt(QPoint(button.frameGeometry().x(), button.frameGeometry().y()))
+        row = table_index.row()  # 删除成功就删除此行
+        try:
+            r = requests.delete(
+                url=config.SERVER_ADDR + 'home/normal-report/'+ str(button.rid) + '/?mc=' + config.app_dawn.value('machine'),
+                headers={
+                    'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION'),
+                },
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.message_label.setText(str(e))
+            print('删除id为%d报告-所在行%d' % (button.rid, row))
+        else:
+            self.message_label.setText(response['message'])
+            self.maintain_table.removeRow(row)
 
 
 # 首页数据管理维护
@@ -37,6 +148,8 @@ class HomepageMaintain(QWidget):
         self.left_group_list = QListWidget()
         self.left_group_list.clicked.connect(self.left_list_clicked)
         self.tab_show = QTabWidget()
+        self.tab_show.tabBar().hide()
+        self.tab_show.setDocumentMode(True)
         show_layout.addWidget(self.left_group_list, alignment=Qt.AlignLeft)
         show_layout.addWidget(self.tab_show)
         layout.addLayout(option_layout)
@@ -65,11 +178,6 @@ class HomepageMaintain(QWidget):
                 self.left_group_list.addItem(item)
             self.network_message_label.setText('')
 
-    # 点击左侧列表
-    def left_list_clicked(self):
-        current_item = self.left_group_list.currentItem()
-        print(current_item.gid)
-
     # 显示网络请求的结果
     def show_network_message(self, message):
         if message == 'hasNewGroup':  # 新增了分组
@@ -82,6 +190,17 @@ class HomepageMaintain(QWidget):
         if not popup.exec_():
             popup.deleteLater()
             del popup
+
+    # 点击左侧列表
+    def left_list_clicked(self):
+        current_item = self.left_group_list.currentItem()
+        if current_item.text() == u'常规报告':
+            maintain_tab = NormalReportMaintain()
+            maintain_tab.getReports()
+        else:
+            maintain_tab = QLabel('【'+current_item.text()+'】还不能进行数据管理', alignment=Qt.AlignCenter)
+        self.tab_show.clear()
+        self.tab_show.addTab(maintain_tab, '')
 
 
 
