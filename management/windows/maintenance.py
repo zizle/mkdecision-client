@@ -41,7 +41,7 @@ class MaintenanceHome(QWidget):
         homepage_block.set_module_widget(QLabel('首页管理',  styleSheet='min-width:200;min-height:180', alignment=Qt.AlignCenter))
         homepage_block.enter_clicked.connect(self.enter_detail_maintainer)
         # 数据分析模块维护
-        analysis_block = ModuleBlock(parent=self, module_name='danalysis')
+        analysis_block = ModuleBlock(parent=self, module_name='trend_analysis')
         analysis_block.set_module_widget(QLabel('数据分析', styleSheet='min-width:180;min-height:180', alignment=Qt.AlignCenter))
         analysis_block.enter_clicked.connect(self.enter_detail_maintainer)
         # 可维护模块布局
@@ -62,17 +62,14 @@ class MaintenanceHome(QWidget):
         self.back_button.maintain_name = None
         self.detail_tab.setDocumentMode(True)
         # 返回按钮和信息提示布局和增加按钮
-        back_message_layout = QHBoxLayout()
+        self.back_msg_create_layout = QHBoxLayout()
         # 信息提示
         self.network_message = QLabel(parent=self.detail_maintainer, objectName='networkMessage')
-        # 增加按钮
-        self.new_module_button = QPushButton('新增模块', parent=self.detail_maintainer)
-        self.new_module_button.is_clicked_connected = False
-        back_message_layout.addWidget(self.back_button, alignment=Qt.AlignLeft)
-        back_message_layout.addWidget(self.network_message, alignment=Qt.AlignLeft)
-        back_message_layout.addStretch()
-        back_message_layout.addWidget(self.new_module_button, alignment=Qt.AlignRight)
-        detail_layout.addLayout(back_message_layout)
+        self.back_msg_create_layout.addWidget(self.back_button, alignment=Qt.AlignLeft)
+        self.back_msg_create_layout.addWidget(self.network_message, alignment=Qt.AlignLeft)
+        self.back_msg_create_layout.addStretch()
+        # self.back_msg_create_layout.addWidget(self.new_module_button, alignment=Qt.AlignRight)
+        detail_layout.addLayout(self.back_msg_create_layout)
         detail_layout.addWidget(self.detail_tab)
         # 样式
         self.detail_tab.tabBar().hide()
@@ -131,7 +128,6 @@ class MaintenanceHome(QWidget):
         )
         # 设置详情页
         self.back_button.maintain_name = module.module_name
-        self.new_module_button.hide()  # 隐藏新增模块按钮(避免进入其他界面也存在)
         # 客户端管理
         if module.module_name == 'client_manager':
             from frame.maintain.base import ClientMaintain
@@ -143,22 +139,28 @@ class MaintenanceHome(QWidget):
             from widgets.maintain.maintenance import ModuleMaintainTable
             maintainer = ModuleMaintainTable(parent=self)
             maintainer.network_result.connect(self.network_message_show_message)  # 网络请求结果信号
-            if not self.new_module_button.is_clicked_connected:  # 未连接信号才连接
-                self.new_module_button.clicked.connect(maintainer.addNewModulePopup)  # 新增模块信号
-                self.new_module_button.is_clicked_connected = True
-            self.new_module_button.show()  # 显示新增模块按钮
+            self.add_create_button(maintainer.create_button)  # 加入新增button
             maintainer.getModules()
         # 品种管理
         elif module.module_name == 'variety_maintain':
             from frame.maintain.base import VarietyMaintain
             maintainer = VarietyMaintain(parent=self)
+            maintainer.network_result.connect(self.network_message_show_message)  # 网络请求结果信号
+            self.add_create_button(maintainer.create_button)  # 加入新增button
             maintainer.getVarietyGroups()  # 获取品种组别
         # 首页管理
         elif module.module_name == 'homepage':
             from frame.maintain.home import HomepageMaintain
             maintainer = HomepageMaintain(parent=self)
-        elif module.module_name == 'danalysis':
-            maintainer = UploadDataMaintain()
+            maintainer.network_result.connect(self.network_message_show_message)  # 网络请求结果信号
+            self.add_create_button(maintainer.create_button)  # 加入新增button
+        # 数据分析管理
+        elif module.module_name == 'trend_analysis':
+            from frame.maintain.trend import TrendMaintain
+            maintainer = TrendMaintain(parent=self)
+            maintainer.network_result.connect(self.network_message_show_message)  # 网络请求结果信号
+            self.add_create_button(maintainer.create_button)  # 加入新增button
+            # maintainer = UploadDataMaintain()
 
         else:
             # self.back_button.maintain_name = None
@@ -178,6 +180,9 @@ class MaintenanceHome(QWidget):
 
     # 退出详情维护界面
     def back_to_maintainers(self):
+        # 去除新增按钮
+        self.remove_create_button()
+
         maintain_name = self.back_button.maintain_name
         # 找到缩小的那个功能模块
         module_blocks = self.findChildren(ModuleBlock, 'moduleBlock')
@@ -211,6 +216,20 @@ class MaintenanceHome(QWidget):
     # 显示提示信息
     def network_message_show_message(self, text):
         self.network_message.setText(text)
+
+    # 去除新增数据的按钮
+    def remove_create_button(self):
+        # 获取最后一个控件
+        count = self.back_msg_create_layout.count()
+        widget = self.back_msg_create_layout.itemAt(count - 1).widget()
+        if isinstance(widget, QPushButton):
+            # 去除布局中最后一个控件
+            widget.deleteLater()
+            del widget
+
+    # 增加新增数据按钮
+    def add_create_button(self, button):
+        self.back_msg_create_layout.addWidget(button, alignment=Qt.AlignRight)
 
 
 # 权限管理主页

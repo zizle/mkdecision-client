@@ -8,7 +8,7 @@ import sys
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, \
-    QListView, QHeaderView, QLabel
+    QListView, QHeaderView, QLabel, QListWidget, QListWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
@@ -55,40 +55,52 @@ class ClientMaintain(QWidget):
 
 # 品种管理
 class VarietyMaintain(QWidget):
+    network_result = pyqtSignal(str)   # 网络请求信号
+
     def __init__(self, *args, **kwargs):
         super(VarietyMaintain, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
-        opl = QHBoxLayout()  # option layout 三级联动显示数据表
-        # 大类选择下拉菜单
-        self.combox_0 = QComboBox(parent=self, objectName='combo')
-        opl.addWidget(self.combox_0, alignment=Qt.AlignLeft)
-        # 网络请求结果显示
-        self.network_message = QLabel(parent=self, objectName='networkMessage')
-        opl.addWidget(self.network_message, alignment=Qt.AlignLeft)
-        opl.addStretch()  # 伸缩
-        # 新建项目
-        opl.addWidget(QPushButton('新增品种', clicked=self.create_variety), alignment=Qt.AlignRight)
+        # 新增品种按钮,给上级窗口添加
+        self.create_button = QPushButton('新增品种', clicked=self.create_variety)
+        layout = QHBoxLayout(margin=0)
+        # 左侧选择列表
+        self.option_list = QListWidget()
+        self.option_list.clicked.connect(self.option_list_clicked)
+        # 右侧显示表格
         self.show_table = VarietyManagerTable()  # 品种管理表格
         self.show_table.verticalHeader().hide()  # 隐藏竖直表头
-        # 信号关联
-        self.show_table.network_result.connect(self.network_message_show_message)
-        self.combox_0.currentIndexChanged.connect(self.combox_0_changed)
-        layout.addLayout(opl)
+        self.show_table.network_result.connect(self.network_message_show_message)  # 表格发生的网络请求结果提示
+        layout.addWidget(self.option_list, alignment=Qt.AlignLeft)
         layout.addWidget(self.show_table)
+
+        # layout = QVBoxLayout(margin=0)
+        # opl = QHBoxLayout()  # option layout 三级联动显示数据表
+        # # 大类选择下拉菜单
+        # self.combox_0 = QComboBox(parent=self, objectName='combo')
+        # opl.addWidget(self.combox_0, alignment=Qt.AlignLeft)
+        # # 网络请求结果显示
+        # self.network_message = QLabel(parent=self, objectName='networkMessage')
+        # opl.addWidget(self.network_message, alignment=Qt.AlignLeft)
+        # opl.addStretch()  # 伸缩
+        # self.show_table = VarietyManagerTable()  # 品种管理表格
+        # self.show_table.verticalHeader().hide()  # 隐藏竖直表头
+        # # 信号关联
+        # self.show_table.network_result.connect(self.network_message_show_message)
+        # self.combox_0.currentIndexChanged.connect(self.combox_0_changed)
+        # layout.addLayout(opl)
+        # layout.addWidget(self.show_table)
         self.setLayout(layout)
-        self.setStyleSheet("""
-        #combo QAbstractItemView::item{
-            height: 22px;
-        }
-        #networkMessage{
-            color: rgb(230,50,50);
-        }
-        """)
-        self.combox_0.setView(QListView())  # comboBox的高度设置生效
+        # self.setStyleSheet("""
+        # #combo QAbstractItemView::item{
+        #     height: 22px;
+        # }
+        # #networkMessage{
+        #     color: rgb(230,50,50);
+        # }
+        # """)
+        # self.combox_0.setView(QListView())  # comboBox的高度设置生效
     
     # 获取品种组别
     def getVarietyGroups(self):
-        self.combox_0.clear()
         # 此方法在表格单元格控件中也使用
         try:
             r = requests.get(
@@ -98,28 +110,48 @@ class VarietyMaintain(QWidget):
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.network_message.setText(str(e))
+            self.network_result.emit(str(e))
             return
+        # 填入左侧list操作菜单
         for group_item in response['data']:
-            self.combox_0.addItem(group_item['name'], group_item['id'])  # 在后续传入所需的数据，就是itemData
+            item = QListWidgetItem(group_item['name'])
+            item.gid = group_item['id']
+            self.option_list.addItem(item)
+            # self.combox_0.addItem(group_item['name'], group_item['id'])  # 在后续传入所需的数据，就是itemData
 
     # 请求当前组别下的品种
-    def combox_0_changed(self):
-        gid = self.combox_0.currentData()
+    def option_list_clicked(self):
+        item = self.option_list.currentItem()
         self.show_table.clear()
         try:
             r = requests.get(
-                url=config.SERVER_ADDR + 'basic/variety-groups/' + str(gid) + '/?mc=' + config.app_dawn.value(
+                url=config.SERVER_ADDR + 'basic/variety-groups/' + str(item.gid) + '/?mc=' + config.app_dawn.value(
                     'machine'),
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.network_message.setText(str(e))
+            self.network_result.emit(str(e))
             return
         self.show_table.addVarieties(response['data'])
-        self.network_message.setText('')
+
+    # def combox_0_changed(self):
+    #     gid = self.combox_0.currentData()
+    #     self.show_table.clear()
+    #     try:
+    #         r = requests.get(
+    #             url=config.SERVER_ADDR + 'basic/variety-groups/' + str(gid) + '/?mc=' + config.app_dawn.value(
+    #                 'machine'),
+    #         )
+    #         response = json.loads(r.content.decode('utf-8'))
+    #         if r.status_code != 200:
+    #             raise ValueError(response['message'])
+    #     except Exception as e:
+    #         self.network_message.setText(str(e))
+    #         return
+    #     self.show_table.addVarieties(response['data'])
+    #     self.network_message.setText('')
 
     # 新增品种
     def create_variety(self):
@@ -132,9 +164,10 @@ class VarietyMaintain(QWidget):
             import traceback
             traceback.print_exc()
 
-    # 显示网络请求的结果
+    # 踢皮球，将网络请求结果信号提出
     def network_message_show_message(self, message):
-        self.network_message.setText(message)
+        self.network_result.emit(message)
+        # self.network_message.setText(message)
 
 
 

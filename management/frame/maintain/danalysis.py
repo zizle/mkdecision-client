@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
 import config
 from thread.request import RequestThread
-from popup.maintain.danalysis import NewTablePopup
+from popup.maintain.danalysis import NewTrendTablePopup
 
 
 

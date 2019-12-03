@@ -15,12 +15,10 @@ import config
 from thread.request import RequestThread
 
 
-
-
 # 新建数据弹窗
-class NewTablePopup(QDialog):
+class NewTrendTablePopup(QDialog):
     def __init__(self, *args, **kwargs):
-        super(NewTablePopup, self).__init__(*args, **kwargs)
+        super(NewTrendTablePopup, self).__init__(*args, **kwargs)
         # 绑定当前显示的页面(0, 上传数据表)、(1, 新增数据组别)
         self.current_option = 0
         # 左侧类别树

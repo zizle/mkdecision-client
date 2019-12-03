@@ -9,7 +9,6 @@ from PyQt5.QtWidgets import *
 
 import config
 from widgets.base import MenuScrollContainer
-from frame.base import NoDataWindow
 from frame.pservice import MessageComm, MarketAnalysis, TopicalStudy, ResearchReport, AdviserShow
 
 

@@ -504,7 +504,6 @@ class MenuScrollContainer(QScrollArea):
         self.menu_thread.start()
 
     def menu_thread_back(self, content):
-        print('widgets.base.py {} 请求到左侧菜单: '.format(str(sys._getframe().f_lineno)), content)
         if content['error']:
             return
         for data_index, menu_data in enumerate(content['data']):

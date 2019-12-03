@@ -105,6 +105,64 @@ class HomeNormalReport(QWidget):
             self.report_table.setItem(row, 4, item_4)
 
 
+# 交易通知显示窗口
+class HomeTransactionNotice(QWidget):
+    def __init__(self, group_id, category_id, *args, **kwargs):
+        super(HomeTransactionNotice, self).__init__(*args, **kwargs)
+        self.group_id = group_id
+        self.category_id = category_id
+        layout = QVBoxLayout(margin=0)
+        # 表格显示
+        self.notice_table = QTableWidget(parent=self)
+        self.notice_table.verticalHeader().hide()
+        layout.addWidget(self.notice_table)
+        self.setLayout(layout)
+
+    # 获取所有通知
+    def getNotices(self):
+        try:
+            r = requests.get(
+                url=config.SERVER_ADDR + 'home/transaction-notice/?mc=' + config.app_dawn.value('machine'),
+                data=json.dumps({
+                    'category': self.category_id,
+                })
+            )
+            response =  json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            return
+        else:
+            self._table_show_notices(response['data'])
+
+    # 展示
+    def _table_show_notices(self, notice_list):
+        self.notice_table.clear()
+        self.notice_table.setRowCount(len(notice_list))
+        self.notice_table.setColumnCount(5)
+        self.notice_table.setHorizontalHeaderLabels(['序号', '名称', '类型', '通知日期', ''])
+        self.notice_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.notice_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.notice_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        if notice_list:
+            self.notice_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        for row, notice_item in enumerate(notice_list):
+            item_0 = QTableWidgetItem(str(row + 1))
+            item_0.setTextAlignment(Qt.AlignCenter)
+            self.notice_table.setItem(row, 0, item_0)
+            item_1 = QTableWidgetItem(str(notice_item['name']))
+            item_1.setTextAlignment(Qt.AlignCenter)
+            self.notice_table.setItem(row, 1, item_1)
+            category_name = notice_item['category'] if notice_item['category'] else '其他'
+            item_2 = QTableWidgetItem(category_name)
+            item_2.setTextAlignment(Qt.AlignCenter)
+            self.notice_table.setItem(row, 2, item_2)
+            item_3 = QTableWidgetItem(str(notice_item['date']))
+            item_3.setTextAlignment(Qt.AlignCenter)
+            self.notice_table.setItem(row, 3, item_3)
+
+
+
 
 class Commodity(QWidget):
     # 现货报表

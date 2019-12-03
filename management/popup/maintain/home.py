@@ -17,6 +17,8 @@ from PyQt5.QtGui import QIcon, QFont
 import config
 from utils import get_desktop_path
 
+""" 常规报告 """
+
 
 # 上传【常规报告文件】的线程
 class UploadReportThread(QThread):
@@ -154,7 +156,7 @@ class NormalReportMaintain(QWidget):
     def select_report_files(self):
         # 获取当前品种名称和报告类型
         report_category = self.attach_category.text() if self.attach_category.text() else '其他'
-        current_variety_text = self.variety_combo.currentText()  + '(' + report_category + ')'
+        current_variety_text = self.variety_combo.currentText() + '(' + report_category + ')'
         file_path_list, _ = QFileDialog.getOpenFileNames(self, '选择文件', '', 'PDF files (*.pdf)')
         if not file_path_list:
             return
@@ -167,7 +169,6 @@ class NormalReportMaintain(QWidget):
         self.report_table_show.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.report_table_show.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         for row, file_path in enumerate(file_path_list):
-            print(file_path)
             item_0 = QTableWidgetItem(str(row + 1))
             item_0.setTextAlignment(Qt.AlignCenter)
             # 处理文件名
@@ -255,6 +256,237 @@ class NormalReportMaintain(QWidget):
         try:
             r = requests.post(
                 url=config.SERVER_ADDR + 'home/group-categories/' + str(self.group_id) + '/?mc=' + config.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({
+                    'name': name
+                })
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.attach_category_tips.setText(str(e))
+            return False
+        else:
+            # 重新获取左侧列表
+            self.network_result.emit(True)
+            # 根据返回的数据，写入选择的分类
+            self.category_id = response['data']['id']
+            self.attach_category.setText(response['data']['name'])
+            self.attach_category_tips.setText('')
+            return True
+
+
+""" 交易通知 """
+
+
+# 上传【交易通知文件】的线程
+class UploadNoticeThread(QThread):
+    response_signal = pyqtSignal(list)
+
+    def __init__(self, file_list, machine_code, token, *args, **kwargs):
+        super(UploadNoticeThread, self).__init__(*args, **kwargs)
+        self.file_list = file_list
+        self.machine_code = machine_code
+        self.token = token
+
+    def run(self):
+        for file_item in self.file_list:
+            # 读取文件
+            print('上传交易通知文件', file_item)
+            try:
+                data_file = dict()
+                # 增加其他字段
+                data_file['name'] = file_item['file_name']
+                data_file['date'] = file_item['file_date']
+                data_file['category_id'] = file_item['category_id']
+                # 读取文件
+                file = open(file_item['file_path'], "rb")
+                file_content = file.read()
+                file.close()
+                # 文件内容字段
+                data_file["file"] = (file_item['file_name'], file_content)
+                encode_data = encode_multipart_formdata(data_file)
+                data_file = encode_data[0]
+                # 发起上传请求
+                r = requests.post(
+                    url=config.SERVER_ADDR + 'home/transaction-notice/?mc=' + self.machine_code,
+                    headers={
+                        'AUTHORIZATION': self.token,
+                        'Content-Type': encode_data[1]
+                    },
+                    data=data_file
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.response_signal.emit([file_item['row_index'], str(e)])
+            else:
+                self.response_signal.emit([file_item['row_index'], response['message']])
+
+
+# 维护【交易通知】的Tab Frame
+class TransactionNoticeMaintain(QWidget):
+    network_result = pyqtSignal(bool)
+
+    def __init__(self, group_id, category_id, category_text, *args, **kwargs):
+        super(TransactionNoticeMaintain, self).__init__(*args, **kwargs)
+        self.group_id = group_id
+        self.category_id = category_id
+        layout = QVBoxLayout(margin=0)
+        # 所属分类布局（含新建）
+        attach_category_layout = QHBoxLayout()
+        attach_category_label = QLabel('所属分类:', parent=self)
+        self.attach_category = QLabel(category_text, parent=self)
+        self.attach_category_tips = QLabel('不选则归类为【其他】。' if not category_id else '', objectName='categoryError')
+        self.new_category_label = QLabel('当前没有的分类?')
+        self.new_category_edit = QLineEdit()
+        self.new_category_edit.hide()  # 隐藏编辑框
+        self.new_category_button = QPushButton('新建', parent=self, clicked=self.add_new_category,
+                                               objectName='newCategoryBtn', cursor=Qt.PointingHandCursor)
+        attach_category_layout.addWidget(attach_category_label, alignment=Qt.AlignLeft)
+        attach_category_layout.addWidget(self.attach_category)
+        attach_category_layout.addStretch()  # 中间伸缩
+        attach_category_layout.addWidget(self.attach_category_tips)
+        attach_category_layout.addWidget(self.new_category_label)
+        attach_category_layout.addWidget(self.new_category_edit)
+        attach_category_layout.addWidget(self.new_category_button)
+        # 导入通知和信息提示布局
+        button_message_layout = QHBoxLayout()
+        self.select_notice_button = QPushButton('新增通知', parent=self, clicked=self.select_notice_files)
+        self.show_tips_label = QLabel(parent=self)
+        button_message_layout.addWidget(self.select_notice_button)
+        button_message_layout.addWidget(self.show_tips_label)
+        button_message_layout.addStretch()  # 伸缩
+        # 显示带操作表格
+        self.notice_table_show = QTableWidget()
+        self.notice_table_show.verticalHeader().hide()
+        layout.addLayout(attach_category_layout)
+        layout.addLayout(button_message_layout)
+        layout.addWidget(self.notice_table_show)
+        self.commit_button = QPushButton('确认上传', parent=self, clicked=self.upload_notices)
+        layout.addWidget(self.commit_button, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        self.setStyleSheet("""
+        #categoryError{
+            color: rgb(220,20,10)
+        }
+        #newCategoryBtn{
+            min-width:35px;
+            max-width:35px;
+            border:none;
+            color: rgb(100,50,200)
+        }
+        #newCategoryBtn:hover{
+            color:rgb(240,120,120)
+        }
+        #dateEdit{
+            border:none;
+        }
+        """)
+        # 初始化，获取所有品种数据
+
+    # 选择交易通知文件
+    def select_notice_files(self):
+        # 获取当前品种名称和报告类型
+        notice_category = self.attach_category.text() if self.attach_category.text() else '其他'
+        file_path_list, _ = QFileDialog.getOpenFileNames(self, '选择文件', '', 'PDF files (*.pdf)')
+        if not file_path_list:
+            return
+        # 数据在表格中展示
+        self.notice_table_show.setColumnCount(5)
+        self.notice_table_show.setRowCount(len(file_path_list))
+        self.notice_table_show.setHorizontalHeaderLabels(['序号', '文件名', '所属类别', '发布日期', '状态'])
+        self.notice_table_show.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.notice_table_show.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.notice_table_show.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        for row, file_path in enumerate(file_path_list):
+            item_0 = QTableWidgetItem(str(row + 1))
+            item_0.setTextAlignment(Qt.AlignCenter)
+            self.notice_table_show.setItem(row, 0, item_0)
+            # 处理文件名
+            item_1 = QTableWidgetItem(file_path.rsplit('/', 1)[1])
+            item_1.file_abspath = file_path  # 保存好绝对路径
+            item_1.setTextAlignment(Qt.AlignCenter)
+            self.notice_table_show.setItem(row, 1, item_1)
+            # 所属类别
+            item_2 = QTableWidgetItem(notice_category)
+            item_2.setTextAlignment(Qt.AlignCenter)
+            self.notice_table_show.setItem(row, 2, item_2)
+            # 通知日期
+            item_3 = QDateEdit(QDate.currentDate(), objectName='dateEdit')
+            item_3.setCalendarPopup(True)
+            item_3.setDisplayFormat('yyyy-MM-dd')
+            item_3.setAlignment(Qt.AlignCenter)
+            self.notice_table_show.setCellWidget(row, 3, item_3)
+            # 状态
+            item_4 = QTableWidgetItem('等待上传')
+            item_4.setTextAlignment(Qt.AlignCenter)
+            self.notice_table_show.setItem(row, 4, item_4)
+        self.commit_button.setEnabled(True)
+
+    # 上传交易通知文件
+    def upload_notices(self):
+        # 遍历表格打包文件信息(上传线程处理，每上传一个发个信号过来修改上传状态)
+        file_message_list = list()
+        for row in range(self.notice_table_show.rowCount()):
+            message_item = self.notice_table_show.item(row, 4)  # 设置上传状态
+            message_item.setText('正在上传...')
+            file_message_list.append({
+                'file_name': self.notice_table_show.item(row, 1).text(),
+                'file_path': self.notice_table_show.item(row, 1).file_abspath,  # 文件的绝对路径保存在item_1中
+                'category_id': self.category_id,
+                'file_date': self.notice_table_show.cellWidget(row, 3).text(),
+                'row_index': row
+            })
+        # 开启线程
+        if hasattr(self, 'uploading_thread'):
+            del self.uploading_thread
+        self.uploading_thread = UploadNoticeThread(
+            file_list=file_message_list,
+            machine_code=config.app_dawn.value('machine'),
+            token=config.app_dawn.value('AUTHORIZATION'),
+        )
+        self.uploading_thread.finished.connect(self.uploading_thread.deleteLater)
+        self.uploading_thread.response_signal.connect(self.change_loading_state)
+        self.uploading_thread.start()
+        self.commit_button.setEnabled(False)
+
+    # 改变上传状态
+    def change_loading_state(self, row_message):
+        self.notice_table_show.item(row_message[0], 4).setText(row_message[1])
+
+    # 新增数据类别
+    def add_new_category(self):
+        # 获取分组id
+        if not self.group_id:
+            self.group_error.emit('请先选择所属模块再创建分类.')
+            return
+        print('在组id为%d下创建分类' % self.group_id)
+        # 显示编辑框
+        if self.new_category_edit.isHidden():
+            self.new_category_label.hide()
+            self.new_category_edit.show()
+            self.new_category_button.setText('确定')
+        else:
+            print('发起新建分类的请求。')
+            if self._commit_new_category():
+                self.new_category_edit.hide()
+                self.new_category_label.show()
+                self.new_category_button.setText('新建')
+
+    # 新建分类的请求
+    def _commit_new_category(self):
+        # 获取name,去除空格
+        name = re.sub(r'\s+', '', self.new_category_edit.text())
+        if not name:
+            self.attach_category_tips.setText('请输入分类名称')
+            return
+        try:
+            r = requests.post(
+                url=config.SERVER_ADDR + 'home/group-categories/' + str(
+                    self.group_id) + '/?mc=' + config.app_dawn.value('machine'),
                 headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
                 data=json.dumps({
                     'name': name
@@ -429,6 +661,9 @@ class NewHomeDataPopup(QDialog):
             maintain_tab = NormalReportMaintain(parent=self, group_id=self.attach_group.gid, category_id=category_id, category_text=category_text)
             maintain_tab.network_result.connect(self.get_groups_categories)
             maintain_tab.group_error.connect(self.show_group_error_message)
+        elif group_text == u'交易通知':
+            maintain_tab = TransactionNoticeMaintain(parent=self, group_id=self.attach_group.gid, category_id=category_id, category_text=category_text)
+            maintain_tab.network_result.connect(self.get_groups_categories)
         else:
             maintain_tab = QLabel('该模块还不支持新增数据。', alignment=Qt.AlignCenter)
         self.right_tab.clear()

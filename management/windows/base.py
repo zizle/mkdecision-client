@@ -4,14 +4,13 @@
 import sys
 import json
 import requests
-from PyQt5.QtWidgets import QWidget, QPushButton, QDesktopWidget, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QPushButton, QDesktopWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
 import config
 from popup.tips import InformationPopup
 from piece.base import TitleBar, NavigationBar
-from frame.base import NoDataWindow
 from widgets.base import ModuleButton, LoadedTab
 from .home import HomePage
 
@@ -372,6 +371,7 @@ class BaseWindow(QWidget):
                 from windows.maintenance import AuthorityHome
                 tab = AuthorityHome(parent=self.tab_loaded)
             else:
-                tab = NoDataWindow(name=name)
+                tab = QLabel(parent=self.tab_loaded, styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)', alignment=Qt.AlignCenter)
+                tab.setText("「" + name + "」暂未开放\n敬请期待,感谢支持~.")
             self.tab_loaded.clear()
             self.tab_loaded.addTab(tab, name)

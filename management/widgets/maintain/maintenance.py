@@ -84,6 +84,9 @@ class ModuleMaintainTable(QTableWidget):
     def __init__(self, *args, **kwargs):
         super(ModuleMaintainTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
+        # 增加按钮
+        self.create_button = QPushButton('新增模块')
+        self.create_button.clicked.connect(self.addNewModulePopup)  # 新增模块信号
 
     # 添加模块数据
     def getModules(self):

@@ -11,7 +11,7 @@ import config
 from widgets.base import ScrollFoldedBox
 from widgets.home import NewsItem, ImageSlider
 from piece.home import NewsBox
-from frame.home import HomeNormalReport
+from frame.home import HomeNormalReport, HomeTransactionNotice
 
 
 # 首页可滚动窗口
@@ -48,6 +48,7 @@ class HomePage(QScrollArea):
         # 菜单滚动折叠窗
         self.folded_box = ScrollFoldedBox(parent=self)
         self.folded_box.left_mouse_clicked.connect(self.folded_box_clicked)
+        self.folded_box.setMinimumWidth(230)
         # head1 = self.variety_box.addHead('第1个品种分组')
         # head2 = self.variety_box.addHead('第2个品种分组')
         # head3 = self.variety_box.addHead('第3个品种分组')
@@ -95,6 +96,9 @@ class HomePage(QScrollArea):
         if signal['group_text'] == u'常规报告':
             frame_show = HomeNormalReport(group_id=signal['group_id'], category_id=signal['category_id'])
             frame_show.getVarieties()
+        elif signal['group_text'] == u'交易通知':
+            frame_show = HomeTransactionNotice(group_id=signal['group_id'], category_id=signal['category_id'])
+            frame_show.getNotices()
         else:
             frame_show = QLabel('该模块正在加紧开放中.\n感谢您的支持...', alignment=Qt.AlignCenter)
         self.tab_frame.clear()
@@ -116,7 +120,8 @@ class HomePage(QScrollArea):
                 continue
             head = self.folded_box.addHead(head_item['name'])
             body = self.folded_box.addBody(head=head)
-            if head_item['name'] == u'常规报告':  # 常规报告加入一个其他, 【其他】的id为-1
+            if head_item['name'] in [u'常规报告', u'交易通知']:  # 常规报告和交易通知加入一个全部和一个其他, 【全部】的id为0【其他】的id为-1
+                head_item['categories'].insert(0, {'id': 0, 'name': '全部', 'group': head_item['id']})
                 head_item['categories'].append({'id': -1, 'name': '其他', 'group': head_item['id']})
             body.addButtons(group_text=head_item['name'], button_list=head_item['categories'])
         self.folded_box.addStretch()  # 添加底部伸缩
