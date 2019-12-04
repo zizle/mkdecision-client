@@ -310,17 +310,15 @@ class NewTrendTablePopup(QDialog):
         # 数据上传
         try:
             r = requests.post(
-                url=config.SERVER_ADDR + 'danalysis/table/' + str(gid) + '/',
-                headers=config.CLIENT_HEADERS,
+                url=config.SERVER_ADDR + 'trend/table/' + str(gid) + '/',
+                headers={'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')},
                 data=json.dumps({
-                    "machine_code": config.app_dawn.value("machine"),
                     "table_name": tbname,
                     "table_data": table_data
                 }),
-                cookies=config.app_dawn.value('cookies')
             )
             response = json.loads(r.content.decode('utf-8'))
-            if response['error']:
+            if r.status_code != 201:
                 raise ValueError(response['message'])
         except Exception as e:
             el = self.findChild(QLabel, 'commitError')

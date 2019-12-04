@@ -161,16 +161,20 @@ class ModuleBar(QWidget):
         }
         """)
 
+    # 清楚除第一个【首页】外的菜单
+    def clearMenu(self):
+        count = self.layout().count()
+        for i in range(1, count):
+            widget = self.layout().itemAt(i).widget()
+            if isinstance(widget, QPushButton) and widget.mid < 0:
+                widget.deleteLater()
+                if i == count - 1:
+                    del widget  # 删除引用
+
     # 设置菜单按钮
     def setMenus(self, menu_data):
-        # 清除所有的控件
         print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
-        count = self.layout().count()
-        for i in range(count):
-            widget = self.layout().itemAt(i).widget()
-            widget.deleteLater()
-            if i == count - 1:
-                del widget  # 删除引用
+        self.clearMenu()
         for button in menu_data:
             self.layout().addWidget(button)
         print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
@@ -180,15 +184,6 @@ class ModuleBar(QWidget):
         print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
         self.layout().addWidget(menu)
         print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
-
-    # 移除菜单
-    def removeMenu(self, mid):
-        for i in range(self.layout().count()):
-            widget = self.layout().itemAt(i).widget()
-            if isinstance(widget, QPushButton) and widget.mid == mid:
-                widget.deleteLater()
-                del widget
-                break
 
 
 # 登录信息栏

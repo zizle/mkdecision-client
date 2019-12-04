@@ -1,20 +1,16 @@
 # _*_ coding:utf-8 _*_
-"""
-public popups in project
-Create: 2019-07-25
-Author: zizle
-"""
+# Author: zizle  QQ:462894999
+
 import re
 import fitz
 import json
 import requests
-from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QCheckBox, QTextBrowser, QScrollArea, QVBoxLayout,\
-    QWidget, QHBoxLayout, QGridLayout
-from PyQt5.QtGui import QCursor, QIcon, QImage, QPixmap
+from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QTextBrowser, QScrollArea, QVBoxLayout,\
+    QWidget, QGridLayout
+from PyQt5.QtGui import QIcon, QImage, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
 
 import config
-from piece.base import TitleBar
 
 
 # 登录弹窗
@@ -102,21 +98,11 @@ class LoginPopup(QDialog):
             config.app_dawn.remove('AUTHORIZATION')
             return False
         else:
-            # 保存token
-            user_data = response['data']
-            token = user_data['Authorization']
-            config.app_dawn.setValue('AUTHORIZATION', token)
-            # 发出信号
-            sig_username = user_data['username']
-            if not user_data['username']:
-                phone = user_data['phone']
-                sig_username = phone[0:3] + '****' + phone[7:11]
-            self.user_listed.emit({
-                'username': sig_username,
-                'auth_data': user_data
-            })
-
-            return True
+            if response['data']:
+                self.user_listed.emit(response['data'])
+                return True
+            else:
+                return False
 
 
 # 注册弹窗
@@ -222,23 +208,10 @@ class RegisterPopup(QDialog):
         print('密码:', password)
         print('确认密码:', re_password)
         # 提交注册
-        user_data = self._register_post(phone=phone, username=username, password=password)
-        print(user_data)
-        if user_data:
+        response_data = self._register_post(phone=phone, username=username, password=password)
+        if response_data:
             # 注册成功
-            # 保存token
-            token = user_data['Authorization']
-            config.app_dawn.setValue('AUTHORIZATION', token)
-            # 发出信号
-            sig_username = user_data['username']
-            if not user_data['username']:
-                phone = user_data['phone']
-                sig_username = phone[0:3] + '****' + phone[7:11]
-            data_dict = {
-                'username': sig_username,
-                'auth_data': user_data
-            }
-            self.user_registered.emit(data_dict)
+            self.user_registered.emit(response_data)
             self.close()
 
     # 提交注册
@@ -259,7 +232,7 @@ class RegisterPopup(QDialog):
             self.register_error.setText(str(e))
             # 移除token
             return {}
-        else:  # 登录成功
+        else:  # 注册成功
             return response['data']
 
 
@@ -269,168 +242,7 @@ class RegisterPopup(QDialog):
 
 
 
-class Register(QDialog):
-    """注册弹窗"""
-    button_click_signal = pyqtSignal(str)
-    login_signal = pyqtSignal(str)
 
-    def __init__(self):
-        super(Register, self).__init__()
-        self.resize(490, 400)
-        # 设置无边框
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        # 添加个head
-        title_bar = TitleBar(self)
-        self.setWindowTitle("注册")
-        title_bar.setTitle("注册账号")
-        title_bar.setGeometry(0, 0, 490, 50)
-        # 按钮处理
-        title_bar.buttonMinimum.hide()
-        title_bar.buttonMaximum.hide()
-        title_bar.buttonClose.setCursor(QCursor(Qt.PointingHandCursor))
-        title_bar.windowClosed.connect(self.close)
-        title_bar.windowMoved.connect(self.move)
-        self.windowIconChanged.connect(title_bar.setIcon)
-        self.setWindowIcon(QIcon("media/logo.png"))
-        # 手机号
-        account_label = QLabel("手机：", self)
-        account_label.setGeometry(75, 100, 60, 36)
-        account_label.setAlignment(Qt.AlignRight | Qt.AlignCenter)
-        self.account_edit = QLineEdit(self)
-        self.account_edit.setPlaceholderText("请输入手机号")
-        self.account_edit.setCursor(QCursor(Qt.PointingHandCursor))
-        self.account_edit.setGeometry(145, 100, 220, 35)
-        # 昵称
-        nick_label = QLabel("昵称：", self)
-        nick_label.setGeometry(75, 150, 60, 35)
-        nick_label.setAlignment(Qt.AlignRight | Qt.AlignCenter)
-        self.nick_edit = QLineEdit(self)
-        self.nick_edit.setPlaceholderText("请输入昵称,不填为空")
-        self.nick_edit.setCursor(QCursor(Qt.PointingHandCursor))
-        self.nick_edit.setGeometry(145, 150, 220, 35)
-        # 密码
-        password_label = QLabel("密码：", self)
-        password_label.setAlignment(Qt.AlignRight | Qt.AlignCenter)
-        password_label.setGeometry(75, 200, 60, 35)
-        self.password_edit = QLineEdit(self)
-        self.password_edit.setPlaceholderText("请输入密码")
-        self.password_edit.setCursor(QCursor(Qt.PointingHandCursor))
-        self.password_edit.setGeometry(145, 200, 220, 35)
-        # 确认密码
-        confirm_password = QLabel("确认密码：", self)
-        confirm_password.setAlignment(Qt.AlignRight | Qt.AlignCenter)
-        confirm_password.setGeometry(75, 250, 60, 35)
-        self.confirm_edit = QLineEdit(self)
-        self.confirm_edit.setPlaceholderText("请再次输入密码")
-        self.confirm_edit.setCursor(QCursor(Qt.PointingHandCursor))
-        self.confirm_edit.setGeometry(145, 250, 220, 35)
-        # 协议
-        self.agreement = QCheckBox("我已阅读并同意", self)
-        self.agreement.setStyleSheet("font-size:11px;color:rgb(100,100,100)")
-        self.agreement.setChecked(True)
-        self.agreement.setGeometry(145, 295, 110, 25)
-        self.agreement.stateChanged.connect(self.agreement_state_changed)
-        agreement_button = QPushButton("《决策分析系统最终用户许可协议》", self)
-        agreement_button.setStyleSheet("font-size:11px;border:none; color:rgb(0,0,255)")
-        agreement_button.setCursor(QCursor(Qt.PointingHandCursor))
-        agreement_button.setGeometry(240, 295, 165, 25)
-        # agreement_button.clicked.connect(lambda: self.button_clicked("agreement"))
-        # 注册
-        self.register_button = QPushButton("注册", self)
-        self.register_button.setCursor(QCursor(Qt.PointingHandCursor))
-        self.register_button.setStyleSheet("color:#FFFFFF;font-size:15px;background-color:rgb(30,50,190);")
-        self.register_button.setGeometry(145, 330, 220, 35)
-        self.register_button.clicked.connect(self.register_account)
-        # # 已有账号
-        # has_account = QLabel("已有账号?", self)
-        # has_account.setStyleSheet("font-size:11px;")
-        # has_account.setGeometry(145, 370, 60, 20)
-        # # 登录
-        # self.login_button = QPushButton("登录", self)
-        # self.login_button.setStyleSheet("font-size:11px;border:none;color:rgb(30,50,190)")
-        # self.login_button.setGeometry(195, 370, 30, 20)
-        # self.login_button.setCursor(QCursor(Qt.PointingHandCursor))
-        # self.login_button.clicked.connect(self.to_login)
-        self.setStyleSheet("RegisterDialog {border:1px solid rgb(54, 157, 180)}")
-
-    def agreement_state_changed(self):
-        """同意协议状态发生改变"""
-        if not self.agreement.isChecked():
-            self.register_button.setEnabled(False)
-            self.register_button.setStyleSheet("color:#FFFFFF;font-size:15px;background-color:rgb(200,200,200);")
-        else:
-            self.register_button.setStyleSheet("color:#FFFFFF;font-size:15px;background-color:rgb(30,50,190);")
-            self.register_button.setEnabled(True)
-
-    def to_login(self):
-        # close self and to show login dialog widget
-        def emit_login_successful(message):
-            # 重新实例化的登录窗口，要再次传出信号才能改变登录栏的显示状态
-            popup.successful_login.emit(message)
-        self.close()
-        popup = Login()
-        popup.successful_login.connect(emit_login_successful)
-        popup.deleteLater()
-        popup.exec()
-        del popup
-
-    def register_account(self):
-        # 上传信息,注册账号
-        phone = self.account_edit.text().strip(' ')
-        nick_name = self.nick_edit.text().strip(' ')
-        password = self.password_edit.text().strip(' ')
-        confirm_psd = self.confirm_edit.text().strip(' ')
-        if password != confirm_psd:
-            popup = TipShow()
-            popup.information('错误', '两次密码输入不一致.')
-            popup.deleteLater()
-            popup.exec()
-            del popup
-            return
-        # 验证手机号
-        if not re.match(r'^[1]([3-9])[0-9]{9}$', phone):
-            popup = TipShow()
-            popup.information('错误', '请输入正确的手机号.')
-            popup.deleteLater()
-            popup.exec()
-            del popup
-            return
-        # 注册
-        try:
-            response = requests.post(
-                url=config.SERVER_ADDR + 'user/register/',
-                data=json.dumps({
-                    'phone':phone,
-                    'nick_name': nick_name,
-                    'password': password,
-                    'machine_code': config.app_dawn.value('machine'),
-                    'is_admin': True
-                })
-            )
-            response_data = json.loads(response.content.decode('utf-8'))
-        except Exception as error:
-            popup = TipShow()
-            popup.information('错误', '注册失败.\n{}'.format(error))
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.deleteLater()
-            popup.exec()
-            del popup
-            return
-        if response.status_code != 201:
-            popup = TipShow()
-            popup.information('错误', response_data['message'])
-            popup.confirm_btn.clicked.connect(popup.close)
-            popup.deleteLater()
-            popup.exec()
-            del popup
-            return
-        popup = TipShow()
-        popup.information('成功', '恭喜!注册成功.返回登录.')
-        popup.confirm_btn.clicked.connect(popup.close)
-        popup.deleteLater()
-        popup.exec()
-        del popup
-        self.to_login()
 
 
 class ShowHtmlContent(QDialog):
@@ -507,53 +319,3 @@ class ShowServerPDF(QDialog):
             page_label.setScaledContents(True)  # pixmap resize with label
             self.page_container.layout().addWidget(page_label)
 
-
-class TipShow(QDialog):
-    def __init__(self, *args, **kwargs):
-        super(TipShow, self).__init__(*args, **kwargs)
-        self.setMinimumSize(300,200)
-        self.setWindowFlags(self.windowFlags() | Qt.FramelessWindowHint)
-        layout = QVBoxLayout(spacing=12)
-        action_layout = QHBoxLayout()
-        # widgets
-        title_bar = TitleBar()
-        self.tips_label = QLabel()
-        self.cancel_btn = QPushButton('取消')
-        self.confirm_btn = QPushButton('确定')
-        # signal
-        self.windowIconChanged.connect(title_bar.setIcon)
-        self.windowTitleChanged.connect(title_bar.setTitle)
-        title_bar.windowClosed.connect(self.close)  # close dialog
-        # style
-        layout.setContentsMargins(0, 0, 0, 0)
-        action_layout.setContentsMargins(0,0,0,0)
-        title_bar.setMaximumHeight(30)
-        title_bar.setMinimumHeight(30)
-        title_bar.buttonMinimum.hide()
-        title_bar.buttonMaximum.hide()
-        title_bar.setIconSize(20)
-        self.tips_label.setAlignment(Qt.AlignCenter)
-        self.setWindowIcon(QIcon('media/logo.png'))
-        self.cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.confirm_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.cancel_btn.setStyleSheet('border:none;background-color:rgb(110,140,220);color:rgb(255,255,255);margin:0 0 10px 0;padding:5px 10px')
-        self.confirm_btn.setStyleSheet('border:none;background-color:rgb(110,140,220);color:rgb(255,255,255);margin:0 10px 10px 0;padding:5px 10px')
-        self.tips_label.setStyleSheet('font-size:15px; padding:2px 10px 2px 10px')
-        self.setStyleSheet("TipShow{border: 1px solid rgb(185,188,191)}")
-        layout.addWidget(title_bar)
-        layout.addWidget(self.tips_label)
-        action_layout.addStretch()
-        action_layout.addWidget(self.cancel_btn)
-        action_layout.addWidget(self.confirm_btn)
-        layout.addLayout(action_layout)
-        self.setLayout(layout)
-
-    def information(self, title, message):
-        self.cancel_btn.hide()
-        self.setWindowTitle(title)
-        self.tips_label.setText(message)
-
-
-    def choose(self, title, message):
-        self.setWindowTitle(title)
-        self.tips_label.setText(message)

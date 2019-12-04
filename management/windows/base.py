@@ -62,6 +62,14 @@ class BaseWindow(QWidget):
         layout.addWidget(self.navigation_bar)
         layout.addWidget(self.tab_loaded)
         self.setLayout(layout)
+        # 加入首页菜单
+        self._add_homepage_menu()
+
+    # 加入【首页】
+    def _add_homepage_menu(self):
+        button = ModuleButton(mid=0, text='首页')
+        button.clicked_module.connect(self.module_clicked)  # 绑定模块菜单点击信号
+        self.navigation_bar.module_bar.addMenu(button)
 
     # 用户点击【登录】
     def user_to_login(self):
@@ -94,46 +102,29 @@ class BaseWindow(QWidget):
             config.app_dawn.remove('AUTHORIZATION')  # 状态保持失败移除token
             return  # 自动登录失败
         else:
-            # 用户名信息设置到登录信息栏
-            user_data = response['data']
-            sig_username = user_data['username']
-            if not user_data['username']:
-                phone = user_data['phone']
-                sig_username = phone[0:3] + '****' + phone[8:11]
-            # 登录成功
-            data_dict = {
-                'username': sig_username,
-                'auth_data': response['data']
-            }
-            self.user_login_successfully(data_dict)
+            if response['data']:
+                self.user_login_successfully(response['data'])
 
-    # 用户登录成功
-    def user_login_successfully(self, data_dict):
-        print(data_dict)
-        username = data_dict.get('username', '')
-        auth_data = data_dict.get('auth_data', {})
-        is_superuser = auth_data.get('is_superuser', False)
-        is_maintainer = auth_data.get('is_maintainer', False)
-        is_researcher = auth_data.get('is_researcher', False)
-        client_is_manager = auth_data.get('ManagerClient', False)
-        is_inner = False
-        if is_superuser or is_maintainer or is_researcher:
-            print('用户满足内部人员条件')
-            is_inner = True
-        # 改变用户名
-        self.navigation_bar.permit_bar.show_username(username)
-        if client_is_manager and is_inner:  # 用户满足条件且为管理端
-            # 加入【管理维护-1】
-            button = ModuleButton(mid=-1, text='数据管理')
-            button.clicked_module.connect(self.module_clicked)
-            self.navigation_bar.module_bar.addMenu(button)
-            if is_superuser:  # 超管在管理端登录加入和【权限管理-9】
-                button = ModuleButton(mid=-9, text='权限管理')
-                button.clicked_module.connect(self.module_clicked)
-                self.navigation_bar.module_bar.addMenu(button)
-        else:  # 不是的话则尝试移除【管理维护-1】和【权限管理-9】
-            self.navigation_bar.module_bar.removeMenu(mid=-1)
-            self.navigation_bar.module_bar.removeMenu(mid=-9)
+    # 用户登录成功(注册成功)
+    def user_login_successfully(self, response_data):
+        print(response_data)
+        # 保存token
+        token = response_data['Authorization']
+        config.app_dawn.setValue('AUTHORIZATION', token)
+        # 组织滚动显示用户名
+        dynamic_username = response_data['username']
+        if not response_data['username']:
+            phone = response_data['phone']
+            dynamic_username = phone[0:3] + '****' + phone[7:11]
+        # 改变显示用户名
+        self.navigation_bar.permit_bar.show_username(dynamic_username)
+        # 设置模块名称
+        menus = list()
+        for menu_item in response_data['modules']:
+            button = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
+            button.clicked_module.connect(self.module_clicked)  # 绑定模块菜单点击信号
+            menus.append(button)
+        self.navigation_bar.module_bar.setMenus(menus)
 
     # 用户点击【注册】
     def user_to_register(self):
@@ -148,9 +139,8 @@ class BaseWindow(QWidget):
     # 用户点击【注销】
     def user_to_logout(self):
         print('用户点击注销按钮')
-        # 如果有【数据管理-1】【权限管理-9】就移除
-        self.navigation_bar.module_bar.removeMenu(mid=-1)
-        self.navigation_bar.module_bar.removeMenu(mid=-9)
+        # 清除菜单
+        self.navigation_bar.module_bar.clearMenu()
         # 移除token
         config.app_dawn.remove('AUTHORIZATION')
         self.navigation_bar.permit_bar.user_logout()  # 注销

@@ -13,7 +13,6 @@ splash.show()
 app.processEvents()  # non-blocking
 splash.make_client_existed()  # 启动使当前客户端存在
 base_window = BaseWindow()  # main window
-base_window.get_module_menus()  # 获取模块菜单信息
 base_window.running_auto_login()  # 自动登录
 base_window.show()
 splash.finish(base_window)  # close welcome when main page loaded  # 执行到这句话才会消失欢迎页

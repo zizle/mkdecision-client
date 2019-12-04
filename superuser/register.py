@@ -52,6 +52,7 @@ class SuperUserRegister(QWidget):
                     'phone': phone,
                     'password': password,
                     'is_superuser': True,
+                    'note': '超级管理员'
                 })
             )
             response = json.loads(r.content.decode('utf-8'))
