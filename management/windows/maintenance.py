@@ -5,8 +5,8 @@ import re
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout,QHBoxLayout, QLabel, QPushButton, QTabWidget, QLineEdit,\
-    QListWidget
-from PyQt5.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QRect, QPoint
+    QListWidget, QComboBox
+from PyQt5.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QRect, QPoint, QMetaMethod
 
 import config
 from frame.maintain.danalysis import UploadDataMaintain
@@ -236,16 +236,27 @@ class MaintenanceHome(QWidget):
 class AuthorityHome(QWidget):
     def __init__(self, *args, **kwargs):
         super(AuthorityHome, self).__init__(*args, **kwargs)
+        """ 显示用户列表页 """
         self.show_users = QWidget(parent=self, objectName='showUsers')
         self.show_users.resize(self.parent().width(), self.parent().height())  # 窗口大小(与一级主容器等大)用于承载显示的表格
         # 显示用户布局
         show_users_layout = QVBoxLayout(margin=2)
+        # 下拉框和网络信息提示布局
+        combo_message_layout = QHBoxLayout()
+        # 下拉框显示当前角色下的所有用户
+        self.user_role_combo = QComboBox(parent=self)
+        self.user_role_combo.activated.connect(self.role_combo_changed)
+        combo_message_layout.addWidget(self.user_role_combo)
+        self.show_users_network_message = QLabel(parent=self.show_users)
+        combo_message_layout.addWidget(self.show_users_network_message)
+        combo_message_layout.addStretch()
         # 显示用户表格
         self.user_table = UserTable()
-        self.user_table.enter_detail.connect(self.enter_authority)
+        self.user_table.network_result.connect(self.set_show_users_network_message)
+        show_users_layout.addLayout(combo_message_layout)
         show_users_layout.addWidget(self.user_table)
         self.show_users.setLayout(show_users_layout)
-        # 右侧用户详情控件
+        """ 权限详情控制页 """
         self.user_detail = QWidget(parent=self, objectName='userDetail')
         self.user_detail.user_id = None
         self.user_detail.resize(self.parent().width(), self.parent().height())
@@ -320,8 +331,7 @@ class AuthorityHome(QWidget):
             max-height:22px;
         }
         """)
-        # 获取用户
-        self.get_users()
+
         # 进入详情管理动画
         self.detail_authority_animation = QPropertyAnimation(self.user_detail, b'pos')
         self.detail_authority_animation.setDuration(300)
@@ -333,19 +343,53 @@ class AuthorityHome(QWidget):
         self.animation_group.addAnimation(self.detail_authority_animation)
         self.animation_group.addAnimation(self.show_users_animation)
 
-    # 获取所有用户信息
-    def get_users(self):
+    # 下拉框添加数据
+    def addComboItem(self):
+        for role_item in [
+            {'role': '全部', 'flag': 'all'},
+            {'role': '运营管理员', 'flag': 'is_operator'},
+            {'role': '信息管理员', 'flag': 'is_collector'},
+            {'role': '研究员', 'flag': 'is_researcher'},
+            {'role': '普通用户', 'flag': None},
+        ]:
+            self.user_role_combo.addItem(role_item['role'], role_item['flag'])
+        # 默认点击了第一个
+        self.role_combo_changed()
+
+    # 角色选择框变化
+    def role_combo_changed(self):
+        self.show_users_network_message.setText('')
+        current_data = self.user_role_combo.currentData()
+        # 获取相应用户
+        params = dict()
+        if current_data == 'all':
+            pass
+        elif current_data is None:  # 普通用户
+            params['is_operator'] = False
+            params['is_collector'] = False
+            params['is_researcher'] = False
+        else:
+            params[current_data] = True
+        self._get_users(params)
+
+    # 获取用户
+    def _get_users(self, params):
         try:
             r = requests.get(
-                url=config.SERVER_ADDR + 'user/users-management/?mc=' + config.app_dawn.value('machine'),
+                url=config.SERVER_ADDR + 'user/authenticated/?mc=' + config.app_dawn.value('machine'),
                 headers={
                   'AUTHORIZATION': config.app_dawn.value('Authorization')
                 },
+                data=json.dumps(params)
             )
             response = json.loads(r.content.decode('utf-8'))
         except Exception:
             return
-        self.user_table.addUsers(json_list=response['data'])
+        self.user_table.showUsers(json_list=response['data'])
+
+    # 设置主页出现的网络请求信息显示
+    def set_show_users_network_message(self, message):
+        self.show_users_network_message.setText(message)
 
     # 进入详情权限管理页
     def enter_authority(self, uid):
@@ -363,10 +407,10 @@ class AuthorityHome(QWidget):
             return
         user_data = response['data']
         self.detail_user_phone.setText(user_data['phone'])
-        if user_data['is_superuser']:
-            role = '超级管理员'
-        elif user_data['is_maintainer']:
-            role = '数据搜集员'
+        if user_data['is_operator']:
+            role = '运营管理员'
+        elif user_data['is_collector']:
+            role = '信息管理员'
         elif user_data['is_researcher']:
             role = '研究员'
         else:
@@ -406,8 +450,7 @@ class AuthorityHome(QWidget):
 
     # 返回用户列表页
     def back_users_list(self):
-        # 刷新用户列表页
-        self.get_users()
+        self.role_combo_changed()   # 刷新用户
         # 详情页退出动画设置
         self.detail_authority_animation.setStartValue(QPoint(0, 0))
         self.detail_authority_animation.setEndValue(QPoint(self.parent().width(), 0))

@@ -8,7 +8,7 @@ import sys
 import json
 import chardet
 from PyQt5.QtWidgets import QTabWidget, QPushButton, QLabel, QTableWidget, QScrollArea, QWidget, QHBoxLayout,\
-    QVBoxLayout, QGridLayout
+    QVBoxLayout, QGridLayout, QMenu
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QPropertyAnimation, QSize
 from PyQt5.QtGui import QCursor, QBrush, QColor
 
@@ -24,6 +24,31 @@ class ModuleButton(QPushButton):
         super(ModuleButton, self).__init__(text, *args, **kwargs)
         self.mid = mid
         self.clicked.connect(lambda: self.clicked_module.emit(self))
+
+
+# 管理菜单按钮
+class ManagerMenu(QMenu):
+    def __init__(self, *args, **kwargs):
+        super(ManagerMenu, self).__init__(*args, **kwargs)
+        self.setStyleSheet("""
+        QMenu{
+            background-color:rgb(85,88,91); /* sets background of the menu 设置整个菜单区域的背景色 */
+            border: 1px solid rgb(250,255,250);/*整个菜单区域的边框粗细、样式、颜色*/
+         }
+        QMenu::item {
+            /* sets background of menu item. set this to something non-transparent
+                if you want menu color and menu item color to be different */
+            background-color: transparent;
+            padding:2px 16px;/*设置菜单项文字上下和左右的内边距，效果就是菜单中的条目左右上下有了间隔*/
+            margin:0px 2px;/*设置菜单项的外边距*/
+            border-bottom:1px solid rgb(180,255,250);/*为菜单项之间添加横线间隔*/
+            color: rgb(255,255,255)
+        }
+          
+        QMenu::item:selected { /* when user selects item using mouse or keyboard */
+            background-color: #2dabf9;/*这一句是设置菜单项鼠标经过选中的样式*/
+        }
+        """)
 
 
 # 承载模块内容的窗口

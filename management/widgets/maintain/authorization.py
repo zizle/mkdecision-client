@@ -4,8 +4,8 @@
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTableWidget, QLabel, QTableWidgetItem, QPushButton, QHeaderView,\
-    QCheckBox, QDateTimeEdit
-from PyQt5.QtCore import Qt, pyqtSignal, QDateTime
+    QCheckBox, QDateTimeEdit, QComboBox, QLineEdit, QListView
+from PyQt5.QtCore import Qt, pyqtSignal, QDateTime, QPoint
 import config
 from utils.maintain import change_user_information
 from popup.tips import InformationPopup
@@ -27,17 +27,78 @@ class EnterAuthorityButton(QPushButton):
 class CheckBox(QWidget):
     check_changed = pyqtSignal(QCheckBox)
 
-    def __init__(self, cid, checked, row_index, *args, **kwargs):
+    def __init__(self, checked, *args, **kwargs):
         super(CheckBox, self).__init__(*args, **kwargs)
         layout = QHBoxLayout()
-        check_button = QCheckBox(parent=self)
-        check_button.cid = cid
-        check_button.row_index = row_index
-        check_button.setChecked(checked)
-        check_button.setMinimumHeight(13)
-        layout.addWidget(check_button, alignment=Qt.AlignCenter)
+        self.check_button = QCheckBox(parent=self, checked=checked)
+        self.check_button.setMinimumHeight(13)
+        layout.addWidget(self.check_button, alignment=Qt.AlignCenter)
         self.setLayout(layout)
-        check_button.stateChanged.connect(lambda: self.check_changed.emit(check_button))
+        self.check_button.stateChanged.connect(lambda: self.check_changed.emit(self))
+
+
+# 【角色】下拉框选择
+class UserRoleComboBox(QComboBox):
+    role_changed = pyqtSignal(QComboBox)
+
+    def __init__(self, role, *args, **kwargs):
+        super(UserRoleComboBox, self).__init__(*args, **kwargs)
+        self.blockSignals(True)  # 关闭信号
+        line_edit = QLineEdit(readOnly=True)
+        line_edit.setAlignment(Qt.AlignCenter)
+        self.addItem('运营管理员', 'is_operator')
+        self.addItem('信息管理员', 'is_collector')
+        self.addItem('研究员', 'is_researcher')
+        self.addItem('普通用户', '')
+        self.setLineEdit(line_edit)  # 居中显示
+        self.currentTextChanged.connect(lambda: self.role_changed.emit(self))
+        # 设置当前项目
+        for i in range(self.count()):
+            if self.itemData(i) == role:
+                self.setCurrentIndex(i)
+            self.view().model().item(i).setTextAlignment(Qt.AlignCenter)
+        self.blockSignals(False)  # 开启信号
+        self.setStyleSheet("""
+        QComboBox{
+            border:none
+        }
+        QComboBox QAbstractItemView::item{
+            height:25px;
+            font-size:15px
+        }
+        /*
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 30px;
+            border-left-width: 0px;
+            border-left-color: gray;
+            border-left-style: solid;
+            border-top-right-radius: 3px;
+            border-bottom-right-radius: 3px;
+            }
+        QComboBox::down-arrow {
+            image: url(media/combo/dd-close.png);
+        }
+        QComboBox::down-arrow:hover{
+            
+        }
+        QComboBox::down-arrow:pressed {
+            border-image: url(media/combo/dd-open.png);
+        }*/
+        """)
+        self.setView(QListView())
+
+
+# 【权限】按钮
+class AuthButton(QPushButton):
+    auth_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(AuthButton, self).__init__(*args, **kwargs)
+        self.setText('权限')
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(lambda: self.auth_clicked.emit(self))
 
 
 # 【有效期】设置控件
@@ -99,68 +160,165 @@ class ExpireDateBox(QWidget):
 
 # 显示用户的表格
 class UserTable(QTableWidget):
-    enter_detail = pyqtSignal(int)
-    active_changed = pyqtSignal(bool)
+    network_result = pyqtSignal(str)
+    # 表头key字典列表
+    HEADER_LABELS = [
+        ('index', '序号'),
+        ('username', '用户名/昵称'),
+        ('phone', '手机号'),
+        ('email', '邮箱'),
+        ('role', '角色'),
+        ('last_login', '最近登录'),
+        ('is_active', '有效'),
+        ('note', '备注名'),
+    ]
+    NO_EDIT_COLUMNS = [0, 5]  # 不可编辑的列
+    CHECKBOX_COLUMNS = [6]  # 复选框的列
+    COMBOBOX_COLUMNS = [4]  # 下拉框的列
 
     def __init__(self, *args, **kwargs):
         super(UserTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
+        self._initialTableMode()
+        self.itemChanged.connect(self.changed_table_text)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.text_ready_to_changed = ''
+        self.cellDoubleClicked.connect(self.cell_double_clicked)
 
-    # 添加显示用户
-    def addUsers(self, json_list):
-        self.clear()
-        # 设置表头
-        self.setRowCount(len(json_list))
-        self.setColumnCount(9)
-        self.setHorizontalHeaderLabels(['序号', '用户名/昵称', '手机号', '邮箱', '角色', '最近登录', '有效', '备注名', ' '])
+    # 设置表格头和列宽模式
+    def _initialTableMode(self):
+        self.setColumnCount(len(self.HEADER_LABELS) + 1)
+        self.setHorizontalHeaderLabels([h[1] for h in self.HEADER_LABELS] + [''])  # 加个空列头
         # 列宽模式
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.horizontalHeader().setSectionResizeMode(self.columnCount() - 1, QHeaderView.ResizeToContents)
-        # 设置内容
-        for row, user in enumerate(json_list):
-            item_0 = QTableWidgetItem(str(row + 1))
-            item_1 = QTableWidgetItem(str(user['username']))
-            item_2 = QTableWidgetItem(str(user['phone']))
-            item_3 = QTableWidgetItem(str(user['email']))
-            # 判断用户角色
-            if user['is_maintainer']:
-                role = '数据搜集员'
-            elif user['is_researcher']:
-                role = '研究员'
 
-            elif user['is_superuser']:
-                role = '超级管理员'
+    # 重写clear
+    def clear(self):
+        super(UserTable, self).clear()
+        self._initialTableMode()
+        print('阻止表格修改信号')
+        self.blockSignals(True)  # 阻止信号
+
+    # 添加显示用户
+    def showUsers(self, json_list):
+        self.clear()
+        self.setRowCount(len(json_list))  # 设置行
+        # 设置内容
+        for row, user_item in enumerate(json_list):
+            print('加入用户：', user_item)
+            for col, couple_item in enumerate(self.HEADER_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.user_id = user_item['id']
+                else:
+                    table_item = QTableWidgetItem(str(user_item[self.HEADER_LABELS[col][0]]))
+                if col in self.NO_EDIT_COLUMNS:
+                    table_item.setFlags(Qt.ItemIsEnabled)
+                if col in self.CHECKBOX_COLUMNS:  # 选择框的列
+                    check_box = CheckBox(checked=int(table_item.text()))
+                    check_box.check_changed.connect(self.set_active_checked)
+                    self.setCellWidget(row, col, check_box)
+                if col in self.COMBOBOX_COLUMNS:  # 下拉框的列
+                    combo_box = UserRoleComboBox(role=table_item.text())
+                    combo_box.role_changed.connect(self.set_user_role)
+                    self.setCellWidget(row, col, combo_box)
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+            # 设置权限按钮
+            auth_button = AuthButton()
+            auth_button.auth_clicked.connect(self.enter_user_authority)
+            self.setCellWidget(row, len(self.HEADER_LABELS), auth_button)
+        print('恢复表格修改信号')
+        self.blockSignals(False)  # 恢复信号
+
+    # 单元格被双击时保存未修改前的内容
+    def cell_double_clicked(self, row, col):
+        if col in self.NO_EDIT_COLUMNS:
+            return
+        else:
+            print('单元格被双击')
+            self.text_ready_to_changed = self.item(row, col).text()  # 保存未修改前的数据
+
+    # 有效修改处理
+    def set_active_checked(self, check_widget):
+        # 获取控件所在的行和列
+        index = self.indexAt(QPoint(check_widget.frameGeometry().x(), check_widget.frameGeometry().y()))
+        row = index.row()
+        column = index.column()
+        print('改变第%d行%d列的复选框状态' %(row,column))
+        text = '1' if check_widget.check_button.isChecked() else '0'
+        self.item(row, column).setText(text)
+
+    # 用户角色修改处理
+    def set_user_role(self, combo_widget):
+        # 获取控件所在的行和列
+        row, column = self._get_widget_index(combo_widget)
+        current_role = combo_widget.currentData()
+        print('改变第%d行%d列的角色为%s' % (row, column, current_role))
+        self.item(row, column).setText(combo_widget.currentData())
+
+    # 进入用户权限管理
+    def enter_user_authority(self, button):
+        row, column = self._get_widget_index(button)
+        user_id = self.item(row, 0).user_id
+        print('进入用户id=%d的权限管理' % user_id)
+
+    # 获取控件所在行和列
+    def _get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+    # 修改表格内容处理
+    def changed_table_text(self, item):
+        current_row = item.row()
+        current_column = item.column()
+        user_id = self.item(current_row, 0).user_id
+        print('修改id=%d的用户%s为:%s' % (user_id, self.HEADER_LABELS[current_column][1], item.text()))
+        modify_content = int(item.text()) if current_column in self.CHECKBOX_COLUMNS else item.text()
+        field = {self.HEADER_LABELS[current_column][0]: modify_content}
+        if current_column in self.COMBOBOX_COLUMNS:
+            if item.text():
+                field = {item.text(): True}
             else:
-                role = '普通用户'
-            item_4 = QTableWidgetItem(role)
-            last_login = str(user['last_login']) if user['last_login'] else ''
-            item_5 = QTableWidgetItem(last_login)
-            note = str(user['note']) if user['note'] else ''
-            item_6 = QTableWidgetItem(note)
-            item_0.setTextAlignment(Qt.AlignCenter)
-            item_1.setTextAlignment(Qt.AlignCenter)
-            item_2.setTextAlignment(Qt.AlignCenter)
-            item_3.setTextAlignment(Qt.AlignCenter)
-            item_4.setTextAlignment(Qt.AlignCenter)
-            item_5.setTextAlignment(Qt.AlignCenter)
-            item_6.setTextAlignment(Qt.AlignCenter)
-            self.setItem(row, 0, item_0)
-            self.setItem(row, 1, item_1)
-            self.setItem(row, 2, item_2)
-            self.setItem(row, 3, item_3)
-            self.setItem(row, 4, item_4)
-            self.setItem(row, 5, item_5)
-            self.setItem(row, 7, item_6)
-            if not user['is_superuser']:
-                # 【有效】
-                active_check = CheckBox(cid=user['id'], checked=user['is_active'], row_index=row)
-                active_check.check_changed.connect(self.change_user_active)
-                # 【进入】
-                button = EnterAuthorityButton(uid=user['id'])
-                button.button_clicked.connect(self.enter_authority)
-                self.setCellWidget(row, 6, active_check)
-                self.setCellWidget(row, 8, button)
+                field = {
+                    'is_operator': False,
+                    'is_collector': False,
+                    'is_researcher': False,
+                }
+        user_data = self._modify_user_data(user_id=user_id, field=field)
+        # 关闭信号再修改单元格内容，防止继续向后端发送请求
+        self.blockSignals(True)
+        if user_data:
+            # 修改单元格内容
+            self.item(current_row, current_column).setText(str(user_data[self.HEADER_LABELS[current_column][0]]))
+        else:
+            self.item(current_row, current_column).setText(self.text_ready_to_changed)
+        # 恢复信号
+        self.blockSignals(False)
+
+    # 修改用户信息
+    def _modify_user_data(self, user_id, field):
+        print('修改用户信息：', field)
+        try:
+            r = requests.patch(
+                url=config.SERVER_ADDR + 'user/' + str(user_id) + '/?mc=' + config.app_dawn.value(
+                    'machine'),
+                headers={
+                    'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')
+                },
+                data=json.dumps(field)
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+            return {}
+        else:
+            self.network_result.emit(response['message'])
+            return response['data']
 
     # 点击进入权限管理
     def enter_authority(self, button):
@@ -180,6 +338,9 @@ class UserTable(QTableWidget):
         if not info_popup.exec_():
             info_popup.deleteLater()
             del info_popup
+
+    def change_item_text(self, item):
+        print(item)
 
 
 # 设置用户-客户端权限的表格

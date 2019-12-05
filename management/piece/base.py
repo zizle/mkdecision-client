@@ -2,10 +2,11 @@
 # Author: zizle QQ:462894999
 
 import fitz
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QMenu, QAction
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QFont, QImage, QPixmap
 from widgets.CAvatar import CAvatar
+from widgets.base import ModuleButton, ManagerMenu
 
 
 # 标题栏
@@ -135,9 +136,14 @@ class TitleBar(QWidget):
 
 # 模块菜单栏
 class ModuleBar(QWidget):
+    menu_clicked = pyqtSignal(int, str)
+
     def __init__(self, *args, **kwargs):
         super(ModuleBar, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0, spacing=0)
+        self.system_manager_button = QPushButton('系统管理')
+        self.actions_menu = ManagerMenu()
+        self.actions_menu.triggered.connect(self.module_action_selected)
         self.setLayout(layout)
         # 样式设计
         self.setObjectName('moduleBar')
@@ -161,29 +167,50 @@ class ModuleBar(QWidget):
         }
         """)
 
-    # 清楚除第一个【首页】外的菜单
-    def clearMenu(self):
-        count = self.layout().count()
-        for i in range(1, count):
-            widget = self.layout().itemAt(i).widget()
-            if isinstance(widget, QPushButton) and widget.mid < 0:
-                widget.deleteLater()
-                if i == count - 1:
-                    del widget  # 删除引用
+    # 清除系统之外的即管理菜单菜单
+    def clearActionMenu(self):
+        self.actions_menu.clear()
+        self.system_manager_button.hide()
+        self.system_manager_button.setText('系统管理')
 
     # 设置菜单按钮
     def setMenus(self, menu_data):
         print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
-        self.clearMenu()
-        for button in menu_data:
-            self.layout().addWidget(button)
+        self.clearActionMenu()
+        for menu_item in menu_data:
+            menu = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
+            menu.clicked_module.connect(self.module_menu_clicked)
+            self.layout().addWidget(menu)
         print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
 
     # 添加菜单按钮
-    def addMenu(self, menu):
+    def addMenu(self, mid, text):
         print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
+        menu = ModuleButton(mid=mid, text=text)
+        menu.clicked_module.connect(self.module_menu_clicked)
         self.layout().addWidget(menu)
         print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
+
+    # 设置管理菜单
+    def setMenuActions(self, actions):
+        print('设置管理菜单')
+        self.actions_menu.clear()
+        self.system_manager_button.setText('系统管理')
+        for action_item in actions:
+            action = self.actions_menu.addAction(action_item['name'])
+            action.aid = action_item['id']
+        self.system_manager_button.setMenu(self.actions_menu)
+        self.layout().addWidget(self.system_manager_button)
+        self.system_manager_button.show()
+
+    # 菜单被点击了
+    def module_menu_clicked(self, button):
+        self.menu_clicked.emit(button.mid, button.text())
+
+    # 管理菜单选择了
+    def module_action_selected(self, action):
+        self.system_manager_button.setText(action.text())
+        self.menu_clicked.emit(action.aid, action.text())
 
 
 # 登录信息栏

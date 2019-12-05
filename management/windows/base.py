@@ -4,7 +4,7 @@
 import sys
 import json
 import requests
-from PyQt5.QtWidgets import QWidget, QPushButton, QDesktopWidget, QVBoxLayout, QLabel
+from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QEnterEvent, QPainter, QColor, QPen, QIcon
 
@@ -35,6 +35,7 @@ class BaseWindow(QWidget):
         self.navigation_bar.clicked_login_button.connect(self.user_to_login)
         self.navigation_bar.clicked_register_button.connect(self.user_to_register)
         self.navigation_bar.clicked_logout_button.connect(self.user_to_logout)
+        self.navigation_bar.module_bar.menu_clicked.connect(self.module_clicked)  # 选择了某个模块的
         # 窗口承载体
         self.tab_loaded = LoadedTab(parent=self)
         # 属性、样式
@@ -67,9 +68,7 @@ class BaseWindow(QWidget):
 
     # 加入【首页】
     def _add_homepage_menu(self):
-        button = ModuleButton(mid=0, text='首页')
-        button.clicked_module.connect(self.module_clicked)  # 绑定模块菜单点击信号
-        self.navigation_bar.module_bar.addMenu(button)
+        self.navigation_bar.module_bar.addMenu(mid=0, text='首页')
 
     # 用户点击【登录】
     def user_to_login(self):
@@ -119,12 +118,9 @@ class BaseWindow(QWidget):
         # 改变显示用户名
         self.navigation_bar.permit_bar.show_username(dynamic_username)
         # 设置模块名称
-        menus = list()
-        for menu_item in response_data['modules']:
-            button = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
-            button.clicked_module.connect(self.module_clicked)  # 绑定模块菜单点击信号
-            menus.append(button)
-        self.navigation_bar.module_bar.setMenus(menus)
+        self.navigation_bar.module_bar.setMenus(response_data['modules'])
+        # 设置管理角色的菜单
+        self.navigation_bar.module_bar.setMenuActions(response_data['actions'])
 
     # 用户点击【注册】
     def user_to_register(self):
@@ -140,14 +136,12 @@ class BaseWindow(QWidget):
     def user_to_logout(self):
         print('用户点击注销按钮')
         # 清除菜单
-        self.navigation_bar.module_bar.clearMenu()
+        self.navigation_bar.module_bar.clearActionMenu()
         # 移除token
         config.app_dawn.remove('AUTHORIZATION')
         self.navigation_bar.permit_bar.user_logout()  # 注销
         # 返回首页
-        menu = QPushButton('首页')
-        menu.mid = 0
-        self.module_clicked(menu)
+        self.module_clicked(module_id=0, module_text='首页')
 
     # 事件过滤器, 用于解决鼠标进入其它控件后还原为标准鼠标样式
     def eventFilter(self, obj, event):
@@ -327,15 +321,15 @@ class BaseWindow(QWidget):
             menus.append(button)
         self.navigation_bar.module_bar.setMenus(menus)
 
-    # 点击模块菜单事件
-    def module_clicked(self, menu):
-        name = menu.text()
+    # 点击模块菜单事件(接受到模块的id和模块名称)
+    def module_clicked(self, module_id, module_text):
+        print(module_id, module_text)
         # 查询权限
         machine_code = config.app_dawn.value('machine')
         if machine_code:
-            url = config.SERVER_ADDR + 'limit/access-module/' + str(menu.mid) + '/?mc=' + machine_code
+            url = config.SERVER_ADDR + 'limit/access-module/' + str(module_id) + '/?mc=' + machine_code
         else:
-            url = config.SERVER_ADDR + 'limit/access-module/' + str(menu.mid) + '/'
+            url = config.SERVER_ADDR + 'limit/access-module/' + str(module_id) + '/'
         try:
             r = requests.get(
                 url=url,
@@ -352,16 +346,17 @@ class BaseWindow(QWidget):
                 del info_popup
             return
         else:
-            if name == u'首页':
+            if module_text == u'首页':
                 tab = HomePage(parent=self.tab_loaded)
-            elif name == u'数据管理':
+            elif module_text == u'数据管理':
                 from windows.maintenance import MaintenanceHome
                 tab = MaintenanceHome(parent=self.tab_loaded)
-            elif name == u'权限管理':
+            elif module_text == u'权限管理':
                 from windows.maintenance import AuthorityHome
                 tab = AuthorityHome(parent=self.tab_loaded)
+                tab.addComboItem()  # 添加选择当前角色，并由此出发请求相应用户列表
             else:
                 tab = QLabel(parent=self.tab_loaded, styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)', alignment=Qt.AlignCenter)
-                tab.setText("「" + name + "」暂未开放\n敬请期待,感谢支持~.")
+                tab.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
             self.tab_loaded.clear()
-            self.tab_loaded.addTab(tab, name)
+            self.tab_loaded.addTab(tab, module_text)
