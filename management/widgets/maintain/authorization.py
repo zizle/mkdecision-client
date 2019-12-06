@@ -23,7 +23,7 @@ class EnterAuthorityButton(QPushButton):
         self.clicked.connect(lambda: self.button_clicked.emit(self))
 
 
-# 【有效】选择按钮
+# 【有效】复选框
 class CheckBox(QWidget):
     check_changed = pyqtSignal(QCheckBox)
 
@@ -161,6 +161,7 @@ class ExpireDateBox(QWidget):
 # 显示用户的表格
 class UserTable(QTableWidget):
     network_result = pyqtSignal(str)
+    enter_detail_authenticated = pyqtSignal(int, dict)
     # 表头key字典列表
     HEADER_LABELS = [
         ('index', '序号'),
@@ -226,10 +227,12 @@ class UserTable(QTableWidget):
                     self.setCellWidget(row, col, combo_box)
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
-            # 设置权限按钮
+            # 设置权限按钮和tableItem
             auth_button = AuthButton()
             auth_button.auth_clicked.connect(self.enter_user_authority)
             self.setCellWidget(row, len(self.HEADER_LABELS), auth_button)
+            table_item = QTableWidgetItem('')
+            self.setItem(row, len(self.HEADER_LABELS), table_item)
         print('恢复表格修改信号')
         self.blockSignals(False)  # 恢复信号
 
@@ -263,7 +266,12 @@ class UserTable(QTableWidget):
     def enter_user_authority(self, button):
         row, column = self._get_widget_index(button)
         user_id = self.item(row, 0).user_id
-        print('进入用户id=%d的权限管理' % user_id)
+        # 按钮的位置
+        button_center = {
+            'center_x':  button.frameGeometry().center().x(),
+            'center_y': button.frameGeometry().center().y() + 40
+        }
+        self.enter_detail_authenticated.emit(user_id, button_center)
 
     # 获取控件所在行和列
     def _get_widget_index(self, widget):
@@ -323,24 +331,6 @@ class UserTable(QTableWidget):
     # 点击进入权限管理
     def enter_authority(self, button):
         self.enter_detail.emit(button.uid)
-
-    # 该变用户的有效
-    def change_user_active(self, check_box):
-        # 发起设置请求
-        request_result = change_user_information(
-            uid=check_box.cid,
-            data_dict={
-                'is_active': check_box.isChecked()
-            }
-        )
-        # 弹窗提示结果
-        info_popup = InformationPopup(parent=self, message=request_result)
-        if not info_popup.exec_():
-            info_popup.deleteLater()
-            del info_popup
-
-    def change_item_text(self, item):
-        print(item)
 
 
 # 设置用户-客户端权限的表格

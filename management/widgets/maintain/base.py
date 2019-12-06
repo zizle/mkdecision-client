@@ -5,8 +5,194 @@ import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QPushButton,\
     QComboBox, QLabel, QListView, QCheckBox
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 import config
+
+""" 管理表格 """
+
+
+# 复选框
+class CheckBox(QWidget):
+    check_changed = pyqtSignal(QCheckBox)
+
+    def __init__(self, checked, *args, **kwargs):
+        super(CheckBox, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout()
+        self.check_button = QCheckBox(parent=self, checked=checked)
+        self.check_button.setMinimumHeight(13)
+        layout.addWidget(self.check_button, alignment=Qt.AlignCenter)
+        self.setLayout(layout)
+        self.check_button.stateChanged.connect(lambda: self.check_changed.emit(self))
+
+
+# 【角色】下拉框选择
+class ComboBox(QComboBox):
+    text_changed = pyqtSignal(QComboBox)
+
+    def __init__(self, couple_items, current_text, *args, **kwargs):
+        super(ComboBox, self).__init__(*args, **kwargs)
+        self.blockSignals(True)  # 关闭信号
+        line_edit = QLineEdit(readOnly=True)
+        line_edit.setAlignment(Qt.AlignCenter)
+        for item in couple_items:
+            self.addItem(item[0], item[1])
+        self.setLineEdit(line_edit)  # 居中显示
+        self.currentTextChanged.connect(lambda: self.text_changed.emit(self))
+        # 设置当前项目
+        for i in range(self.count()):
+            if self.itemData(i) == current_text:
+                self.setCurrentIndex(i)
+            self.view().model().item(i).setTextAlignment(Qt.AlignCenter)
+        self.blockSignals(False)  # 开启信号
+        self.setStyleSheet("""
+        QComboBox{
+            border:none
+        }
+        QComboBox QAbstractItemView::item{
+            height:25px;
+            font-size:15px
+        }
+        /*
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 30px;
+            border-left-width: 0px;
+            border-left-color: gray;
+            border-left-style: solid;
+            border-top-right-radius: 3px;
+            border-bottom-right-radius: 3px;
+            }
+        QComboBox::down-arrow {
+            image: url(media/combo/dd-close.png);
+        }
+        QComboBox::down-arrow:hover{
+
+        }
+        QComboBox::down-arrow:pressed {
+            border-image: url(media/combo/dd-open.png);
+        }*/
+        """)
+        self.setView(QListView())
+
+
+# 管理表格
+class ManagerAbstractTable(QTableWidget):
+    network_result = pyqtSignal(str)
+    # 表头key字典列表
+    HEADER_LABELS = []
+    NO_EDIT_COLUMNS = []  # 不可编辑的列
+    CHECKBOX_COLUMNS = []  # 复选框的列
+    COMBOBOX_COLUMNS = []  # 下拉框的列
+
+    def __init__(self, *args, **kwargs):
+        super(ManagerAbstractTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self._initialTableMode()
+        self.itemChanged.connect(self.changed_table_text)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.text_ready_to_changed = ''
+        self.cellDoubleClicked.connect(self.cell_double_clicked)
+
+    # 设置表格头和列宽模式
+    def _initialTableMode(self):
+        self.setColumnCount(len(self.HEADER_LABELS) + 1)
+        self.setHorizontalHeaderLabels([h[1] for h in self.HEADER_LABELS] + [''])  # 加个空列头
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.setVerticalSectionResizeMode()
+
+    # 设置列宽模式【子类重写】
+    def setVerticalSectionResizeMode(self):
+        pass
+
+    # 单元格被双击时保存未修改前的内容
+    def cell_double_clicked(self, row, col):
+        if col in self.NO_EDIT_COLUMNS:
+            return
+        else:
+            self.text_ready_to_changed = self.item(row, col).text()  # 保存未修改前的数据
+
+    # 重写clear
+    def clear(self):
+        super(ManagerAbstractTable, self).clear()
+        self._initialTableMode()
+        print('阻止表格修改信号')
+        self.blockSignals(True)  # 阻止信号
+
+    # 显示内容
+    def showRowsContent(self, json_list):
+        self.clear()
+        self.setRowCount(len(json_list))
+        # 设置内容
+        for row, row_item in enumerate(json_list):
+            print('加入行内容：', row_item)
+            for col, couple_item in enumerate(self.HEADER_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.row_item_id = row_item['id']
+                else:
+                    table_item = QTableWidgetItem(str(row_item[couple_item[0]]))
+                if col in self.NO_EDIT_COLUMNS:
+                    table_item.setFlags(Qt.ItemIsEnabled)
+                if col in self.CHECKBOX_COLUMNS:  # 选择框的列
+                    check_box = CheckBox(checked=int(table_item.text()))
+                    check_box.check_changed.connect(self.check_button_changed)
+                    self.setCellWidget(row, col, check_box)
+                # 下拉框控件设置
+                for combo_item in self.COMBOBOX_COLUMNS:
+                    if col == combo_item[0]:
+                        combo_box = ComboBox(couple_items=combo_item[1], current_text=table_item.text())
+                        combo_box.text_changed.connect(self.combo_text_changed)
+                        self.setCellWidget(row, col, combo_box)
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+        print('恢复表格修改信号')
+        self.blockSignals(False)  # 恢复信号
+
+    # 设置最后一列控件
+    def setLastColumnWidget(self, widget):
+        last_column = len(self.HEADER_LABELS)
+        for row in range(self.rowCount()):
+            self.setCellWidget(row, last_column, widget)
+
+    # 获取控件所在行和列
+    def _get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+    # 修改表格信息
+    def _modify_row_content(self, url, fields):
+        print('修改当前管理表格的相关信息：', fields)
+        try:
+            r = requests.patch(
+                url=url,
+                headers={
+                    'AUTHORIZATION': config.app_dawn.value('AUTHORIZATION')
+                },
+                data=json.dumps(fields)
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+            return {}
+        else:
+            self.network_result.emit(response['message'])
+            return response['data']
+
+    # 复选框选择改变
+    def check_button_changed(self, check_widget):
+        pass
+
+    # 下拉框选择改变
+    def combo_text_changed(self, combo_widget):
+        pass
+
+    # 修改表格内容处理
+    def changed_table_text(self, item):
+        pass
+
 
 """ 客户端管理相关 """
 

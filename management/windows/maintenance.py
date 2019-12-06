@@ -253,34 +253,38 @@ class AuthorityHome(QWidget):
         # 显示用户表格
         self.user_table = UserTable()
         self.user_table.network_result.connect(self.set_show_users_network_message)
+        self.user_table.enter_detail_authenticated.connect(self.enter_user_authenticated)
         show_users_layout.addLayout(combo_message_layout)
         show_users_layout.addWidget(self.user_table)
         self.show_users.setLayout(show_users_layout)
         """ 权限详情控制页 """
         self.user_detail = QWidget(parent=self, objectName='userDetail')
         self.user_detail.user_id = None
-        self.user_detail.resize(self.parent().width(), self.parent().height())
-        # 右侧详情页布局
+        # self.user_detail.resize(self.parent().width(), self.parent().height())  # 点击进入改变详情页的大小(利用动画改变)
+        # 详情页布局
         detail_layout = QVBoxLayout()
-        # 详情页返回按钮
-        back_show_users = QPushButton('←返回', clicked=self.back_users_list)
-        # 详情页信息头
-        detail_header_layout = QHBoxLayout(spacing=0)
-        self.detail_user_phone = QLabel(parent=self.user_detail, objectName='textLabel')
-        self.detail_user_role = QLabel(parent=self.user_detail, objectName='textLabel')
-        self.detail_user_note = QLineEdit(parent=self.user_detail, objectName='noteEdit')
-        detail_header_layout.addWidget(QLabel('手机:', parent=self.user_detail, objectName='tipsLabel'), alignment=Qt.AlignLeft)
-        detail_header_layout.addWidget(self.detail_user_phone, alignment=Qt.AlignLeft)
-        detail_header_layout.addWidget(QLabel('角色:', parent=self.user_detail, objectName='tipsLabel'), alignment=Qt.AlignLeft)
-        detail_header_layout.addWidget(self.detail_user_role, alignment=Qt.AlignLeft)
-        detail_header_layout.addWidget(QLabel('备注名:', parent=self.user_detail, objectName='tipsLabel'), alignment=Qt.AlignLeft)
-        detail_header_layout.addWidget(self.detail_user_note, alignment=Qt.AlignLeft)
-        detail_header_layout.addWidget(QPushButton('设置', parent=self.user_detail, objectName='noteButton',
-                                                   cursor=Qt.PointingHandCursor, clicked=self.set_note_name))
-        self.note_name_error = QLabel(parent=self.user_detail, objectName='noteError')
-        self.detail_user_note.textChanged.connect(lambda: self.note_name_error.setText(''))
-        detail_header_layout.addWidget(self.note_name_error)
-        detail_header_layout.addStretch()
+        # 详情页用户信息和网络信息显示和返回按钮
+        detail_msgbtn_layout = QHBoxLayout()
+        # 用户信息（手机）
+        detail_msgbtn_layout.addWidget(QLabel('手机:', parent=self.user_detail))
+        self.detail_user_phone = QLabel(parent=self.user_detail)
+        detail_msgbtn_layout.addWidget(self.detail_user_phone)
+        # 用户信息（角色）
+        detail_msgbtn_layout.addWidget(QLabel('角色:', parent=self.user_detail))
+        self.detail_user_role = QLabel(parent=self.user_detail)
+        detail_msgbtn_layout.addWidget(self.detail_user_role)
+        # 用户信息（备注）
+        detail_msgbtn_layout.addWidget(QLabel('备注名:', parent=self.user_detail))
+        self.detail_user_note = QLabel(parent=self.user_detail)
+        detail_msgbtn_layout.addWidget(self.detail_user_role)
+        # 显示网络请求的结果
+        self.user_detail.network_message_show = QLabel('显示网络请求的信息')
+        detail_msgbtn_layout.addWidget(self.user_detail.network_message_show)
+        detail_msgbtn_layout.addStretch()  # 伸缩
+        # 关闭按钮
+        back_show_users = QPushButton('关闭', clicked=self._animation_detail_out)
+        detail_msgbtn_layout.addWidget(back_show_users, alignment=Qt.AlignRight)
+        detail_layout.addLayout(detail_msgbtn_layout)
         # 详情页权限设置布局
         detail_authority_layout = QHBoxLayout()
         self.authority_list = QListWidget()
@@ -288,60 +292,24 @@ class AuthorityHome(QWidget):
         self.authority_list.clicked.connect(self.authority_list_clicked)
         detail_authority_layout.addWidget(self.authority_list, alignment=Qt.AlignLeft)
         # 详情权限右侧容器
-        self.detail_tab = QTabWidget(parent=self)
+        self.detail_tab = QTabWidget(parent=self.user_detail)
         self.detail_tab.setDocumentMode(True)
         self.detail_tab.tabBar().hide()
         detail_authority_layout.addWidget(self.detail_tab)
-
-        detail_layout.addWidget(back_show_users, alignment=Qt.AlignTop|Qt.AlignLeft)
-        detail_layout.addLayout(detail_header_layout)
         detail_layout.addLayout(detail_authority_layout)
         self.user_detail.setLayout(detail_layout)
-        # 详情页移动到右侧窗口外
-        self.user_detail.move(self.parent().width(), 0)
-        # 样式
+        self.user_detail.resize(0, 0)  # 初始没有大小，即不可见
         self.setStyleSheet("""
-        #showUsers{
-            background-color: rgb(80,150,89);  
-        }
         #userDetail{
-            background-color: rgb(160,150,189);
-        }
-        #tipsLabel{
-            margin-left: 10px;
-            font-weight: bold;
-            font-size:12px;
-        }
-        #textLabel,#noteEdit{
-            color: rgb(100,130,200);
-            font-size:12px;
-        }
-        #noteEdit{
-            max-width:70px;
-            min-width:70px;
-        }
-        #noteError{
-            color: rgb(200,100,110)
-        }
-        #noteButton{
-            margin-left:5px;
-            min-width:40px;
-            min-height:22px;
-            max-width:40px;
-            max-height:22px;
+            background-color: rgb(180, 210, 210);   
         }
         """)
-
-        # 进入详情管理动画
-        self.detail_authority_animation = QPropertyAnimation(self.user_detail, b'pos')
-        self.detail_authority_animation.setDuration(300)
-        # 当前用户列表页退出动画
-        self.show_users_animation = QPropertyAnimation(self.show_users, b'pos')
-        self.show_users_animation.setDuration(300)
-        # 串行动画组
-        self.animation_group = QParallelAnimationGroup()
-        self.animation_group.addAnimation(self.detail_authority_animation)
-        self.animation_group.addAnimation(self.show_users_animation)
+        # 记录原始权限按钮的位置
+        self.detail_origin_x = None
+        self.detail_origin_y = None
+        # 详情页进入退出动画
+        self.authority_animation = QPropertyAnimation(self.user_detail, b'geometry')
+        self.authority_animation.setDuration(300)
 
     # 下拉框添加数据
     def addComboItem(self):
@@ -391,82 +359,96 @@ class AuthorityHome(QWidget):
     def set_show_users_network_message(self, message):
         self.show_users_network_message.setText(message)
 
-    # 进入详情权限管理页
-    def enter_authority(self, uid):
-        print('权限管理用户id', uid)
-        self.user_detail.user_id = uid  # 设置用户id
-        self.note_name_error.setText('')  # 清空提示
-        # 获取当前用户的基础信息
+    # 设置详情页网络请求信息提示
+    def set_user_detail_network_message(self, message):
+        self.user_detail.network_message_show.setText(message)
+
+    # 进入用户权限管理
+    def enter_user_authenticated(self, user_id, origin_center):
+        self.user_detail.network_message_show.setText('')  # 网络信息置空
+        print('进入用户id=%d的详情权限管理' % user_id)
+        # 获取当前用户信息
+        user_detail_data = self._get_current_user(user_id)
+        if not user_detail_data:
+            self.show_users_network_message.setText('获取当前用户信息失败')
+            return
+        self.user_detail.user_id = user_detail_data['id']  # 设置当前管理的用户id
+        # 初始化好详情管理页
+        role_dict = {
+            'is_operator': '运营管理员',
+            'is_collector': '信息管理员',
+            'is_researcher': '研究员',
+            '': '普通用户'
+        }
+        print(user_detail_data)
+        # 设置权限列表的项目
+        self.authority_list.setCurrentRow(0)
+        self.authority_list_clicked()  # 点中第一个
+        # 设置用户基本信息
+        self.detail_user_phone.setText(user_detail_data['phone'])
+        self.detail_user_role.setText(role_dict.get(user_detail_data['role'], ''))
+        self.detail_user_note.setText(user_detail_data['note'])
+        # 动画显示出来
+        self._animation_detail_in(origin_center)
+
+    # 获取当前用户详情信息
+    @staticmethod
+    def _get_current_user(user_id):
         try:
             r = requests.get(
-                url=config.SERVER_ADDR + 'user/' + str(uid) + '/?mc=' + config.app_dawn.value('machine'),
+                url=config.SERVER_ADDR + 'user/' + str(user_id) + '/?mc=' + config.app_dawn.value('machine'),
                 headers={"AUTHORIZATION": config.app_dawn.value('AUTHORIZATION')},
             )
             response = json.loads(r.content.decode('utf-8'))
         except Exception:
-            return
-        user_data = response['data']
-        self.detail_user_phone.setText(user_data['phone'])
-        if user_data['is_operator']:
-            role = '运营管理员'
-        elif user_data['is_collector']:
-            role = '信息管理员'
-        elif user_data['is_researcher']:
-            role = '研究员'
+            return {}
         else:
-            role = '普通用户'
-        self.detail_user_role.setText(role)
-        note = user_data['note'] if user_data['note'] else ''
-        self.detail_user_note.setText(note)
-        # 设置权限列表的项目
-        self.authority_list.setCurrentRow(0)
-        self.authority_list_clicked()  # 点中第一个
-        # 进入详情页动画设置
-        self.detail_authority_animation.setStartValue(QPoint(self.parent().width(), 0))
-        self.detail_authority_animation.setEndValue(QPoint(0, 0))
-        # 列表页退出动画设置
-        self.show_users_animation.setStartValue(QPoint(0, 0))
-        self.show_users_animation.setEndValue(QPoint(-self.parent().width(), 0))
-        # 开启动画组动画
-        self.animation_group.start()
+            return response['data']
 
-    # 设置用户的备注名
-    def set_note_name(self):
-        note_name = self.detail_user_note.text()
-        note_name = re.sub(r'\s+', '', note_name)
-        note_name = re.match(r'^[\u4e00-\u9fa5a-z]{2,20}', note_name)
-        if not note_name:
-            self.note_name_error.setText('备注名只能由中文、英文且2-20个字符组成')
-            return
-        note_name = note_name.group()
-        # 发起设置请求
-        result = change_user_information(
-            uid=self.user_detail.user_id,
-            data_dict={
-                'note': note_name
-            }
+    # 动画显示详情页
+    def _animation_detail_in(self, origin_center):
+        print('按钮中心位置', origin_center)  # 记录按钮原始位置
+        self.detail_origin_x = origin_center['center_x']
+        self.detail_origin_y = origin_center['center_y']
+        # 设置详情页放大
+        self.authority_animation.setStartValue(
+            QRect(self.detail_origin_x, self.detail_origin_y, 0, 0)
         )
-        self.note_name_error.setText(result)
+        self.authority_animation.setEndValue(
+            QRect(0, 0, self.parent().width(), self.parent().height())
+        )
+        self.authority_animation.start()
 
-    # 返回用户列表页
-    def back_users_list(self):
-        self.role_combo_changed()   # 刷新用户
-        # 详情页退出动画设置
-        self.detail_authority_animation.setStartValue(QPoint(0, 0))
-        self.detail_authority_animation.setEndValue(QPoint(self.parent().width(), 0))
-        # 列表页退出动画设置
-        self.show_users_animation.setStartValue(QPoint(-self.parent().width(), 0))
-        self.show_users_animation.setEndValue(QPoint(0, 0))
-        # 开启动画组动画
-        self.animation_group.start()
-
-    # 使用备注名后面的错误显示框显示网络错误信息
-    def network_error(self, error_message):
-        self.note_name_error.setText(error_message)
+    # 动画关闭详情页
+    def _animation_detail_out(self):
+        # 设置详情页缩小
+        self.authority_animation.setStartValue(
+            QRect(0, 0, self.parent().width(), self.parent().height())
+        )
+        self.authority_animation.setEndValue(
+            QRect(self.detail_origin_x, self.detail_origin_y, 0, 0)
+        )
+        self.authority_animation.start()
+        self.detail_origin_x = None
+        self.detail_origin_y = None  # 原始位置置空
+        self.user_detail.user_id = None  # 用户id置空
 
     # 详情页权限设置列表点击
     def authority_list_clicked(self):
         item = self.authority_list.currentItem()
+        print(item)
+        if item.text() == u'客户端权限':
+            from frame.maintain.authorization import UserToClientAuth
+            auth_tab = UserToClientAuth(user_id=self.user_detail.user_id)
+            auth_tab.network_result.connect(self.set_user_detail_network_message)
+        else:
+            auth_tab = QLabel('【' + item.text() + '】还不能进行管理.', alignment=Qt.AlignCenter)
+        self.detail_tab.clear()
+        self.detail_tab.addTab(auth_tab, item.text())
+        return
+
+
+
         if item.text() == u'客户端权限':
             from widgets.maintain.authorization import UserClientTable
             auth_tab = UserClientTable(uid=self.user_detail.user_id, parent=self.detail_tab)
@@ -496,5 +478,4 @@ class AuthorityHome(QWidget):
             auth_tab.getVarietyGroup()
         else:
             return
-        self.detail_tab.clear()
-        self.detail_tab.addTab(auth_tab, item.text())
+
