@@ -1,0 +1,18 @@
+# _*_ coding:utf-8 _*_
+# Author: zizle  QQ:462894999
+
+import sys
+from PyQt5.QtWidgets import QApplication
+
+from widgets.base import WelcomePage, BaseWindow
+
+app = QApplication(sys.argv)
+splash = WelcomePage()  # welcome
+splash.show()
+app.processEvents()  # non-blocking
+splash.make_client_existed()  # 启动使当前客户端存在（发送请求,不存在就注册）
+base_window = BaseWindow()  # main window
+base_window.running_auto_login()  # 自动登录
+base_window.show()
+splash.finish(base_window)  # close welcome when main page loaded  # 执行到这句话才会消失欢迎页
+sys.exit(app.exec_())
