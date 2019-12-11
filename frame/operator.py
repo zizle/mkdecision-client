@@ -3,9 +3,10 @@
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QListWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QLabel, QComboBox, \
-    QHeaderView
+    QHeaderView, QPushButton
 from PyQt5.QtCore import Qt
-from popup.operator import EditUserInformationPopup, EditClientInformationPopup
+from popup.operator import EditUserInformationPopup, EditClientInformationPopup, CreateNewModulePopup,\
+    EditModuleInformationPopup
 import settings
 from widgets.base import ManageTable
 
@@ -127,6 +128,7 @@ class UserManagePage(QWidget):
 """ 客户端管理相关 """
 
 
+# 客户端管理表格
 class ClientsTable(ManageTable):
     KEY_LABELS = [
         ('id', '序号'),
@@ -150,7 +152,7 @@ class ClientsTable(ManageTable):
         # 修改客户端有效的请求
         try:
             r = requests.patch(
-                url=settings.SERVER_ADDR + 'basic/client/' + str(client_id) + '/?mc=' + settings.app_dawn.value(
+                url=settings.SERVER_ADDR + 'client/' + str(client_id) + '/?mc=' + settings.app_dawn.value(
                     'machine'),
                 headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
                 data=json.dumps({'is_active': check_box.check_box.isChecked()})
@@ -222,7 +224,7 @@ class ClientManagePage(QWidget):
         # 请求数据
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'basic/client/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'client/?mc=' + settings.app_dawn.value('machine'),
                 headers={'AUTHORIZATION': settings.app_dawn.value("AUTHORIZATION")},
                 data=json.dumps(params)
             )
@@ -234,6 +236,96 @@ class ClientManagePage(QWidget):
         else:
             self.clients_table.setRowContents(response['data'])
             self.network_message.setText(response['message'])
+
+
+""" 系统模块管理相关 """
+
+
+# 模块显示管理表格
+class ModulesTable(ManageTable):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '名称'),
+        ('is_active', '有效')
+    ]
+    CHECK_COLUMNS = [2]
+
+    def resetTableMode(self, row_count):
+        super(ModulesTable, self).resetTableMode(row_count)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+
+    # 编辑模块的有效
+    def check_box_changed(self, check_box):
+        current_row, current_col = self.get_widget_index(check_box)
+        module_id = self.item(current_row, 0).id
+        try:
+            r = requests.patch(
+                url=settings.SERVER_ADDR + 'module/' + str(module_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({'is_active': check_box.check_box.isChecked()})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.network_result.emit(response['message'])
+
+    def edit_button_clicked(self, edit_button):
+        current_row, current_col = self.get_widget_index(edit_button)
+        module_id = self.item(current_row, 0).id
+        # 弹窗编辑信息
+        edit_popup = EditModuleInformationPopup(module_id=module_id, parent=self)
+        edit_popup.getCurrentModule()
+        if not edit_popup.exec_():
+            edit_popup.deleteLater()
+            del edit_popup
+
+
+# 模块管理页面
+class ModuleManagePage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(ModuleManagePage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        # 信息显示与新增按钮布局
+        message_button_layout = QHBoxLayout()
+        self.network_message = QLabel()
+        message_button_layout.addWidget(self.network_message)
+        message_button_layout.addStretch()
+        self.add_button = QPushButton('新增', clicked=self.create_new_module)
+        message_button_layout.addWidget(self.add_button, alignment=Qt.AlignRight)
+        # 模块编辑显示表格
+        self.module_table = ModulesTable(parent=self)
+        self.module_table.network_result.connect(self.network_message.setText)
+        layout.addLayout(message_button_layout)
+        layout.addWidget(self.module_table)
+        self.setLayout(layout)
+
+    # 获取系统模块信息
+    def getCurrentModules(self):
+        # 请求数据
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message.setText(str(e))
+        else:
+            print(response)
+            self.module_table.setRowContents(response['data'])
+            self.network_message.setText(response['message'])
+
+    # 新增系统模块
+    def create_new_module(self):
+        popup = CreateNewModulePopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
 
 
 """ 运营管理主页 """
@@ -269,6 +361,9 @@ class OperatorMaintain(QWidget):
             elif text == u'客户端管理':
                 tab = ClientManagePage(parent=self)
                 tab.getCurrentClients()
+            elif text == u'模块管理':
+                tab = ModuleManagePage(parent=self)
+                tab.getCurrentModules()
             else:
                 tab = QLabel(parent=self,
                              styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',

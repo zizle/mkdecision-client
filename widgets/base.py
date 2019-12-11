@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QPoint
 from widgets.CAvatar import CAvatar
 
 
-__all__ = ['ManageTable', 'TitleBar', 'NavigationBar', 'LoadedTab']  # 别的模块 import * 时控制可导入的类
+__all__ = ['TableCheckBox', 'ManageTable', 'TitleBar', 'NavigationBar', 'LoadedTab']  # 别的模块 import * 时控制可导入的类
 
 """ 管理信息的表格及其相关控件 """
 
@@ -319,13 +319,7 @@ class ModuleBar(QWidget):
             self.layout().addWidget(menu)
         print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
 
-    # 添加菜单按钮
-    def addMenu(self, mid, text):
-        print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
-        menu = ModuleButton(mid=mid, text=text)
-        menu.clicked_module.connect(self.module_menu_clicked)
-        self.layout().addWidget(menu)
-        print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.addMenu'))
+
 
     # 设置管理菜单
     def setMenuActions(self, actions):

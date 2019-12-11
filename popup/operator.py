@@ -246,7 +246,6 @@ class UserToClientTable(QTableWidget):
         index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
         return index.row(), index.column()
 
-
     # 发起可登录与有效期的设置请求
     def _running_accessed_expire_date_request(self, params):
         try:
@@ -394,6 +393,7 @@ class EditUserInformationPopup(QDialog):
 class EditClientInformationPopup(QDialog):
     def __init__(self, client_id, *args, **kwargs):
         super(EditClientInformationPopup, self).__init__(*args, **kwargs)
+        self.setWindowTitle('编辑客户端')
         self.client_id = client_id
         layout = QGridLayout()
         layout.addWidget(QLabel('名称:'), 0, 0)
@@ -416,7 +416,7 @@ class EditClientInformationPopup(QDialog):
     def getCurrentClient(self):
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'basic/client/' + str(self.client_id) + '/?mc=' + settings.app_dawn.value(
+                url=settings.SERVER_ADDR + 'client/' + str(self.client_id) + '/?mc=' + settings.app_dawn.value(
                     'machine'),
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -442,7 +442,7 @@ class EditClientInformationPopup(QDialog):
         # 发起请求
         try:
             r = requests.patch(
-                url=settings.SERVER_ADDR + 'basic/client/' + str(self.client_id) + '/?mc=' + settings.app_dawn.value(
+                url=settings.SERVER_ADDR + 'client/' + str(self.client_id) + '/?mc=' + settings.app_dawn.value(
                     'machine'),
                 headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
                 data=json.dumps({
@@ -458,3 +458,94 @@ class EditClientInformationPopup(QDialog):
         else:
             self.findChild(QLabel, 'machineError').setText(response['message'])
 
+
+""" 运营管理-【新增模块】"""
+
+
+# 编辑模块信息
+class EditModuleInformationPopup(QDialog):
+    def __init__(self, module_id, *args, **kwargs):
+        super(EditModuleInformationPopup, self).__init__(*args, **kwargs)
+        self.setWindowTitle('编辑模块')
+        self.module_id = module_id
+        layout = QGridLayout()
+        layout.addWidget(QLabel('名称:'), 0, 0)
+        self.name_edit = QLineEdit()
+        layout.addWidget(self.name_edit, 0, 1)
+        layout.addWidget(QLabel(parent=self, objectName='nameError'), 1, 0, 1, 2)
+        self.commit_button = QPushButton('确认提交', clicked=self.edit_module_info)
+        layout.addWidget(self.commit_button, 2, 1)
+        self.setLayout(layout)
+
+    # 获取当前模块信息
+    def getCurrentModule(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'module/' + str(self.module_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            el = self.findChild(QLabel, 'nameError')
+            el.setText(str(e))
+        else:
+            module_data = response['data']
+            self.name_edit.setText(module_data['name'])
+
+    # 修改模块信息
+    def edit_module_info(self):
+        name = re.sub(r'\s+', '', self.name_edit.text())
+        if not name:
+            self.findChild(QLabel, 'nameError').setText('请输入模块名称!')
+            return
+        try:
+            r = requests.patch(
+                url=settings.SERVER_ADDR + 'module/' + str(self.module_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({'name': name})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.findChild(QLabel, 'nameError').setText(str(e))
+        else:
+            self.findChild(QLabel, 'nameError').setText(response['message'])
+
+
+# 新增模块
+class CreateNewModulePopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(CreateNewModulePopup, self).__init__(*args, **kwargs)
+        self.setWindowTitle('新增模块')
+        layout = QGridLayout()
+        layout.addWidget(QLabel('名称:'), 0, 0)
+        self.name_edit = QLineEdit()
+        layout.addWidget(self.name_edit, 0, 1)
+        layout.addWidget(QLabel(parent=self, objectName='nameError'), 1, 0, 1, 2)
+        self.commit_button = QPushButton('确认提交', clicked=self.commit_new_module)
+        layout.addWidget(self.commit_button, 2, 1)
+        self.setLayout(layout)
+
+    # 提交新增模块
+    def commit_new_module(self):
+        name = re.sub(r'\s+', '', self.name_edit.text())
+        if not name:
+            self.findChild(QLabel, 'nameError').setText('请输入模块名称!')
+            return
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({'name': name})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.findChild(QLabel, 'nameError').setText(str(e))
+        else:
+            self.network_message.setText(response['message'])
