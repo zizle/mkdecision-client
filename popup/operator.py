@@ -4,12 +4,16 @@ import re
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QDialog, QGridLayout, QHBoxLayout, QVBoxLayout, QLineEdit, QPushButton, QLabel, QComboBox, \
-    QTabWidget, QTableWidget, QTableWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal
+    QTabWidget, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView
+from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
 import settings
+from widgets.base import TableCheckBox
 
 
-""" 管理用户具体信息相关 """
+""" 管理用户具体信息相关(编辑用户弹窗子集) """
+
+
+# 用户基础信息
 class UserBaseInfo(QWidget):
     def __init__(self, user_id, *args, **kwargs):
         super(UserBaseInfo, self).__init__(*args, **kwargs)
@@ -92,18 +96,66 @@ class UserBaseInfo(QWidget):
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
-            print(response)
         except Exception as e:
-            print(e)
             self.findChild(QLabel, 'noteError').setText(str(e))
         else:
             self.findChild(QLabel, 'noteError').setText(response['message'])
 
 
-""" 用户客户端权限编辑相关 """
+""" 用户-客户端权限编辑相关(编辑用户弹窗子集) """
 
 
+# 有效期编辑控件
+class TableDatetimeEdit(QWidget):
+    edit_activated = pyqtSignal(QWidget)
+
+    def __init__(self, date_text, *args, **kwargs):
+        super(TableDatetimeEdit, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout()
+        layout.setContentsMargins(5,0,0,0)
+        self.label_show = QLabel(date_text, parent=self)
+        initial_day = QDate.fromString(self.label_show.text(), 'yyyy-MM-dd')
+        self.date_edit = QDateEdit(initial_day, parent=self, objectName='dateEdit')
+        self.date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.hide()
+        self.edit_button = QPushButton('修改', parent=self, objectName='editButton', clicked=self.edit_date_time)
+        self.edit_button.setCursor(Qt.PointingHandCursor)
+        layout.addWidget(self.label_show)
+        layout.addWidget(self.date_edit)
+        layout.addWidget(self.edit_button, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        self.setStyleSheet("""
+        #editButton{
+            border:none;
+            color: rgb(100,200,240);
+        }
+        #editButton:hover{
+            color: rgb(240,200,100);
+        }
+        """)
+
+    # 按钮点击修改有效期
+    def edit_date_time(self):
+        if self.date_edit.isHidden():
+            self.edit_button.setText('设置')
+            self.label_show.hide()
+            self.date_edit.show()
+        else:
+            self.edit_button.setText('修改')
+            # 读取时间，写入label
+            date_str = self.date_edit.date().toString('yyyy-MM-dd')
+            self.label_show.setText(date_str)
+            self.label_show.show()
+            self.date_edit.hide()
+            # 传出信号，设置有效期
+            self.edit_activated.emit(self)
+
+
+# 显示客户端的表格
 class UserToClientTable(QTableWidget):
+    network_message = pyqtSignal(str)
+
     KEY_LABELS = [
         ('id', '序号'),
         ('name', '名称'),
@@ -120,10 +172,14 @@ class UserToClientTable(QTableWidget):
 
     # 显示信息
     def showClientContents(self, client_list):
-        print(client_list)
+        self.clear()
         self.setRowCount(len(client_list))
         self.setColumnCount(len(self.KEY_LABELS))
         self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(self.columnCount() - 2, QHeaderView.ResizeToContents)
         for row, client_item in enumerate(client_list):
             for col, header in enumerate(self.KEY_LABELS):
                 if col == 0:
@@ -133,6 +189,81 @@ class UserToClientTable(QTableWidget):
                     table_item = QTableWidgetItem(str(client_item[header[0]]))
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
+                # 设置可登录的复选框
+                if header[0] == 'accessed':
+                    check_box = TableCheckBox(checked=client_item['accessed'])
+                    check_box.check_activated.connect(self.item_check_changed)
+                    self.setCellWidget(row, col, check_box)
+                # 设置有效期编辑控件
+                if header[0] == 'expire_date' and client_item['accessed']:
+                    date_edit = TableDatetimeEdit(date_text=client_item['expire_date'])
+                    date_edit.edit_activated.connect(self.set_expire_date)
+                    self.setCellWidget(row, col, date_edit)
+                    self.item(row, col).setText('')
+
+    # 可登陆按钮发生改变
+    def item_check_changed(self, check_widget):
+        current_row, current_col = self._get_widget_index(check_widget)
+        current_cid = self.item(current_row, 0).id
+        checked = check_widget.check_box.isChecked()
+        # 发起修改可登录状态
+        params = {
+            'accessed': checked,
+            'client_id': current_cid,
+            'expire_date': '3000-01-01',  # 默认有效期为3000-01-01
+        }
+        response = self._running_accessed_expire_date_request(params)
+        if response:
+            if checked:  # 可登录改变有效期控件显示
+                expire_date = response['data']['expire_date']
+                date_edit = TableDatetimeEdit(date_text=expire_date)
+                date_edit.edit_activated.connect(self.set_expire_date)
+                self.setCellWidget(current_row, current_col + 1, date_edit)
+                self.horizontalHeader().setSectionResizeMode(current_col + 1, QHeaderView.ResizeToContents)
+            else:
+                self.removeCellWidget(current_row, current_col + 1)
+            self.network_message.emit(response['message'])
+
+    # 设置有效期(状态为可登录才有得设置)
+    def set_expire_date(self, edit_widget):
+        current_row, current_col = self._get_widget_index(edit_widget)
+        expire_date = edit_widget.date_edit.date().toString('yyyy-MM-dd')
+        current_cid = self.item(current_row, 0).id
+        # 发起修改有效期
+        params = {
+            'expire_date': expire_date,
+            'client_id': current_cid,
+            'accessed': True  # 默认为可登录才能设置
+        }
+        response = self._running_accessed_expire_date_request(params)
+        if response:
+            # 将返回的有效期写入label
+            edit_widget.label_show.setText(response['data']['expire_date'])
+            self.network_message.emit(response['message'])
+
+    # 获取控件所在行和列
+    def _get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+    # 发起可登录与有效期的设置请求
+    def _running_accessed_expire_date_request(self, params):
+        try:
+            r = requests.patch(
+                url=settings.SERVER_ADDR + 'user/' + str(self.user_id) + '/clients/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps(params)
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message.emit(str(e))
+            return {}
+        else:
+            return response
 
 
 # 客户端权限管理
@@ -151,6 +282,7 @@ class UserToClientEdit(QWidget):
         layout.addLayout(message_combo_layout)
         # 下方客户端显示表格
         self.client_user_table = UserToClientTable(user_id=self.user_id)
+        self.client_user_table.network_message.connect(self.network_message_label.setText)
         layout.addWidget(self.client_user_table)
         self.setLayout(layout)
         self._addCategoryCombo()
@@ -186,6 +318,9 @@ class UserToClientEdit(QWidget):
             self.network_message_label.setText(response['message'])
             # 显示客户端信息
             self.client_user_table.showClientContents(response['data'])
+
+
+""" 运营管理-【编辑】用户信息 """
 
 
 # 编辑用户信息
@@ -251,3 +386,75 @@ class EditUserInformationPopup(QDialog):
         else:
             tab = QLabel('暂无相关维护')
         self.tab_show.addTab(tab, '')
+
+
+""" 运营管理-【编辑】客户端信息 """
+
+
+class EditClientInformationPopup(QDialog):
+    def __init__(self, client_id, *args, **kwargs):
+        super(EditClientInformationPopup, self).__init__(*args, **kwargs)
+        self.client_id = client_id
+        layout = QGridLayout()
+        layout.addWidget(QLabel('名称:'), 0, 0)
+        # 名称
+        self.name_edit = QLineEdit()
+        layout.addWidget(self.name_edit, 0, 1)
+        layout.addWidget(QLabel(parent=self, objectName='nameError'), 1, 0, 1, 2)
+        # 机器码
+        layout.addWidget(QLabel('机器码:'), 2, 0)
+        self.machine_code_edit = QLineEdit()
+        layout.addWidget(self.machine_code_edit, 2, 1)
+        layout.addWidget(QLabel(parent=self, objectName='machineError'), 3, 0, 1, 2)
+        # 确定按钮
+        self.commit_button = QPushButton('确定提交', clicked=self.edit_client_info)
+        layout.addWidget(self.commit_button, 4, 0, 1, 2)
+        self.setLayout(layout)
+        self.setFixedSize(330,180)
+
+    # 获取当前用户信息
+    def getCurrentClient(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'basic/client/' + str(self.client_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            el = self.findChild(QLabel, 'machineError')
+            el.setText(str(e))
+        else:
+            client_data = response['data']
+            self.name_edit.setText(client_data['name'])
+            self.machine_code_edit.setText(client_data['machine_code'])
+
+    # 提交客户端信息
+    def edit_client_info(self):
+        name = re.sub(r'\s+', '', self.name_edit.text())
+        machine_code = re.match(r'[a-f0-9]+', self.machine_code_edit.text())
+        if not machine_code:
+            el = self.findChild(QLabel, 'machineError')
+            el.setText('请输入正确的机器码.')
+            return
+        machine_code = machine_code.group()
+        # 发起请求
+        try:
+            r = requests.patch(
+                url=settings.SERVER_ADDR + 'basic/client/' + str(self.client_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({
+                    'name': name,
+                    'machine_code': machine_code
+                })
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.findChild(QLabel, 'machineError').setText(str(e))
+        else:
+            self.findChild(QLabel, 'machineError').setText(response['message'])
+

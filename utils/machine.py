@@ -46,7 +46,7 @@ def get_machine_code():
         md.update(main_board.encode('utf-8'))
         md.update(disk.encode('utf-8'))
         machine_code = md.hexdigest()
-        # machine_code = machine_code[:-1] + '6'
+        # machine_code = machine_code[:-1] + '4'
     except Exception:
         machine_code = ''
     return machine_code

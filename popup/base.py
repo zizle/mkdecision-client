@@ -77,7 +77,7 @@ class LoginPopup(QDialog):
     def _login_post(self, phone, password):
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'user/login/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'user/login/?mc=' + settings.app_dawn.value('machine', ''),
                 headers={
                     "AUTHORIZATION": settings.app_dawn.value('AUTHORIZATION'),
                 },
@@ -215,7 +215,7 @@ class RegisterPopup(QDialog):
     def _register_post(self, phone, username, password):
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'user/register/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'user/?mc=' + settings.app_dawn.value('machine'),
                 data=json.dumps({
                     "phone": phone,
                     "username": username,
