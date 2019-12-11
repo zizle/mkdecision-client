@@ -33,7 +33,7 @@ class WelcomePage(QSplashScreen):
         # 查询机器是否存在
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'basic/client/',
+                url=settings.SERVER_ADDR + 'client/',
                 data=json.dumps({
                     'machine_code': machine_code,
                     'is_manager': settings.ADMINISTRATOR
@@ -100,12 +100,6 @@ class BaseWindow(QWidget):
         layout.addWidget(self.navigation_bar)
         layout.addWidget(self.tab_loaded)
         self.setLayout(layout)
-        # 加入首页菜单
-        self._add_homepage_menu()
-
-    # 加入【首页】
-    def _add_homepage_menu(self):
-        self.navigation_bar.module_bar.addMenu(mid=0, text='首页')
 
     # 用户点击【登录】
     def user_to_login(self):
