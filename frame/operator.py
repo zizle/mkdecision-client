@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QWidget, QListWidget, QHBoxLayout, QVBoxLayout, QTab
     QHeaderView, QPushButton
 from PyQt5.QtCore import Qt
 from popup.operator import EditUserInformationPopup, EditClientInformationPopup, CreateNewModulePopup,\
-    EditModuleInformationPopup
+    EditModuleInformationPopup, CreateNewVarietyPopup, EditVarietyInformationPopup
 import settings
 from widgets.base import ManageTable
 
@@ -316,13 +316,106 @@ class ModuleManagePage(QWidget):
         except Exception as e:
             self.network_message.setText(str(e))
         else:
-            print(response)
             self.module_table.setRowContents(response['data'])
             self.network_message.setText(response['message'])
 
     # 新增系统模块
     def create_new_module(self):
         popup = CreateNewModulePopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 品种管理相关 """
+
+
+# 品种显示管理表格
+class VarietiesTable(ManageTable):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '名称'),
+        ('name_en', '英文代码'),
+        ('group', '所属组'),
+    ]
+
+    def resetTableMode(self, row_count):
+        super(VarietiesTable, self).resetTableMode(row_count)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+
+    def edit_button_clicked(self, edit_button):
+        current_row, current_col = self.get_widget_index(edit_button)
+        variety_id = self.item(current_row, 0).id
+        print('修改品种', variety_id)
+        # 弹窗编辑信息
+        edit_popup = EditVarietyInformationPopup(variety_id=variety_id, parent=self)
+        edit_popup.getCurrentVariety()
+        if not edit_popup.exec_():
+            edit_popup.deleteLater()
+            del edit_popup
+
+
+# 品种管理页面
+class VarietyManagePage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(VarietyManagePage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        # 上方品种大类选择和信息提示
+        combo_message_layout = QHBoxLayout()
+        self.select_combo = QComboBox(activated=self.getCurrentVarieties)
+        combo_message_layout.addWidget(self.select_combo)
+        self.network_message_label = QLabel()
+        combo_message_layout.addWidget(self.network_message_label)
+        combo_message_layout.addStretch()
+        # 新增品种按钮
+        self.add_button = QPushButton('新增', clicked=self.create_new_variety)
+        combo_message_layout.addWidget(self.add_button)
+        layout.addLayout(combo_message_layout)
+        # 下方显示管理表格
+        self.variety_table = VarietiesTable(parent=self)
+        layout.addWidget(self.variety_table)
+        self.setLayout(layout)
+
+    # 获取分组
+    def getVarietyGroup(self):
+        # 请求数据
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            # 增加全部选项
+            self.select_combo.addItem('全部', 0)
+            for group_item in response['data']:
+                self.select_combo.addItem(group_item['name'], group_item['id'])
+            self.network_message_label.setText(response['message'])
+
+    # 获取品种
+    def getCurrentVarieties(self):
+        current_gid = self.select_combo.currentData()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'group-varieties/' + str(current_gid) + '/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.variety_table.setRowContents(response['data'])
+            self.network_message_label.setText(response['message'])
+
+    # 新增品种
+    def create_new_variety(self):
+        popup = CreateNewVarietyPopup(parent=self)
+        popup.getGroupWithVarieties()
         if not popup.exec_():
             popup.deleteLater()
             del popup
@@ -364,6 +457,10 @@ class OperatorMaintain(QWidget):
             elif text == u'模块管理':
                 tab = ModuleManagePage(parent=self)
                 tab.getCurrentModules()
+            elif text == u'品种管理':
+                tab = VarietyManagePage(parent=self)
+                tab.getVarietyGroup()
+                tab.getCurrentVarieties()
             else:
                 tab = QLabel(parent=self,
                              styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',

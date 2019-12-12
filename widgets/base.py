@@ -319,8 +319,6 @@ class ModuleBar(QWidget):
             self.layout().addWidget(menu)
         print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
 
-
-
     # 设置管理菜单
     def setMenuActions(self, actions):
         print('设置管理菜单')
