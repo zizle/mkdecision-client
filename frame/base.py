@@ -148,8 +148,6 @@ class BaseWindow(QWidget):
             dynamic_username = phone[0:3] + '****' + phone[7:11]
         # 改变显示用户名
         self.navigation_bar.permit_bar.show_username(dynamic_username)
-        # 设置模块名称
-        self.navigation_bar.module_bar.setMenus(response_data['modules'])
         # 设置管理角色的菜单
         self.navigation_bar.module_bar.setMenuActions(response_data['actions'])
 
@@ -326,6 +324,22 @@ class BaseWindow(QWidget):
     def showNormal(self):
         super(BaseWindow, self).showNormal()
         self.layout().setContentsMargins(self.MARGIN, self.MARGIN, self.MARGIN, self.MARGIN)
+
+    # 获取系统的普通模块
+    def getSystemStartModules(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'module/start/?mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            modules = {}
+        else:
+            modules = response['data']
+        # 设置模块菜单
+        self.navigation_bar.module_bar.setMenus(modules)
 
     # 点击模块菜单事件(接受到模块的id和模块名称)
     def module_clicked(self, module_id, module_text):
