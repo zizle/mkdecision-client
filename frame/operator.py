@@ -428,7 +428,7 @@ class VarietyManagePage(QWidget):
 class OperatorMaintain(QWidget):
     def __init__(self, *args, **kwargs):
         super(OperatorMaintain, self).__init__(*args, **kwargs)
-        layout = QHBoxLayout()
+        layout = QHBoxLayout(margin=2)
         # 左侧管理项目列表
         self.operate_list = QListWidget()
         self.operate_list.clicked.connect(self.operate_list_clicked)
@@ -447,27 +447,24 @@ class OperatorMaintain(QWidget):
     # 点击左侧管理菜单
     def operate_list_clicked(self):
         text = self.operate_list.currentItem().text()
-        try:
-            if text == u'用户管理':
-                tab = UserManagePage(parent=self)
-                tab.getCurrentUsers()
-            elif text == u'客户端管理':
-                tab = ClientManagePage(parent=self)
-                tab.getCurrentClients()
-            elif text == u'模块管理':
-                tab = ModuleManagePage(parent=self)
-                tab.getCurrentModules()
-            elif text == u'品种管理':
-                tab = VarietyManagePage(parent=self)
-                tab.getVarietyGroup()
-                tab.getCurrentVarieties()
-            else:
-                tab = QLabel(parent=self,
-                             styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
-                             alignment=Qt.AlignCenter)
-                tab.setText("「" + text + "」正在加紧开放中...")
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+
+        if text == u'用户管理':
+            tab = UserManagePage(parent=self)
+            tab.getCurrentUsers()
+        elif text == u'客户端管理':
+            tab = ClientManagePage(parent=self)
+            tab.getCurrentClients()
+        elif text == u'模块管理':
+            tab = ModuleManagePage(parent=self)
+            tab.getCurrentModules()
+        elif text == u'品种管理':
+            tab = VarietyManagePage(parent=self)
+            tab.getVarietyGroup()
+            tab.getCurrentVarieties()
+        else:
+            tab = QLabel(parent=self,
+                         styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
+                         alignment=Qt.AlignCenter)
+            tab.setText("「" + text + "」正在加紧开放中...")
         self.frame_tab.clear()
         self.frame_tab.addTab(tab, text)

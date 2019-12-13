@@ -8,7 +8,7 @@ from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFo
 from PyQt5.QtCore import Qt
 
 import settings
-from widgets.base import TitleBar, NavigationBar, LoadedTab
+from widgets.base import TitleBar, NavigationBar, LoadedPage
 from utils.machine import get_machine_code
 from popup.tips import InformationPopup
 
@@ -74,7 +74,7 @@ class BaseWindow(QWidget):
         self.navigation_bar.clicked_logout_button.connect(self.user_to_logout)
         self.navigation_bar.module_bar.menu_clicked.connect(self.module_clicked)  # 选择了某个模块的
         # 窗口承载体
-        self.tab_loaded = LoadedTab(parent=self)
+        self.page_container = LoadedPage(parent=self)
         # 属性、样式
         user_desktop = QDesktopWidget().availableGeometry()  # 用户的桌面信息,来改变自身窗体大小
         max_width = user_desktop.width()
@@ -93,12 +93,12 @@ class BaseWindow(QWidget):
         self.setMouseTracking(True)  # 鼠标不点下移动依然有效(针对本窗口, 子控件无效)
         self.title_bar.installEventFilter(self)  # 子控件安装事件事件过滤
         self.navigation_bar.installEventFilter(self)
-        self.tab_loaded.installEventFilter(self)
+        self.page_container.installEventFilter(self)
         # 布局
         layout = QVBoxLayout(margin=self.MARGIN, spacing=0)
         layout.addWidget(self.title_bar)
         layout.addWidget(self.navigation_bar)
-        layout.addWidget(self.tab_loaded)
+        layout.addWidget(self.page_container)
         self.setLayout(layout)
 
     # 用户点击【登录】
@@ -366,32 +366,45 @@ class BaseWindow(QWidget):
             try:
                 if module_text == u'首页':
                     from frame.home import HomePage
-                    tab = HomePage(parent=self.tab_loaded)
-                    tab.more_news_signal.connect(self.homepage_more_news)
-                    tab.getCurrentNews()
-                    tab.getCurrentSliderAdvertisement()
+                    page = HomePage(parent=self.page_container)
+                    page.more_news_signal.connect(self.homepage_more_news)
+                    page.getCurrentNews()
+                    page.getCurrentSliderAdvertisement()
+                elif module_text == '数据管理':
+                    from frame.collector import CollectorMaintain
+                    page = CollectorMaintain(parent=self.page_container)
+
                 elif module_text == u'运营管理':
                     from frame.operator import OperatorMaintain
-                    tab = OperatorMaintain(parent=self.tab_loaded)
-                    tab.addListItem()  # 加入管理项目
-            # elif module_text == u'数据管理':
-            #     from windows.maintenance import MaintenanceHome
-            #     tab = MaintenanceHome(parent=self.tab_loaded)
-            # elif module_text == u'权限管理':
-            #     from windows.maintenance import AuthorityHome
-            #     tab = AuthorityHome(parent=self.tab_loaded)
-            #     tab.addComboItem()  # 添加选择当前角色，并由此出发请求相应用户列表
+                    page = OperatorMaintain(parent=self.page_container)
+                    page.addListItem()  # 加入管理项目
+                # elif module_text == u'数据管理':
+                #     from windows.maintenance import MaintenanceHome
+                #     tab = MaintenanceHome(parent=self.tab_loaded)
+                # elif module_text == u'权限管理':
+                #     from windows.maintenance import AuthorityHome
+                #     tab = AuthorityHome(parent=self.tab_loaded)
+                #     tab.addComboItem()  # 添加选择当前角色，并由此出发请求相应用户列表
                 else:
-                    tab = QLabel(parent=self.tab_loaded,
-                                 styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
-                                 alignment=Qt.AlignCenter)
-                    tab.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
+                    page = QLabel(parent=self.page_container,
+                                  styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
+                                  alignment=Qt.AlignCenter)
+                    page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
+
+                self.page_container.clear()
+                print('当前窗体个数：', self.page_container.count())
+                self.page_container.addWidget(page)
+                # self.page_container.removeWidget(self.page_container.widget(0))
+                # print('当前窗体个数：', self.page_container.count())
             except Exception as e:
                 import traceback
                 traceback.print_exc()
 
-            self.tab_loaded.clear()
-            self.tab_loaded.addTab(tab, module_text)
+            # self.tab_loaded.clear()
+
+
+
+
 
     # 首页新闻版块【更多】被点击
     def homepage_more_news(self):

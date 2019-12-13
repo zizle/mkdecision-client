@@ -2,13 +2,13 @@
 # __Author__： zizle
 import chardet
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QTabWidget, QGridLayout, QScrollArea,\
-    QVBoxLayout
+    QVBoxLayout, QStackedWidget
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from widgets.CAvatar import CAvatar
 
 
-__all__ = ['TitleBar', 'NavigationBar', 'LoadedTab', 'ScrollFoldedBox']  # 别的模块 import * 时控制可导入的类
+__all__ = ['TitleBar', 'NavigationBar', 'LoadedPage', 'ScrollFoldedBox']  # 别的模块 import * 时控制可导入的类
 
 
 """ 标题栏 """
@@ -399,17 +399,17 @@ class NavigationBar(QWidget):
 
 
 # 承载模块内容的窗口
-class LoadedTab(QTabWidget):
+class LoadedPage(QStackedWidget):
     def __init__(self, *args, **kwargs):
-        super(LoadedTab, self).__init__(*args, **kwargs)
-        self.setDocumentMode(True)  # 去掉边框
+        super(LoadedPage, self).__init__(*args, **kwargs)
+        # self.setDocumentMode(True)  # 去掉边框
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
-        self.setTabBarAutoHide(True)
+        # self.setTabBarAutoHide(True)
         self.setMouseTracking(True)
-        self.setObjectName('loadedTab')
+        self.setObjectName('pageContainer')
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
         self.setStyleSheet("""
-        #loadedTab{
+        #pageContainer{
             background-color: rgb(230, 235, 230)
         }
         """)
@@ -417,6 +417,16 @@ class LoadedTab(QTabWidget):
     # 鼠标移动事件
     def mouseMoveEvent(self, event, *args, **kwargs):
         event.accept()  # 接受事件,不传递到父控件
+
+    # 清除所有控件
+    def clear(self):
+        widget = None
+        for i in range(self.count()):
+            widget = self.widget(i)
+            self.removeWidget(widget)
+            if widget:
+                widget.deleteLater()
+        del widget
 
 
 """ 菜单折叠窗 """
@@ -429,9 +439,6 @@ class FoldedBodyButton(QPushButton):
     def __init__(self, text, *args, **kwargs):
         super(FoldedBodyButton, self).__init__(*args, **kwargs)
         self.setText(text)
-        # self.group_text = group_text
-        # self.gid = gid
-        # self.bid = bid
         self.clicked.connect(self.left_mouse_clicked)
 
     def left_mouse_clicked(self):
