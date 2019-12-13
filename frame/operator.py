@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt
 from popup.operator import EditUserInformationPopup, EditClientInformationPopup, CreateNewModulePopup,\
     EditModuleInformationPopup, CreateNewVarietyPopup, EditVarietyInformationPopup
 import settings
-from widgets.base import ManageTable
+from widgets.operator import ManageTable
 
 """ 用户管理相关 """
 

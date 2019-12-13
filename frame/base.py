@@ -364,9 +364,15 @@ class BaseWindow(QWidget):
             return
         else:  # 模块权限验证通过
             try:
-                if module_text == u'运营管理':
+                if module_text == u'首页':
+                    from frame.home import HomePage
+                    tab = HomePage(parent=self.tab_loaded)
+                    tab.more_news_signal.connect(self.homepage_more_news)
+                    tab.getCurrentNews()
+                    tab.getCurrentSliderAdvertisement()
+                elif module_text == u'运营管理':
                     from frame.operator import OperatorMaintain
-                    tab = OperatorMaintain()
+                    tab = OperatorMaintain(parent=self.tab_loaded)
                     tab.addListItem()  # 加入管理项目
             # elif module_text == u'数据管理':
             #     from windows.maintenance import MaintenanceHome
@@ -386,3 +392,10 @@ class BaseWindow(QWidget):
 
             self.tab_loaded.clear()
             self.tab_loaded.addTab(tab, module_text)
+
+    # 首页新闻版块【更多】被点击
+    def homepage_more_news(self):
+        from frame.home import MoreNewsPage
+        tab = MoreNewsPage()
+        self.tab_loaded.clear()
+        self.tab_loaded.addTab(tab, '更多新闻')

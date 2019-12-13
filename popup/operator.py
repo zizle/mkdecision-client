@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QWidget, QDialog, QGridLayout, QHBoxLayout, QVBoxLay
     QComboBox, QTabWidget, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QTreeWidget, QTreeWidgetItem
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
 import settings
-from widgets.base import TableCheckBox
+from widgets.operator import TableCheckBox
 
 __all__ = [
     'EditUserInformationPopup',
