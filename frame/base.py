@@ -1,5 +1,6 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
+import os
 import json
 import time
 import requests
@@ -50,6 +51,29 @@ class WelcomePage(QSplashScreen):
             # 写入配置
             print('utils.client.make_client_existed写入配置')
             settings.app_dawn.setValue('machine', response['data']['machine_code'])
+
+    # 启动访问广告图片文件并保存至本地
+    def getCurrentAdvertisements(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/advertise/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            # 清空slider文件夹
+            for path in ['media/slider/' + path for path in os.listdir('media/slider')]:
+                os.remove(path)
+            # 遍历请求每一个图片
+            for ad_item in response['data']:
+                image_name = ad_item['image'].rsplit('/', 1)[1]
+                time.sleep(0.0001)
+                r = requests.get(url=settings.STATIC_PREFIX + ad_item['image'])
+                with open('media/slider/' + image_name, 'wb') as img:
+                    img.write(r.content)
 
 
 # 主窗口(无边框)
@@ -367,7 +391,6 @@ class BaseWindow(QWidget):
                 if module_text == u'首页':
                     from frame.home import HomePage
                     page = HomePage(parent=self.page_container)
-                    page.more_news_signal.connect(self.homepage_more_news)
                     page.getCurrentNews()
                     page.getCurrentSliderAdvertisement()
                 elif module_text == '数据管理':
@@ -406,9 +429,3 @@ class BaseWindow(QWidget):
 
 
 
-    # 首页新闻版块【更多】被点击
-    def homepage_more_news(self):
-        from frame.home import MoreNewsPage
-        page = MoreNewsPage()
-        self.page_container.clear()
-        self.page_container.addWidget(page)

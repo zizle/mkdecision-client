@@ -50,7 +50,7 @@ class DetailCollector(QWidget):
         font.setFamily('Webdings')
         self.back_collector_button = QPushButton('r', parent=self, font=font, objectName='closeButton', cursor=Qt.PointingHandCursor)
         message_button_layout.addWidget(self.back_collector_button, alignment=Qt.AlignLeft)
-        self.network_message_label = QLabel('网络信息提示', parent=self)
+        self.network_message_label = QLabel('', parent=self)
         message_button_layout.addWidget(self.network_message_label)
         layout.addLayout(message_button_layout)
         # 下方容器控件

@@ -6,9 +6,10 @@ import requests
 import chardet
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
     QTabWidget
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap
-from widgets.base import ScrollFoldedBox
+import settings
+from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup
 
 """ 【更多新闻】页面"""
 
@@ -110,7 +111,8 @@ class NewsBox(QWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
         self.setStyleSheet("""
         #newsBox{
-            
+            min-width:330px;
+            max-width:420px;
         }
         #moreNews{
             border:none;
@@ -125,6 +127,7 @@ class NewsBox(QWidget):
         for item in item_list:
             item.item_clicked.connect(self.news_item_clicked)
             self.layout().addWidget(item, alignment=Qt.AlignTop)
+        self.layout().addStretch()
 
     # 设置更多按钮
     def setMoreNewsButton(self):
@@ -135,12 +138,22 @@ class NewsBox(QWidget):
 
 """ 图片广告轮播相关 """
 
+# 轮播图的label
+class SliderLabel(QLabel):
+    def __init__(self, name, *args, **kwargs):
+        super(SliderLabel, self).__init__(*args, **kwargs)
+        self.name = name
+
 
 # 轮播图控件
 class ImageSlider(QStackedWidget):
+    image_clicked = pyqtSignal(str)
 
     def __init__(self, *args, **kwargs):
         super(ImageSlider, self).__init__(*args, **kwargs)
+        self.setCursor(Qt.PointingHandCursor)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.slider_image_label)
         self.setObjectName('imageSlider')
         self.setStyleSheet("""
         #imageSlider{
@@ -150,13 +163,42 @@ class ImageSlider(QStackedWidget):
 
     # 添加图片
     def addImages(self, url_list):
+        self.clear()
         for img_path in url_list:
+            # 获取名称
+            img_name = img_path.rsplit('/', 1)[1]
             pix_map = QPixmap(img_path)
-            image_container = QLabel(parent=self, objectName='imageContainer')
+            image_container = SliderLabel(name=img_name, parent=self, objectName='imageContainer')
             image_container.setScaledContents(True)
             image_container.setPixmap(pix_map)
             self.addWidget(image_container)
-        print(self.count())
+        if self.count() > 1 and not self.timer.isActive():
+            self.timer.start(settings.IMAGE_SLIDER_RATE)
+
+    # 清空
+    def clear(self):
+        widget = None
+        for i in range(self.count()):
+            widget = self.widget(i)
+            self.removeWidget(widget)
+            if widget:
+                widget.deleteLater()
+        del widget
+
+    def mouseReleaseEvent(self, event):
+        super(ImageSlider, self).mouseReleaseEvent(event)
+        current_label = self.currentWidget()
+        self.image_clicked.emit(current_label.name)
+
+    # 改变图片显示
+    def slider_image_label(self):
+
+        current_index = self.currentIndex()
+        if current_index + 1 >= self.count():
+            self.setCurrentIndex(0)
+        else:
+            self.setCurrentIndex(current_index + 1)
+
 
 
 # 首页主页面(可滚动)
@@ -174,6 +216,7 @@ class HomePage(QScrollArea):
         news_slider_layout.addWidget(self.news_box, alignment=Qt.AlignLeft)
         # 广告图片轮播栏
         self.image_slider = ImageSlider(parent=self)
+        self.image_slider.image_clicked.connect(self.read_advertisement)
         news_slider_layout.addWidget(self.image_slider)
         layout.addLayout(news_slider_layout)
         # 左下角菜单折叠窗
@@ -200,25 +243,82 @@ class HomePage(QScrollArea):
 
     # 阅读更多新闻
     def read_more_news(self):
-        print('阅读更多新闻')
-        self.more_news_signal.emit(True)
+        page = MoreNewsPage()
+        self.parent().clear()
+        self.parent().addWidget(page)
 
     # 阅读一条新闻
     def read_news_item(self, news_id):
-        print('阅读一条新闻', news_id)
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/news/' + str(news_id) + '/',
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            # 根据具体情况显示内容
+            news_data = response['data']
+            if news_data['file']:
+                # 显示文件
+                file = settings.STATIC_PREFIX + news_data['file']
+                popup = PDFContentPopup(title=news_data['title'], file=file, parent=self)
+            else:
+                popup = TextContentPopup(title=news_data['title'], content=news_data['content'], parent=self)  # 显示内容
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
 
     # 根据当前需求显示获取新闻公告数据
     def getCurrentNews(self):
-        news_list = [NewsItem(title=str(i) + ' 新闻新闻新闻新闻新闻新闻新闻新闻标题', create_time='2019-11-22',
-                              item_id=i, parent=self) for i in range(11)]
-        self.news_box.addItems(news_list)
-        more_button = self.news_box.setMoreNewsButton()
-        more_button.clicked.connect(self.read_more_news)  # 阅读更多新闻
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/news/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            news_list = [NewsItem(title=news_item['title'],
+                                  create_time=news_item['create_time'],
+                                  item_id=news_item['id'], parent=self) for news_item in response['data']]
+            self.news_box.addItems(news_list)
+            more_button = self.news_box.setMoreNewsButton()
+            more_button.clicked.connect(self.read_more_news)  # 阅读更多新闻
 
     # 获取当前广告轮播数据
     def getCurrentSliderAdvertisement(self):
-        print('获取当前广告轮播的数据')
         self.image_slider.addImages(['media/slider/' + path for path in os.listdir('media/slider')])
+
+    # 点击阅读广告
+    def read_advertisement(self, name):
+        # 请求广告数据
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/advertise/' + name + '/?mc=' +settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            # 根据具体情况显示内容
+            ad_data = response['data']
+            if ad_data['file']:
+                # 显示文件
+                file = settings.STATIC_PREFIX + ad_data['file']
+                popup = PDFContentPopup(title=ad_data['name'], file=file, parent=self)
+            else:
+                popup = TextContentPopup(title=ad_data['name'], content=ad_data['content'], parent=self)  # 显示内容
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
+
 
 
 

@@ -1,14 +1,25 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
+import fitz
 import chardet
+import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QTabWidget, QGridLayout, QScrollArea,\
-    QVBoxLayout, QStackedWidget
-from PyQt5.QtGui import QPixmap, QFont
+    QVBoxLayout, QStackedWidget, QDialog, QTextBrowser
+from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from widgets.CAvatar import CAvatar
 
 
-__all__ = ['TitleBar', 'NavigationBar', 'LoadedPage', 'ScrollFoldedBox']  # 别的模块 import * 时控制可导入的类
+__all__ = [
+    'TitleBar',
+    'NavigationBar',
+    'LoadedPage',
+    'ScrollFoldedBox',
+    'TableRowDeleteButton',
+    'TableRowReadButton',
+    'PDFContentPopup',
+    'TextContentPopup'
+]  # 别的模块 import * 时控制可导入的类
 
 
 """ 标题栏 """
@@ -605,4 +616,136 @@ class ScrollFoldedBox(QScrollArea):
 
     def body_button_clicked(self, signal):
         pass
+
+
+""" 表格控件 """
+
+
+# 删除一条记录
+class TableRowDeleteButton(QPushButton):
+    button_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(TableRowDeleteButton, self).__init__(*args, **kwargs)
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(lambda: self.button_clicked.emit(self))
+        self.setObjectName('tableDelete')
+        self.setStyleSheet("""
+            #tableDelete{
+                border: none;
+                padding: 1px 8px;
+                color: rgb(200,100,100);
+            }
+            #tableDelete:hover{
+                color: rgb(240,100,100)
+            }
+            """)
+
+
+# 阅读一条记录
+class TableRowReadButton(QPushButton):
+    button_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(TableRowReadButton, self).__init__(*args, **kwargs)
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(lambda: self.button_clicked.emit(self))
+        self.setObjectName('tableDelete')
+        self.setStyleSheet("""
+        #tableDelete{
+            border: none;
+            padding: 1px 8px;
+            color: rgb(100,150,180);
+        }
+        #tableDelete:hover{
+            color: rgb(120,130,230)
+        }
+        """)
+
+
+""" 阅读内容相关 """
+
+
+# PDF文件内容弹窗
+class PDFContentPopup(QDialog):
+    def __init__(self, title, file, *args, **kwargs):
+        super(PDFContentPopup, self).__init__(*args, **kwargs)
+        self.file = file
+        self.file_name = title
+        # auth doc type
+        self.setWindowTitle(title)
+        self.setMinimumSize(1000, 600)
+        self.download = QPushButton("下载PDF")
+        self.download.setIcon(QIcon('media/download-file.png'))
+        self.setWindowIcon(QIcon("media/reader.png"))
+        # scroll
+        scroll_area = QScrollArea()
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        # 设置滚动条样式
+        with open("media/ScrollBar.qss", "rb") as fp:
+            content = fp.read()
+            encoding = chardet.detect(content) or {}
+            content = content.decode(encoding.get("encoding") or "utf-8")
+        scroll_area.setStyleSheet(content)
+        # content
+        self.page_container = QWidget()
+        self.page_container.setLayout(QVBoxLayout())
+        layout = QVBoxLayout(margin=0)
+        # initial data
+        self.add_pages()
+        # add to show
+        scroll_area.setWidget(self.page_container)
+        # add layout
+        # layout.addWidget(self.download, alignment=Qt.AlignLeft)
+        layout.addWidget(scroll_area)
+        self.setLayout(layout)
+
+    def add_pages(self):
+        # 请求文件
+        if not self.file:
+            message_label = QLabel('没有文件.')
+            self.page_container.layout().addWidget(message_label)
+            return
+        try:
+            response = requests.get(self.file)
+            doc = fitz.Document(filename=self.file_name, stream=response.content)
+        except Exception as e:
+            message_label = QLabel('获取文件内容失败.\n{}'.format(e))
+            self.page_container.layout().addWidget(message_label)
+            return
+        for page_index in range(doc.pageCount):
+            page = doc.loadPage(page_index)
+            page_label = QLabel()
+            page_label.setMinimumSize(self.width() - 20, self.height())  # 设置label大小
+            # show PDF content
+            zoom_matrix = fitz.Matrix(1.58, 1.5)  # 图像缩放比例
+            pagePixmap = page.getPixmap(
+                matrix=zoom_matrix,
+                alpha=False)
+            imageFormat = QImage.Format_RGB888  # get image format
+            pageQImage = QImage(
+                pagePixmap.samples,
+                pagePixmap.width,
+                pagePixmap.height,
+                pagePixmap.stride,
+                imageFormat)  # init QImage
+            page_map = QPixmap()
+            page_map.convertFromImage(pageQImage)
+            page_label.setPixmap(page_map)
+            page_label.setScaledContents(True)  # pixmap resize with label
+            self.page_container.layout().addWidget(page_label)
+
+
+# 纯文字内容弹窗
+class TextContentPopup(QDialog):
+    def __init__(self, title, content, *args, **kwargs):
+        super(TextContentPopup, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        text_browser = QTextBrowser()
+        text_browser.setText(content)
+        layout.addWidget(text_browser)
+        self.setWindowTitle(title)
+        self.setLayout(layout)
+
 
