@@ -191,7 +191,7 @@ class HomePage(QScrollArea):
         self.setWidget(container)
         self.setWidgetResizable(True)  # 内部控件可随窗口调整大小
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 始终不显示右侧滚动条
-        # 设置滚动条样式(包含子控件)
+        # 设置滚动条样式
         with open("media/ScrollBar.qss", "rb") as fp:
             content = fp.read()
             encoding = chardet.detect(content) or {}

@@ -409,6 +409,6 @@ class BaseWindow(QWidget):
     # 首页新闻版块【更多】被点击
     def homepage_more_news(self):
         from frame.home import MoreNewsPage
-        tab = MoreNewsPage()
-        self.tab_loaded.clear()
-        self.tab_loaded.addTab(tab, '更多新闻')
+        page = MoreNewsPage()
+        self.page_container.clear()
+        self.page_container.addWidget(page)

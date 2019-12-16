@@ -541,7 +541,7 @@ class ScrollFoldedBox(QScrollArea):
         # 设置样式
         self.setMinimumWidth(220)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setStyleSheet("""
+        extra_style = """
         #foldedHead{
             background-color: rgb(20,120,200);
             border-bottom: 1px solid rgb(200,200,200)
@@ -549,7 +549,13 @@ class ScrollFoldedBox(QScrollArea):
         #foldedBody{
             background-color: rgb(20,120,100)
         }
-        """)
+        """
+        # 设置滚动条样式(防止父控件设置无效)
+        with open("media/ScrollBar.qss", "rb") as fp:
+            content = fp.read()
+            encoding = chardet.detect(content) or {}
+            content = content.decode(encoding.get("encoding") or "utf-8")
+        self.setStyleSheet(content + extra_style)
 
     # 鼠标进入显示竖直滚动条
     def enterEvent(self, *args, **kwargs):
