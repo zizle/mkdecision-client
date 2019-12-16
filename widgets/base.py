@@ -1,107 +1,25 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
-
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QCheckBox, QLabel, QMenu, QPushButton, QTabWidget,\
-    QTableWidget, QAbstractItemView, QTableWidgetItem, QHeaderView
-from PyQt5.QtGui import QPixmap, QFont
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QPoint
+import fitz
+import chardet
+import requests
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QTabWidget, QGridLayout, QScrollArea,\
+    QVBoxLayout, QStackedWidget, QDialog, QTextBrowser
+from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from widgets.CAvatar import CAvatar
 
 
-__all__ = ['TableCheckBox', 'ManageTable', 'TitleBar', 'NavigationBar', 'LoadedTab']  # 别的模块 import * 时控制可导入的类
-
-""" 管理信息的表格及其相关控件 """
-
-
-# 【有效】勾选按钮
-class TableCheckBox(QWidget):
-    check_activated = pyqtSignal(QWidget)
-
-    def __init__(self, checked=False, *args, **kwargs):
-        super(TableCheckBox, self).__init__(*args, **kwargs)
-        self.check_box = QCheckBox(checked=checked)
-        self.check_box.setMinimumHeight(14)
-        layout = QVBoxLayout()
-        layout.addWidget(self.check_box, alignment=Qt.AlignCenter)
-        self.setLayout(layout)
-        self.check_box.stateChanged.connect(lambda: self.check_activated.emit(self))
-
-
-# 【编辑】按钮
-class EditButton(QPushButton):
-    button_clicked = pyqtSignal(QPushButton)
-
-    def __init__(self, *args, **kwargs):
-        super(EditButton, self).__init__(*args, **kwargs)
-        self.setCursor(Qt.PointingHandCursor)
-        self.clicked.connect(lambda: self.button_clicked.emit(self))
-        self.setObjectName('tableEdit')
-        self.setStyleSheet("""
-        #tableEdit{
-            border: none;
-            padding: 1px 8px;
-            color: rgb(100,200,240);
-        }
-        #tableEdit:hover{
-            color: rgb(240,200,100)
-        }
-        """)
-
-
-# 信息管理的表格，最后一列[编辑]按钮
-class ManageTable(QTableWidget):
-    network_result = pyqtSignal(str)
-    KEY_LABELS = []
-    CHECK_COLUMNS = []
-
-    def __init__(self, *args, **kwargs):
-        super(ManageTable, self).__init__(*args, **kwargs)
-        self.verticalHeader().hide()
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-    # 设置表格数据
-    def setRowContents(self, row_list):
-        self.resetTableMode(len(row_list))
-        for row, user_item in enumerate(row_list):
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = user_item[header[0]]
-                else:
-                    table_item = QTableWidgetItem(str(user_item[header[0]]))
-                if col in self.CHECK_COLUMNS:
-                    check_box = TableCheckBox(checked=user_item[header[0]])
-                    check_box.check_activated.connect(self.check_box_changed)
-                    self.setCellWidget(row, col, check_box)
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
-                # 增加【编辑】按钮
-                if col == len(self.KEY_LABELS) - 1:
-                    edit_button = EditButton('编辑')
-                    edit_button.button_clicked.connect(self.edit_button_clicked)
-                    self.setCellWidget(row, col + 1, edit_button)
-
-    # 选择框状态发生改变
-    def check_box_changed(self, check_box):
-        pass
-
-    # 编辑框点击
-    def edit_button_clicked(self, edit_button):
-        pass
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
-
-    # 填充数据前初始化表格
-    def resetTableMode(self, row_count):
-        self.clear()
-        self.setRowCount(row_count)
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+__all__ = [
+    'TitleBar',
+    'NavigationBar',
+    'LoadedPage',
+    'ScrollFoldedBox',
+    'TableRowDeleteButton',
+    'TableRowReadButton',
+    'PDFContentPopup',
+    'TextContentPopup'
+]  # 别的模块 import * 时控制可导入的类
 
 
 """ 标题栏 """
@@ -492,17 +410,17 @@ class NavigationBar(QWidget):
 
 
 # 承载模块内容的窗口
-class LoadedTab(QTabWidget):
+class LoadedPage(QStackedWidget):
     def __init__(self, *args, **kwargs):
-        super(LoadedTab, self).__init__(*args, **kwargs)
-        self.setDocumentMode(True)  # 去掉边框
+        super(LoadedPage, self).__init__(*args, **kwargs)
+        # self.setDocumentMode(True)  # 去掉边框
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
-        self.setTabBarAutoHide(True)
+        # self.setTabBarAutoHide(True)
         self.setMouseTracking(True)
-        self.setObjectName('loadedTab')
+        self.setObjectName('pageContainer')
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
         self.setStyleSheet("""
-        #loadedTab{
+        #pageContainer{
             background-color: rgb(230, 235, 230)
         }
         """)
@@ -510,3 +428,324 @@ class LoadedTab(QTabWidget):
     # 鼠标移动事件
     def mouseMoveEvent(self, event, *args, **kwargs):
         event.accept()  # 接受事件,不传递到父控件
+
+    # 清除所有控件
+    def clear(self):
+        widget = None
+        for i in range(self.count()):
+            widget = self.widget(i)
+            self.removeWidget(widget)
+            if widget:
+                widget.deleteLater()
+        del widget
+
+
+""" 菜单折叠窗 """
+
+
+# 折叠盒子的按钮
+class FoldedBodyButton(QPushButton):
+    mouse_clicked = pyqtSignal(dict)
+
+    def __init__(self, text, *args, **kwargs):
+        super(FoldedBodyButton, self).__init__(*args, **kwargs)
+        self.setText(text)
+        self.clicked.connect(self.left_mouse_clicked)
+
+    def left_mouse_clicked(self):
+        self.mouse_clicked.emit({
+            'group_text': self.text(),
+        })
+
+
+# FoldedHead(), FoldedBody()
+# 折叠盒子的头
+class FoldedHead(QWidget):
+    def __init__(self, text, *args, **kwargs):
+        super(FoldedHead, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=0)
+        self.head_label = QLabel(text, parent=self)
+        self.head_button = QPushButton('折叠', parent=self, clicked=self.body_toggle)
+        layout.addWidget(self.head_label, alignment=Qt.AlignLeft)
+        layout.addWidget(self.head_button, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        # 样式
+        self.body_hidden = False  # 显示与否
+        self.body_height = 0  # 原始高度
+        # 样式
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+
+    # 设置身体控件(由于设置parent后用findChild没找到，用此法)
+    def setBody(self, body):
+        if not hasattr(self, 'bodyChild'):
+            self.bodyChild = body
+
+    def get_body(self):
+        if hasattr(self, 'bodyChild'):
+            return self.bodyChild
+
+    # 窗体折叠展开动画
+    def body_toggle(self):
+        print('头以下的身体折叠展开')
+        body = self.get_body()
+        if not body:
+            return
+        self.body_height = body.height()
+        self.setMinimumWidth(self.width())
+        if not self.body_hidden:
+            body.hide()
+            self.body_hidden = True
+        else:
+            body.show()
+            self.body_hidden = False
+
+
+# 折叠盒子的身体
+class FoldedBody(QWidget):
+    mouse_clicked = pyqtSignal(dict)
+
+    def __init__(self, *args, **kwargs):
+        super(FoldedBody, self).__init__(*args, **kwargs)
+        layout = QGridLayout(margin=0)
+        self.setLayout(layout)
+        # 样式
+        self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
+        self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+
+    # 添加按钮
+    def addButtons(self, group_text, button_list, horizontal_count=3):
+        if horizontal_count < 3:
+            horizontal_count = 3
+        row_index = 0
+        col_index = 0
+        for index, button_item in enumerate(button_list):
+            button = FoldedBodyButton(
+                text=button_item.text(),
+                parent=self
+            )
+            button.mouse_clicked.connect(self.left_mouse_clicked)
+            self.layout().addWidget(button, row_index, col_index)
+            col_index += 1
+            if col_index == horizontal_count:  # 因为col_index先+1,此处应相等
+                row_index += 1
+                col_index = 0
+
+    # 踢皮球，将信号直接传出
+    def left_mouse_clicked(self, signal):
+        self.mouse_clicked.emit(signal)
+
+
+# 滚动折叠盒子
+class ScrollFoldedBox(QScrollArea):
+    left_mouse_clicked = pyqtSignal(dict)
+
+    def __init__(self, *args, **kwargs):
+        super(ScrollFoldedBox, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=0)
+        self.container = QWidget(parent=self)
+        self.container.setLayout(layout)
+        self.setWidgetResizable(True)
+        self.setWidget(self.container)
+        # 样式
+        self.setObjectName('foldedBox')
+        # 设置样式
+        self.setMinimumWidth(220)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        extra_style = """
+        #foldedHead{
+            background-color: rgb(20,120,200);
+            border-bottom: 1px solid rgb(200,200,200)
+        }
+        #foldedBody{
+            background-color: rgb(20,120,100)
+        }
+        """
+        # 设置滚动条样式(防止父控件设置无效)
+        with open("media/ScrollBar.qss", "rb") as fp:
+            content = fp.read()
+            encoding = chardet.detect(content) or {}
+            content = content.decode(encoding.get("encoding") or "utf-8")
+        self.setStyleSheet(content + extra_style)
+
+    # 鼠标进入显示竖直滚动条
+    def enterEvent(self, *args, **kwargs):
+        super(ScrollFoldedBox, self).enterEvent(*args, **kwargs)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+    # 鼠标离开不显示滚动条
+    def leaveEvent(self, *args, **kwargs):
+        super(ScrollFoldedBox, self).leaveEvent(*args, **kwargs)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+    # 添加头部
+    def addHead(self, text):
+        head = FoldedHead(text, parent=self.container, objectName='foldedHead')
+        self.container.layout().addWidget(head, alignment=Qt.AlignTop)
+        return head
+
+    # 添加头部的身体
+    def addBody(self, head):
+        body = FoldedBody(parent=self.container, objectName='foldedBody')
+        head.setBody(body)
+        # 找出head所在的位置
+        for i in range(self.container.layout().count()):
+            widget = self.container.layout().itemAt(i).widget()
+            if isinstance(widget, FoldedHead) and widget == head:
+                self.container.layout().insertWidget(i+1, body, alignment=Qt.AlignTop)
+                break
+        # 连接信号
+        body.mouse_clicked.connect(self.body_button_clicked)
+        return body
+
+    # 获取折叠窗的数据
+    def getFoldedBoxMenu(self):
+        head1 = self.addHead('第1个品种分组')
+        head2 = self.addHead('第2个品种分组')
+        head3 = self.addHead('第3个品种分组')
+        body2 = self.addBody(head=head2)
+        buttons = [QPushButton('品种' + str(i)) for i in range(40)]
+        body2.addButtons('二组', buttons, horizontal_count=2)
+
+        buttons = [QPushButton('品种' + str(i)) for i in range(55)]
+        body1 = self.addBody(head=head1)
+        body1.addButtons('一组', buttons, horizontal_count=2)
+        self.container.layout().addStretch()
+
+    def body_button_clicked(self, signal):
+        pass
+
+
+""" 表格控件 """
+
+
+# 删除一条记录
+class TableRowDeleteButton(QPushButton):
+    button_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(TableRowDeleteButton, self).__init__(*args, **kwargs)
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(lambda: self.button_clicked.emit(self))
+        self.setObjectName('tableDelete')
+        self.setStyleSheet("""
+            #tableDelete{
+                border: none;
+                padding: 1px 8px;
+                color: rgb(200,100,100);
+            }
+            #tableDelete:hover{
+                color: rgb(240,100,100)
+            }
+            """)
+
+
+# 阅读一条记录
+class TableRowReadButton(QPushButton):
+    button_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(TableRowReadButton, self).__init__(*args, **kwargs)
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(lambda: self.button_clicked.emit(self))
+        self.setObjectName('tableDelete')
+        self.setStyleSheet("""
+        #tableDelete{
+            border: none;
+            padding: 1px 8px;
+            color: rgb(100,150,180);
+        }
+        #tableDelete:hover{
+            color: rgb(120,130,230)
+        }
+        """)
+
+
+""" 阅读内容相关 """
+
+
+# PDF文件内容弹窗
+class PDFContentPopup(QDialog):
+    def __init__(self, title, file, *args, **kwargs):
+        super(PDFContentPopup, self).__init__(*args, **kwargs)
+        self.file = file
+        self.file_name = title
+        # auth doc type
+        self.setWindowTitle(title)
+        self.setMinimumSize(1000, 600)
+        self.download = QPushButton("下载PDF")
+        self.download.setIcon(QIcon('media/download-file.png'))
+        self.setWindowIcon(QIcon("media/reader.png"))
+        # scroll
+        scroll_area = QScrollArea()
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        # 设置滚动条样式
+        with open("media/ScrollBar.qss", "rb") as fp:
+            content = fp.read()
+            encoding = chardet.detect(content) or {}
+            content = content.decode(encoding.get("encoding") or "utf-8")
+        scroll_area.setStyleSheet(content)
+        # content
+        self.page_container = QWidget()
+        self.page_container.setLayout(QVBoxLayout())
+        layout = QVBoxLayout(margin=0)
+        # initial data
+        self.add_pages()
+        # add to show
+        scroll_area.setWidget(self.page_container)
+        # add layout
+        # layout.addWidget(self.download, alignment=Qt.AlignLeft)
+        layout.addWidget(scroll_area)
+        self.setLayout(layout)
+
+    def add_pages(self):
+        # 请求文件
+        if not self.file:
+            message_label = QLabel('没有文件.')
+            self.page_container.layout().addWidget(message_label)
+            return
+        try:
+            response = requests.get(self.file)
+            doc = fitz.Document(filename=self.file_name, stream=response.content)
+        except Exception as e:
+            message_label = QLabel('获取文件内容失败.\n{}'.format(e))
+            self.page_container.layout().addWidget(message_label)
+            return
+        for page_index in range(doc.pageCount):
+            page = doc.loadPage(page_index)
+            page_label = QLabel()
+            page_label.setMinimumSize(self.width() - 20, self.height())  # 设置label大小
+            # show PDF content
+            zoom_matrix = fitz.Matrix(1.58, 1.5)  # 图像缩放比例
+            pagePixmap = page.getPixmap(
+                matrix=zoom_matrix,
+                alpha=False)
+            imageFormat = QImage.Format_RGB888  # get image format
+            pageQImage = QImage(
+                pagePixmap.samples,
+                pagePixmap.width,
+                pagePixmap.height,
+                pagePixmap.stride,
+                imageFormat)  # init QImage
+            page_map = QPixmap()
+            page_map.convertFromImage(pageQImage)
+            page_label.setPixmap(page_map)
+            page_label.setScaledContents(True)  # pixmap resize with label
+            self.page_container.layout().addWidget(page_label)
+
+
+# 纯文字内容弹窗
+class TextContentPopup(QDialog):
+    def __init__(self, title, content, *args, **kwargs):
+        super(TextContentPopup, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        text_browser = QTextBrowser()
+        text_browser.setText(content)
+        layout.addWidget(text_browser)
+        self.setWindowTitle(title)
+        self.setLayout(layout)
+
+
