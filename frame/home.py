@@ -5,11 +5,11 @@ import json
 import requests
 import chardet
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
-    QTabWidget
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint
 from PyQt5.QtGui import QPixmap
 import settings
-from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup
+from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, LoadedPage, TableRowReadButton
 
 """ 【更多新闻】页面"""
 
@@ -99,6 +99,7 @@ class NewsItem(QWidget):
 # 新闻公告板块
 class NewsBox(QWidget):
     news_item_clicked = pyqtSignal(int)
+
     def __init__(self, *args, **kwargs):
         super(NewsBox, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=0)  # spacing会影响子控件的高度，控件之间有间隔，视觉就影响高度
@@ -137,6 +138,7 @@ class NewsBox(QWidget):
 
 
 """ 图片广告轮播相关 """
+
 
 # 轮播图的label
 class SliderLabel(QLabel):
@@ -200,6 +202,121 @@ class ImageSlider(QStackedWidget):
             self.setCurrentIndex(current_index + 1)
 
 
+""" 常规报告显示相关 """
+
+
+# 常规报告展示表格
+class NormalReportTable(QTableWidget):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '报告名'),
+        ('category', '报告类型'),
+        ('date', '报告日期'),
+        ('varieties', '关联品种'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(NormalReportTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    # 显示报告内容
+    def showRowContents(self, report_list):
+        self.clear()
+        self.setRowCount(len(report_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(report_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                if col == len(self.KEY_LABELS) - 1:
+                    read_button = TableRowReadButton('阅读')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+
+    # 阅读一个报告
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        report_file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + report_file
+        popup = PDFContentPopup(title='阅读报告', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 显示常规报告
+class NormalReportPage(QWidget):
+    def __init__(self, category_id, *args, **kwargs):
+        super(NormalReportPage, self).__init__(*args, **kwargs)
+        self.category_id = category_id
+        layout = QVBoxLayout(margin=0)
+        # 相关品种选框
+        relate_variety_layout = QHBoxLayout()
+        relate_variety_layout.addWidget(QLabel('相关品种:'))
+        self.variety_combo = QComboBox(activated=self.getCurrentReports)
+        relate_variety_layout.addWidget(self.variety_combo)
+        relate_variety_layout.addStretch()
+        layout.addLayout(relate_variety_layout)
+        self.report_table = NormalReportTable()
+        layout.addWidget(self.report_table)
+        self.setLayout(layout)
+
+    # 获取品种选框内容
+    def getVarietyCombo(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value(
+                    'machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.variety_combo.clear()
+            # 加入全部
+            self.variety_combo.addItem('全部', 0)
+            for variety_group in response['data']:
+                for variety_item in variety_group['varieties']:
+                    self.variety_combo.addItem(variety_item['name'], variety_item['id'])
+            self.getCurrentReports()  # 获取当前报告
+
+    # 获取当前显示的报告
+    def getCurrentReports(self):
+        current_variety_id = self.variety_combo.currentData()
+        try:
+            # 发起上传请求
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/normal-report/?mc=' + settings.app_dawn.value('machine'),
+                data=json.dumps({'category': self.category_id, 'variety': current_variety_id})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            self.report_table.showRowContents(response['data'])
+
 
 # 首页主页面(可滚动)
 class HomePage(QScrollArea):
@@ -224,10 +341,11 @@ class HomePage(QScrollArea):
         box_frame_layout = QHBoxLayout()
         # 菜单滚动折叠窗
         self.folded_box = ScrollFoldedBox(parent=self)
-        self.folded_box.getFoldedBoxMenu()  # 初始化获取它的内容再加入布局
+        # self.folded_box.getFoldedBoxMenu()  # 初始化获取它的内容再加入布局
+        self.folded_box.left_mouse_clicked.connect(self.folded_box_clicked)
         box_frame_layout.addWidget(self.folded_box, alignment=Qt.AlignLeft)
         # 显示窗
-        self.frame_window = QTabWidget(parent=self)
+        self.frame_window = LoadedPage(parent=self)
         box_frame_layout.addWidget(self.frame_window)
         layout.addLayout(box_frame_layout)
         container.setLayout(layout)
@@ -319,6 +437,44 @@ class HomePage(QScrollArea):
                 popup.deleteLater()
                 del popup
 
+    # 获取折叠窗的数据
+    def getFoldedBoxContent(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/data-category/all/?mc=' + settings.app_dawn.value('machine')
+            )
+            if r.status_code != 200:
+                raise ValueError('获取折叠窗数据失败.')
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception:
+            pass
+        else:
+            # 重新组织数据
+            data_category = dict()
+            for category_item in response['data']:
+                group = category_item['group']
+                if group not in data_category.keys():
+                    data_category[group] = list()
+                data_category[group].append({'id': category_item['id'], 'name': category_item['name']})
+
+            for key, values in data_category.items():
+                head = self.folded_box.addHead(key)  # 一个group就得一个Head
+                body = self.folded_box.addBody(head=head)
+                body.addButtons(values)
+                body.setHead(head)
+            self.folded_box.container.layout().addStretch()
+
+    # 折叠盒子被点击
+    def folded_box_clicked(self, category_id, head_text):
+        print('点击折叠盒子', category_id, head_text)
+        # 根据头部text显示窗口
+        if head_text == u'常规报告':
+            page = NormalReportPage(category_id=category_id, parent=self.frame_window)
+            page.getVarietyCombo()
+        else:
+            page = QLabel('暂无数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.frame_window.clear()
+        self.frame_window.addWidget(page)
 
 
 
