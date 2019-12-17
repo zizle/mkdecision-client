@@ -393,6 +393,7 @@ class BaseWindow(QWidget):
                     page = HomePage(parent=self.page_container)
                     page.getCurrentNews()
                     page.getCurrentSliderAdvertisement()
+                    page.getFoldedBoxContent()
                 elif module_text == '数据管理':
                     from frame.collector import CollectorMaintain
                     page = CollectorMaintain(parent=self.page_container)

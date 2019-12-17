@@ -445,17 +445,16 @@ class LoadedPage(QStackedWidget):
 
 # 折叠盒子的按钮
 class FoldedBodyButton(QPushButton):
-    mouse_clicked = pyqtSignal(dict)
+    mouse_clicked = pyqtSignal(int)
 
-    def __init__(self, text, *args, **kwargs):
+    def __init__(self, text, bid, *args, **kwargs):
         super(FoldedBodyButton, self).__init__(*args, **kwargs)
         self.setText(text)
+        self.bid = bid
         self.clicked.connect(self.left_mouse_clicked)
 
     def left_mouse_clicked(self):
-        self.mouse_clicked.emit({
-            'group_text': self.text(),
-        })
+        self.mouse_clicked.emit(self.bid)
 
 
 # FoldedHead(), FoldedBody()
@@ -463,6 +462,7 @@ class FoldedBodyButton(QPushButton):
 class FoldedHead(QWidget):
     def __init__(self, text, *args, **kwargs):
         super(FoldedHead, self).__init__(*args, **kwargs)
+        self.head_text = text
         layout = QHBoxLayout(margin=0)
         self.head_label = QLabel(text, parent=self)
         self.head_button = QPushButton('折叠', parent=self, clicked=self.body_toggle)
@@ -503,7 +503,7 @@ class FoldedHead(QWidget):
 
 # 折叠盒子的身体
 class FoldedBody(QWidget):
-    mouse_clicked = pyqtSignal(dict)
+    mouse_clicked = pyqtSignal(int, str)
 
     def __init__(self, *args, **kwargs):
         super(FoldedBody, self).__init__(*args, **kwargs)
@@ -514,31 +514,42 @@ class FoldedBody(QWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
 
     # 添加按钮
-    def addButtons(self, group_text, button_list, horizontal_count=3):
-        if horizontal_count < 3:
+    def addButtons(self, button_list, horizontal_count=3):
+        if horizontal_count != 3:
             horizontal_count = 3
         row_index = 0
         col_index = 0
         for index, button_item in enumerate(button_list):
             button = FoldedBodyButton(
-                text=button_item.text(),
+                text=button_item['name'],
+                bid=button_item['id'],
                 parent=self
             )
-            button.mouse_clicked.connect(self.left_mouse_clicked)
+            button.mouse_clicked.connect(self.body_button_clicked)
             self.layout().addWidget(button, row_index, col_index)
             col_index += 1
             if col_index == horizontal_count:  # 因为col_index先+1,此处应相等
                 row_index += 1
                 col_index = 0
 
-    # 踢皮球，将信号直接传出
-    def left_mouse_clicked(self, signal):
-        self.mouse_clicked.emit(signal)
+    # 按钮被点击
+    def body_button_clicked(self, bid):
+        # 获取body的parent
+        head = self.get_body()
+        self.mouse_clicked.emit(bid, head.head_text)
 
+    # 设置身体控件(由于设置parent后用findChild没找到，用此法)
+    def setHead(self, head):
+        if not hasattr(self, 'myHead'):
+            self.myHead = head
+
+    def get_body(self):
+        if hasattr(self, 'myHead'):
+            return self.myHead
 
 # 滚动折叠盒子
 class ScrollFoldedBox(QScrollArea):
-    left_mouse_clicked = pyqtSignal(dict)
+    left_mouse_clicked = pyqtSignal(int, str)
 
     def __init__(self, *args, **kwargs):
         super(ScrollFoldedBox, self).__init__(*args, **kwargs)
@@ -550,7 +561,7 @@ class ScrollFoldedBox(QScrollArea):
         # 样式
         self.setObjectName('foldedBox')
         # 设置样式
-        self.setMinimumWidth(220)
+        self.setMinimumWidth(240)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         extra_style = """
         #foldedHead{
@@ -597,25 +608,22 @@ class ScrollFoldedBox(QScrollArea):
                 self.container.layout().insertWidget(i+1, body, alignment=Qt.AlignTop)
                 break
         # 连接信号
-        body.mouse_clicked.connect(self.body_button_clicked)
+        body.mouse_clicked.connect(self.left_mouse_clicked.emit)
         return body
 
-    # 获取折叠窗的数据
-    def getFoldedBoxMenu(self):
-        head1 = self.addHead('第1个品种分组')
-        head2 = self.addHead('第2个品种分组')
-        head3 = self.addHead('第3个品种分组')
-        body2 = self.addBody(head=head2)
-        buttons = [QPushButton('品种' + str(i)) for i in range(40)]
-        body2.addButtons('二组', buttons, horizontal_count=2)
-
-        buttons = [QPushButton('品种' + str(i)) for i in range(55)]
-        body1 = self.addBody(head=head1)
-        body1.addButtons('一组', buttons, horizontal_count=2)
-        self.container.layout().addStretch()
-
-    def body_button_clicked(self, signal):
-        pass
+    # # 获取折叠窗的数据
+    # def getFoldedBoxMenu(self):
+    #     head1 = self.addHead('第1个品种分组')
+    #     head2 = self.addHead('第2个品种分组')
+    #     head3 = self.addHead('第3个品种分组')
+    #     body2 = self.addBody(head=head2)
+    #     buttons = [QPushButton('品种' + str(i)) for i in range(40)]
+    #     body2.addButtons('二组', buttons, horizontal_count=2)
+    #
+    #     buttons = [QPushButton('品种' + str(i)) for i in range(55)]
+    #     body1 = self.addBody(head=head1)
+    #     body1.addButtons('一组', buttons, horizontal_count=2)
+    #     self.container.layout().addStretch()
 
 
 """ 表格控件 """
