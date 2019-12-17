@@ -6,9 +6,10 @@ import hashlib
 import requests
 from PIL import Image
 from urllib3 import encode_multipart_formdata
-from PyQt5.QtWidgets import QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QLineEdit, \
-    QTextEdit, QFileDialog
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWidget, QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QComboBox, QLabel, QPushButton, QLineEdit, \
+    QTextEdit, QFileDialog, QTreeWidget, QTreeWidgetItem, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView
+from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
+from PyQt5.QtGui import QBrush, QColor
 import settings
 
 
@@ -209,7 +210,7 @@ class CreateAdvertisementPopup(QDialog):
     # 选择广告图片
     def browser_image(self):
         self.error_message_label.setText('')
-        image_path, _ = QFileDialog.getOpenFileName(self, '打开图片', '', "png files(*.png)")
+        image_path, _ = QFileDialog.getOpenFileName(self, '打开图片', '', "png file(*.png)")
         if image_path:
             # 对文件的大小进行限制
             img = Image.open(image_path)
@@ -288,5 +289,291 @@ class CreateAdvertisementPopup(QDialog):
             self.error_message_label.setText(response['message'])
         self.commit_button.setEnabled(True)
         self.close()
+
+
+# 上传常规报告线程
+class UploadReportThread(QThread):
+    response_signal = pyqtSignal(int, bool)
+
+    def __init__(self, file_list, machine_code, token, *args, **kwargs):
+        super(UploadReportThread, self).__init__(*args, **kwargs)
+        self.file_list = file_list
+        self.machine_code = machine_code
+        self.token = token
+
+    def run(self):
+        for file_item in self.file_list:
+            # 读取文件
+            try:
+                data_file = dict()
+                # 增加其他字段
+                data_file['name'] = file_item['file_name']
+                data_file['date'] = file_item['file_date']
+                data_file['category_id'] = file_item['category_id']
+                data_file['variety_ids'] = str(file_item['variety_ids'])
+                # 读取文件
+                file = open(file_item['file_path'], "rb")
+                file_content = file.read()
+                file.close()
+                # 文件内容字段
+                data_file["file"] = (file_item['file_name'], file_content)
+                encode_data = encode_multipart_formdata(data_file)
+                data_file = encode_data[0]
+                # 发起上传请求
+                r = requests.post(
+                    url=settings.SERVER_ADDR + 'home/normal-report/?mc=' + self.machine_code,
+                    headers={
+                        'AUTHORIZATION': self.token,
+                        'Content-Type': encode_data[1]
+                    },
+                    data=data_file
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                with open('debug/normal_report.log', 'w') as f:
+                    f.write(str(e) + '\n')
+                self.response_signal.emit(file_item['row_index'], False)
+            else:
+                self.response_signal.emit(file_item['row_index'], True)
+
+
+# 新增常规报告
+class CreateReportPopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(CreateReportPopup, self).__init__(*args, **kwargs)
+        # 总布局-左右
+        layout = QHBoxLayout()
+        # 左侧上下布局
+        llayout = QVBoxLayout()
+        # 左侧是品种树
+        self.left_tree = QTreeWidget(clicked=self.variety_tree_clicked)
+        self.left_tree.header().hide()
+        self.left_tree.setMaximumWidth(160)
+        llayout.addWidget(self.left_tree)
+        layout.addLayout(llayout)
+        # 右侧上下布局
+        rlayout = QVBoxLayout()
+        # 所属品种
+        attach_varieties_layout = QHBoxLayout()
+        attach_varieties_layout.addWidget(QLabel('所属品种:'))
+        self.attach_varieties = QLabel()
+        self.attach_varieties.variety_ids = list()  # id字符串
+        attach_varieties_layout.addWidget(self.attach_varieties)
+        attach_varieties_layout.addStretch()
+        attach_varieties_layout.addWidget(QPushButton('清空', objectName='deleteBtn', cursor=Qt.PointingHandCursor, clicked=self.clear_attach_varieties), alignment=Qt.AlignRight)
+        rlayout.addLayout(attach_varieties_layout)
+        rlayout.addWidget(QLabel(parent=self, objectName='varietyError'))
+        # 所属分类
+        attach_category_layout = QHBoxLayout()
+        attach_category_layout.addWidget(QLabel('所属分类:'))
+        self.category_combo = QComboBox()
+        self.category_combo.setMinimumWidth(400)
+        attach_category_layout.addWidget(self.category_combo)
+        attach_category_layout.addStretch()
+        attach_category_layout.addWidget(QPushButton('新分类?', objectName='newCategoryBtn', cursor=Qt.PointingHandCursor, clicked=self.add_new_category), alignment=Qt.AlignRight)
+        rlayout.addLayout(attach_category_layout)
+        rlayout.addWidget(QLabel(parent=self, objectName='categoryError'))
+        # 选择报告
+        rlayout.addWidget(QPushButton('选择报告', clicked=self.select_reports), alignment=Qt.AlignLeft)
+        # 预览表格
+        self.review_table = QTableWidget()
+        self.review_table.verticalHeader().hide()
+        rlayout.addWidget(self.review_table)
+        # 提交按钮
+        self.commit_button = QPushButton('提交', clicked=self.commit_upload_report)
+        rlayout.addWidget(self.commit_button, alignment=Qt.AlignRight)
+        layout.addLayout(rlayout)
+        self.setLayout(layout)
+        self.setMinimumWidth(800)
+        self.setStyleSheet("""
+        #deleteBtn{
+            border: none;
+            color:rgb(200,100,80)
+        }
+        #newCategoryBtn{
+            border:none;
+            color:rgb(80,100,200)
+        }
+        """)
+
+    # 获取分类选框内容
+    def getCategoryCombo(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/data-category/normal_report/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            self.category_combo.clear()
+            for category_item in response['data']:
+                self.category_combo.addItem(category_item['name'], category_item['id'])
+            # 加入其它
+            self.category_combo.addItem('其它', 0)
+
+    # 删除所属品种
+    def clear_attach_varieties(self):
+        self.attach_varieties.setText('')
+        self.attach_varieties.variety_ids.clear()  # id列表
+
+    # 新增报告分类
+    def add_new_category(self):
+        popup = QDialog(parent=self)
+        def commit_new_category():
+            print('提交新建分类')
+            name = re.sub(r'\s+', '', popup.category_name_edit.text())
+            if not name:
+                popup.name_error_label.setText('请输入正确的分类名称!')
+                return
+            # 提交常规报告分类
+            try:
+                r = requests.post(
+                    url=settings.SERVER_ADDR + 'home/data-category/normal_report/?mc=' + settings.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({'name': name})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                popup.name_error_label.setText(str(e))
+            else:
+                # 重新获取填充分类选框
+                self.getCategoryCombo()
+                popup.close()
+
+        popup.setWindowTitle('新建分类')
+        new_layout = QGridLayout()
+        new_layout.addWidget(QLabel('名称:'), 0, 0)
+        popup.category_name_edit = QLineEdit()
+        new_layout.addWidget(popup.category_name_edit, 0, 1)
+        popup.name_error_label = QLabel()
+        new_layout.addWidget(popup.name_error_label, 1, 0, 1, 2)
+        new_layout.addWidget(QPushButton('确定', clicked=commit_new_category), 2, 1)
+        popup.setLayout(new_layout)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取左侧品种树的品种内容
+    def geTreeVarieties(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            # 填充品种树
+            for group_item in response['data']:
+                group = QTreeWidgetItem(self.left_tree)
+                group.setText(0, group_item['name'])
+                group.gid = group_item['id']
+                # 添加子节点
+                for variety_item in group_item['varieties']:
+                    child = QTreeWidgetItem()
+                    child.setText(0, variety_item['name'])
+                    child.vid = variety_item['id']
+                    group.addChild(child)
+            self.left_tree.expandAll()  # 展开所有
+
+    # 点击左侧品种树
+    def variety_tree_clicked(self):
+        item = self.left_tree.currentItem()
+        if item.childCount():  # has children open the root
+            if item.isExpanded():
+                item.setExpanded(False)
+            else:
+                item.setExpanded(True)
+        text = item.text(0)
+        if item.parent() and item.vid not in self.attach_varieties.variety_ids:  # 所属品种中增加当前品种
+            self.attach_varieties.setText(self.attach_varieties.text() + text + '、')
+            self.attach_varieties.variety_ids.append(item.vid)
+
+    # 选择报告文件
+    def select_reports(self):
+        path_list, _ = QFileDialog.getOpenFileNames(self, '打开文件', '', "PDF files(*.pdf)")
+        # 遍历报告文件填充预览表格与设置状态
+        self.review_table.setRowCount(len(path_list))
+        self.review_table.setColumnCount(4)
+        self.review_table.setHorizontalHeaderLabels(['序号', '报告名', '报告日期', '状态'])
+        self.review_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.review_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, file_path in enumerate(path_list):
+            item_1 = QTableWidgetItem(str(row + 1))
+            item_1.file_path = file_path
+            item_1.setTextAlignment(Qt.AlignCenter)
+            self.review_table.setItem(row, 0, item_1)
+            file_name = file_path.rsplit('/', 1)[1]
+            item_2 = QTableWidgetItem(file_name)
+            item_2.setTextAlignment(Qt.AlignCenter)
+            self.review_table.setItem(row, 1, item_2)
+            # 日期控件
+            date_edit = QDateEdit(QDate.currentDate())
+            date_edit.setCalendarPopup(True)
+            date_edit.setDisplayFormat('yyyy-MM-dd')
+            self.review_table.setCellWidget(row, 2, date_edit)
+            # 装态
+            item_4 = QTableWidgetItem('等待上传')
+            item_4.setTextAlignment(Qt.AlignCenter)
+            self.review_table.setItem(row, 3, item_4)
+
+    # 确认上传报告
+    def commit_upload_report(self):
+        self.commit_button.setEnabled(False)
+        # 获取所属品种列表id
+        attach_variety_ids = self.attach_varieties.variety_ids
+        if not attach_variety_ids:
+            self.findChild(QLabel, 'varietyError').setText('请选择所属品种(支持多选)')
+            return
+        # 获取所属分类
+        attach_category = self.category_combo.currentData()
+        # 遍历表格打包文件信息(上传线程处理，每上传一个发个信号过来修改上传状态)
+        file_message_list = list()
+        for row in range(self.review_table.rowCount()):
+            message_item = self.review_table.item(row, 3)  # 设置上传状态
+            message_item.setText('正在上传...')
+            message_item.setForeground(QBrush(QColor(20, 50, 200)))
+            # 设置颜色
+            file_message_list.append({
+                'file_name': self.review_table.item(row, 1).text(),
+                'file_path': self.review_table.item(row, 0).file_path,
+                'category_id': attach_category,
+                'variety_ids': attach_variety_ids,
+                'file_date': self.review_table.cellWidget(row, 2).text(),
+                'row_index': row
+            })
+        # 开启线程
+        if hasattr(self, 'uploading_thread'):
+            del self.uploading_thread
+        self.uploading_thread = UploadReportThread(
+            file_list=file_message_list,
+            machine_code=settings.app_dawn.value('machine'),
+            token=settings.app_dawn.value('AUTHORIZATION'),
+        )
+        self.uploading_thread.finished.connect(self.uploading_thread.deleteLater)
+        self.uploading_thread.response_signal.connect(self.change_loading_state)
+        self.uploading_thread.start()
+
+    # 上传的线程返回消息
+    def change_loading_state(self, row, succeed):
+        item = self.review_table.item(row, 3)
+        if succeed:
+            item.setText('上传成功!')
+            item.setForeground(QBrush(QColor(20, 200, 50)))
+        else:
+            item.setText('上传失败...')
+            item.setForeground(QBrush(QColor(200, 20, 50)))
+        if row == self.review_table.rowCount() - 1:
+            self.commit_button.setEnabled(True)
+
 
 
