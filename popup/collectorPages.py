@@ -5,6 +5,7 @@ import json
 import hashlib
 import requests
 from PIL import Image
+from pandas import read_excel
 from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import QWidget, QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QComboBox, QLabel, QPushButton, QLineEdit, \
     QTextEdit, QFileDialog, QTreeWidget, QTreeWidgetItem, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QListWidget, QListWidgetItem
@@ -795,6 +796,88 @@ class CreateTransactionNoticePopup(QDialog):
         if not popup.exec_():
             popup.deleteLater()
             del popup
+
+
+# 新增现货报表
+class CreateNewSpotTablePopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(CreateNewSpotTablePopup, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        # 选择文件与信息提示
+        select_message_layout = QHBoxLayout()
+        select_message_layout.addWidget(QPushButton('选择报表', clicked=self.select_spot_table))
+        select_message_layout.addWidget(QLabel(parent=self, objectName='errorMessage'))
+        select_message_layout.addStretch()
+        select_message_layout.addWidget(QPushButton('模板下载', objectName='downloadModel'))
+        layout.addLayout(select_message_layout)
+        # 预览表格
+        self.review_table = QTableWidget()
+        self.review_table.verticalHeader().hide()
+        layout.addWidget(self.review_table)
+        layout.addWidget(QPushButton('确认上传', clicked=self.commit_spot_table), alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        self.setWindowTitle('新增现货数据')
+        self.setMinimumWidth(660)
+        self.setStyleSheet("""
+        #downloadModel{
+            border: none;
+            color:rgb(20,150,200)
+        }
+        """)
+
+    # 选择文件
+    def select_spot_table(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开表格', '', "Excel file(*.xls *xlsx)")
+        df = read_excel(file_path, keep_default_na=False)
+        table_headers = ['序号'] + list(df.columns)
+        # 行数：df.shape[0] 列数: df.shape[1]
+        # print(df.shape[0], df.shape[1])
+        self.review_table.setRowCount(df.shape[0])
+        self.review_table.setColumnCount(df.shape[1] + 1)
+        self.review_table.setHorizontalHeaderLabels(table_headers)
+        self.review_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        df.columns = ['name', 'area', 'level', 'price', 'increase', 'date', 'note']  # 重命名列名
+        df['date'] = df['date'].dt.strftime('%Y-%m-%d')  # 改变时间格式
+        col_keys = [''] + list(df.columns)
+        # 遍历转为字典
+        for i in df.index.values:
+            row_data = df.loc[i, ['name', 'area', 'level', 'price', 'increase', 'date', 'note']].to_dict()
+            # 写入表格
+            for col, col_key in enumerate(col_keys):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(i + 1))
+                else:
+                    table_item = QTableWidgetItem(str(row_data[col_key]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.review_table.setItem(i, col, table_item)
+
+    # 上传数据
+    def commit_spot_table(self):
+        col_keys = ['', 'name', 'area', 'level', 'price', 'increase', 'date', 'note']
+        col_count = self.review_table.columnCount()
+        # 遍历表中的数据
+        spot_data = list()
+        for row in range(self.review_table.rowCount()):
+            row_content = dict()
+            for col in range(1, col_count):
+                # if col_keys[col] in ['price', 'increase']:
+                #     row_content[col_keys[col]] = self.review_table.item(row, col).text()
+                # else:
+                row_content[col_keys[col]] = self.review_table.item(row, col).text()
+            spot_data.append(row_content)
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'home/spot-commodity/?mc=' + settings.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({'commodity_list': spot_data})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.findChild(QLabel, 'errorMessage').setText(str(e))
+        else:
+            self.close()
 
 
 

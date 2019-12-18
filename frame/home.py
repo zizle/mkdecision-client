@@ -5,9 +5,9 @@ import json
 import requests
 import chardet
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
-    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QCalendarWidget
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint
-from PyQt5.QtGui import QPixmap
+    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QDateEdit
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint, QDate
+from PyQt5.QtGui import QPixmap, QBrush, QColor
 import settings
 from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, LoadedPage, TableRowReadButton
 
@@ -404,6 +404,110 @@ class TransactionNoticePage(QWidget):
             self.notice_table.showRowContents(response['data'])
 
 
+""" 现货报表相关 """
+
+
+# 现货报表表格
+class SpotCommodityTable(QTableWidget):
+    network_result = pyqtSignal(str)
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '名称'),
+        ('area', '地区'),
+        ('level', '等级'),
+        ('price', '价格'),
+        ('increase', '增减'),
+        ('note', '备注'),
+        ('date', '日期'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(SpotCommodityTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS))
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                color = QBrush(QColor(0,0,0))
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    if header[0] == 'price':
+                        text = str(int(content_item[header[0]]))
+                    elif header[0] == 'increase':
+                        num = int(content_item[header[0]])
+                        text = str(num)
+                        if num > 0:
+                            print('数大于0')
+                            color.setColor(QColor(220, 100, 100))
+                        elif num < 0:
+                            print('数《0')
+                            color.setColor(QColor(100, 220, 100))
+                        else:
+                            pass
+                    else:
+                        text = content_item[header[0]]
+                    table_item = QTableWidgetItem(text)
+                    table_item.setForeground(color)
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+
+
+# 现货报表显示主页
+class SpotCommodityPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(SpotCommodityPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 日期选择
+        message_button_layout = QHBoxLayout()
+        self.date_edit = QDateEdit(QDate.currentDate().addDays(-1), dateChanged=self.getCurrentSpotCommodity)
+        self.date_edit.setDisplayFormat('yyyy-MM-dd')
+        self.date_edit.setCalendarPopup(True)
+        message_button_layout.addWidget(QLabel('日期:'))
+        message_button_layout.addWidget(self.date_edit)
+        message_button_layout.addStretch()  # 伸缩
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.spot_table = SpotCommodityTable()
+        layout.addWidget(self.spot_table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+
+        self.setLayout(layout)
+
+    def getCurrentSpotCommodity(self):
+        current_date = self.date_edit.text()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/spot-commodity/?date=' + current_date + '&mc=' + settings.app_dawn.value(
+                    'machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            if response['data']:
+                self.spot_table.showRowContents(response['data'])
+                self.spot_table.show()
+                self.no_data_label.hide()
+            else:
+                self.spot_table.hide()
+                self.no_data_label.show()
+
+
 # 首页主页面(可滚动)
 class HomePage(QScrollArea):
     more_news_signal = pyqtSignal(bool)
@@ -567,8 +671,11 @@ class HomePage(QScrollArea):
         elif head_text == u'交易通知':
             page = TransactionNoticePage(category_id=category_id, parent=self.frame_window)
             page.getCurrentNotices()
+        elif head_text == u'现货报表':
+            page = SpotCommodityPage(parent=self)
+            page.getCurrentSpotCommodity()
         else:
-            page = QLabel('暂无数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+            page = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
         self.frame_window.clear()
         self.frame_window.addWidget(page)
 
