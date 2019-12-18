@@ -5,9 +5,9 @@ import json
 import requests
 import chardet
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
-    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint
-from PyQt5.QtGui import QPixmap
+    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QDateEdit
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint, QDate
+from PyQt5.QtGui import QPixmap, QBrush, QColor
 import settings
 from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, LoadedPage, TableRowReadButton
 
@@ -318,6 +318,281 @@ class NormalReportPage(QWidget):
             self.report_table.showRowContents(response['data'])
 
 
+""" 交易通知显示相关 """
+
+
+# 交易通知表格
+class TransactionNoticeTable(QTableWidget):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '通知文件'),
+        ('category', '通知类型'),
+        ('date', '通知日期'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(TransactionNoticeTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    # 显示报告内容
+    def showRowContents(self, report_list):
+        self.clear()
+        self.setRowCount(len(report_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(report_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                if col == len(self.KEY_LABELS) - 1:
+                    read_button = TableRowReadButton('阅读')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+
+    # 阅读一个通知
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        report_file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + report_file
+        popup = PDFContentPopup(title='阅读通知', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 显示交易通知
+class TransactionNoticePage(QWidget):
+    def __init__(self, category_id, *args, **kwargs):
+        super(TransactionNoticePage, self).__init__(*args, **kwargs)
+        self.category_id = category_id
+        layout = QVBoxLayout(margin=0)
+        self.notice_table = TransactionNoticeTable()
+        layout.addWidget(self.notice_table)
+        self.setLayout(layout)
+
+    # 获取当前通知
+    def getCurrentNotices(self):
+        try:
+            # 发起请求当前数据
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/transaction_notice/?mc=' + settings.app_dawn.value('machine'),
+                data=json.dumps({'category_id': self.category_id})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            self.notice_table.showRowContents(response['data'])
+
+
+""" 现货报表相关 """
+
+
+# 现货报表表格
+class SpotCommodityTable(QTableWidget):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '名称'),
+        ('area', '地区'),
+        ('level', '等级'),
+        ('price', '价格'),
+        ('increase', '增减'),
+        ('note', '备注'),
+        ('date', '日期'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(SpotCommodityTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS))
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                color = QBrush(QColor(0,0,0))
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    if header[0] == 'price':
+                        text = str(int(content_item[header[0]]))
+                    elif header[0] == 'increase':
+                        num = int(content_item[header[0]])
+                        text = str(num)
+                        if num > 0:
+                            print('数大于0')
+                            color.setColor(QColor(220, 100, 100))
+                        elif num < 0:
+                            print('数《0')
+                            color.setColor(QColor(100, 220, 100))
+                        else:
+                            pass
+                    else:
+                        text = content_item[header[0]]
+                    table_item = QTableWidgetItem(text)
+                    table_item.setForeground(color)
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+
+
+# 现货报表显示主页
+class SpotCommodityPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(SpotCommodityPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 日期选择
+        message_button_layout = QHBoxLayout()
+        self.date_edit = QDateEdit(QDate.currentDate().addDays(-1), dateChanged=self.getCurrentSpotCommodity)
+        self.date_edit.setDisplayFormat('yyyy-MM-dd')
+        self.date_edit.setCalendarPopup(True)
+        message_button_layout.addWidget(QLabel('日期:'))
+        message_button_layout.addWidget(self.date_edit)
+        message_button_layout.addStretch()  # 伸缩
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.spot_table = SpotCommodityTable()
+        layout.addWidget(self.spot_table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+
+        self.setLayout(layout)
+
+    def getCurrentSpotCommodity(self):
+        current_date = self.date_edit.text()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/spot-commodity/?date=' + current_date + '&mc=' + settings.app_dawn.value(
+                    'machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            self.spot_table.hide()
+            self.no_data_label.show()
+        else:
+            if response['data']:
+                self.spot_table.showRowContents(response['data'])
+                self.spot_table.show()
+                self.no_data_label.hide()
+            else:
+                self.spot_table.hide()
+                self.no_data_label.show()
+
+
+""" 财经日历相关 """
+
+
+# 财经日历显示表格
+class FinanceCalendarTable(QTableWidget):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('date', '日期'),
+        ('time', '时间'),
+        ('country', '地区'),
+        ('event', '事件'),
+        ('expected', '预期值'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(FinanceCalendarTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS))
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+
+
+# 财经日历显示主页
+class FinanceCalendarPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(FinanceCalendarPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 日期选择
+        message_button_layout = QHBoxLayout()
+        self.date_edit = QDateEdit(QDate.currentDate(), dateChanged=self.getCurrentFinanceCalendar)
+        self.date_edit.setDisplayFormat('yyyy-MM-dd')
+        self.date_edit.setCalendarPopup(True)
+        message_button_layout.addWidget(QLabel('日期:'))
+        message_button_layout.addWidget(self.date_edit)
+        message_button_layout.addStretch()  # 伸缩
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.finance_table = FinanceCalendarTable()
+        layout.addWidget(self.finance_table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+        self.setLayout(layout)
+
+    # 获取当前日期财经日历
+    def getCurrentFinanceCalendar(self):
+        current_date = self.date_edit.text()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/finance-calendar/?date=' + current_date + '&mc=' + settings.app_dawn.value(
+                    'machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            self.finance_table.hide()
+            self.no_data_label.show()
+        else:
+            if response['data']:
+                self.finance_table.showRowContents(response['data'])
+                self.finance_table.show()
+                self.no_data_label.hide()
+            else:
+                self.finance_table.hide()
+                self.no_data_label.show()
+
+
 # 首页主页面(可滚动)
 class HomePage(QScrollArea):
     more_news_signal = pyqtSignal(bool)
@@ -351,7 +626,8 @@ class HomePage(QScrollArea):
         container.setLayout(layout)
         self.setWidget(container)
         self.setWidgetResizable(True)  # 内部控件可随窗口调整大小
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 始终不显示右侧滚动条
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         # 设置滚动条样式
         with open("media/ScrollBar.qss", "rb") as fp:
             content = fp.read()
@@ -456,12 +732,19 @@ class HomePage(QScrollArea):
                 if group not in data_category.keys():
                     data_category[group] = list()
                 data_category[group].append({'id': category_item['id'], 'name': category_item['name']})
-
             for key, values in data_category.items():
                 head = self.folded_box.addHead(key)  # 一个group就得一个Head
                 body = self.folded_box.addBody(head=head)
                 body.addButtons(values)
-                body.setHead(head)
+                # body.setHead(head)
+            # 加入现货报表和财经日历
+            spot_head = self.folded_box.addHead('现货报表')
+            finance_head = self.folded_box.addHead('财经日历')
+            spot_body = self.folded_box.addBody(head=spot_head)
+            spot_body.addButtons([{'id': -1, 'name': '昨日数据'}])
+            # spot_body.setHead(spot_head)
+            finance_body = self.folded_box.addBody(head=finance_head)
+            finance_body.addButtons([{'id': 0, 'name': '今日数据'}])
             self.folded_box.container.layout().addStretch()
 
     # 折叠盒子被点击
@@ -471,8 +754,17 @@ class HomePage(QScrollArea):
         if head_text == u'常规报告':
             page = NormalReportPage(category_id=category_id, parent=self.frame_window)
             page.getVarietyCombo()
+        elif head_text == u'交易通知':
+            page = TransactionNoticePage(category_id=category_id, parent=self.frame_window)
+            page.getCurrentNotices()
+        elif head_text == u'现货报表':
+            page = SpotCommodityPage(parent=self)
+            page.getCurrentSpotCommodity()
+        elif head_text == u'财经日历':
+            page = FinanceCalendarPage(parent=self)
+            page.getCurrentFinanceCalendar()
         else:
-            page = QLabel('暂无数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+            page = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
         self.frame_window.clear()
         self.frame_window.addWidget(page)
 

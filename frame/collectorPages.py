@@ -3,11 +3,12 @@
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout,QGridLayout, QListWidget, QLabel, QDialog, QComboBox, \
-    QTextEdit, QPushButton, QHeaderView, QTableWidget, QAbstractItemView, QTableWidgetItem
-from PyQt5.Qt import Qt, pyqtSignal, QPoint
+    QTextEdit, QPushButton, QHeaderView, QTableWidget, QAbstractItemView, QTableWidgetItem, QDateEdit
+from PyQt5.Qt import Qt, pyqtSignal, QPoint, QDate
 from PyQt5.QtGui import QPixmap, QImage
 from widgets.base import LoadedPage, PDFContentPopup, TextContentPopup
-from popup.collectorPages import CreateNewsPopup, CreateAdvertisementPopup, CreateReportPopup
+from popup.collectorPages import CreateNewsPopup, CreateAdvertisementPopup, CreateReportPopup, CreateTransactionNoticePopup, \
+    CreateNewSpotTablePopup, CreateNewFinanceCalendarPopup
 import settings
 from widgets.base import TableRowDeleteButton, TableRowReadButton
 from popup.tips import WarningPopup
@@ -403,10 +404,9 @@ class ReportTable(QTableWidget):
                 self.setItem(row, col, table_item)
                 if col == len(self.KEY_LABELS) - 1:
                     # 添加阅读按钮
-                    if col == len(self.KEY_LABELS) - 1:
-                        read_button = TableRowReadButton('阅读')
-                        read_button.button_clicked.connect(self.read_button_clicked)
-                        self.setCellWidget(row, col + 1, read_button)
+                    read_button = TableRowReadButton('阅读')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
                     # 增加【删除】按钮
                     delete_button = TableRowDeleteButton('删除')
                     delete_button.button_clicked.connect(self.delete_button_clicked)
@@ -430,9 +430,10 @@ class ReportTable(QTableWidget):
                 self.network_result.emit(str(e))
             else:
                 self.network_result.emit(response['message'])
-            popup.close()
-            # 移除本行
-            self.removeRow(current_row)
+                popup.close()
+                # 移除本行
+                self.removeRow(current_row)
+
         # 警示框
         popup = WarningPopup(parent=self)
         popup.confirm_button.connect(delete_row_report)
@@ -551,6 +552,439 @@ class NormalReportPage(QWidget):
             del popup
 
 
+""" 交易通知 """
+
+
+# 交易通知表格
+class TransactionNoticeTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '名称'),
+        ('category', '通知类型'),
+        ('date', '通知日期'),
+        ('uploader', '上传者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(TransactionNoticeTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS) + 1, QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 添加阅读按钮
+                    if col == len(self.KEY_LABELS) - 1:
+                        read_button = TableRowReadButton('阅读')
+                        read_button.button_clicked.connect(self.read_button_clicked)
+                        self.setCellWidget(row, col + 1, read_button)
+                    # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 2, delete_button)
+
+    # 删除一个通知
+    def delete_button_clicked(self, delete_button):
+        def delete_row_report():
+            current_row, _ = self.get_widget_index(delete_button)
+            report_id = self.item(current_row, 0).id
+            # 发起删除通知请求
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'home/transaction_notice/' + str(
+                        report_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result.emit(str(e))
+            else:
+                self.network_result.emit(response['message'])
+                popup.close()
+                # 移除本行
+                self.removeRow(current_row)
+
+
+        # 警示框
+        popup = WarningPopup(parent=self)
+        popup.confirm_button.connect(delete_row_report)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 阅读一个通知
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        notice_file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + notice_file
+        popup = PDFContentPopup(title='阅读通知', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 交易通知管理页面
+class TransactionNoticePage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(TransactionNoticePage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 分类选择、信息展示与新增按钮
+        message_button_layout = QHBoxLayout()
+        self.category_combo = QComboBox(activated=self.getCurrentTransactionNotce)
+        message_button_layout.addWidget(QLabel('类别:'))
+        message_button_layout.addWidget(self.category_combo)
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addStretch()  # 伸缩
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_transaction_notice), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.notice_table = TransactionNoticeTable()
+        self.notice_table.network_result.connect(self.network_message_label.setText)
+        layout.addWidget(self.notice_table)
+        self.setLayout(layout)
+
+    # 获取类别选择框内容
+    def getCategoryCombo(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/data-category/transaction_notice/?mc=' + settings.app_dawn.value(
+                    'machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.category_combo.clear()
+            # 加入全部
+            self.category_combo.addItem('全部', 0)
+            for category_item in response['data']:
+                self.category_combo.addItem(category_item['name'], category_item['id'])
+            # 加入其他
+            self.category_combo.addItem('其他', -1)
+
+    # 获取当前交易通知
+    def getCurrentTransactionNotce(self):
+        category_id = self.category_combo.currentData()
+        try:
+            # 发起请求当前数据
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/transaction_notice/?mc=' + settings.app_dawn.value('machine'),
+                data=json.dumps({'category_id': category_id})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.notice_table.showRowContents(response['data'])
+            self.network_message_label.setText(response['message'])
+
+    # 新建交易通知
+    def create_transaction_notice(self):
+        popup = CreateTransactionNoticePopup(parent=self)
+        popup.getCategoryList()
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 现货报表相关 """
+
+
+# 现货报表管理表格
+class SpotCommodityTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '名称'),
+        ('area', '地区'),
+        ('level', '等级'),
+        ('price', '价格'),
+        ('increase', '增减'),
+        ('note', '备注'),
+        ('date', '日期'),
+        ('uploader', '上传者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(SpotCommodityTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(row_list):
+            print(content_item)
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 1, delete_button)
+
+    # 删除一条数据
+    def delete_button_clicked(self, delete_button):
+        def delete_row_content():
+            current_row, _ = self.get_widget_index(delete_button)
+            spot_id = self.item(current_row, 0).id
+            # 发起删除通知请求
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'home/spot-commodity/' + str(
+                        spot_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result.emit(str(e))
+            else:
+                self.network_result.emit(response['message'])
+                popup.close()
+                # 移除本行
+                self.removeRow(current_row)
+
+        # 警示框
+        popup = WarningPopup(parent=self)
+        popup.confirm_button.connect(delete_row_content)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 现货报表管理页面
+class SpotCommodityPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(SpotCommodityPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 日期选择、信息展示与新增按钮
+        message_button_layout = QHBoxLayout()
+        self.date_edit = QDateEdit(QDate.currentDate().addDays(-1), dateChanged=self.getCurrentSpotCommodity)
+        self.date_edit.setDisplayFormat('yyyy-MM-dd')
+        self.date_edit.setCalendarPopup(True)
+        message_button_layout.addWidget(QLabel('日期:'))
+        message_button_layout.addWidget(self.date_edit)
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addStretch()  # 伸缩
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_spot_table), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.spot_table = SpotCommodityTable()
+        self.spot_table.network_result.connect(self.network_message_label.setText)
+        layout.addWidget(self.spot_table)
+        self.setLayout(layout)
+
+    # 获取当前时间的现货报表
+    def getCurrentSpotCommodity(self):
+        current_date = self.date_edit.text()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/spot-commodity/?date=' + current_date + '&mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.spot_table.showRowContents(response['data'])
+            self.network_message_label.setText(response['message'])
+
+    # 新增现货报表数据
+    def create_spot_table(self):
+        popup = CreateNewSpotTablePopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 财经日历相关 """
+
+
+# 财经日历显示表格
+class FinanceCalendarTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('date', '日期'),
+        ('time', '时间'),
+        ('country', '地区'),
+        ('event', '事件'),
+        ('expected', '预期值'),
+        ('uploader', '上传者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(FinanceCalendarTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 1, delete_button)
+
+    # 删除一条数据
+    def delete_button_clicked(self, delete_button):
+        def delete_row_content():
+            current_row, _ = self.get_widget_index(delete_button)
+            finance_id = self.item(current_row, 0).id
+            # 发起删除通知请求
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'home/finance-calendar/' + str(
+                        finance_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result.emit(str(e))
+            else:
+                self.network_result.emit(response['message'])
+                popup.close()
+                # 移除本行
+                self.removeRow(current_row)
+
+        # 警示框
+        popup = WarningPopup(parent=self)
+        popup.confirm_button.connect(delete_row_content)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 财经日历管理页面
+class FinanceCalendarPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(FinanceCalendarPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 日期选择、信息展示与新增按钮
+        message_button_layout = QHBoxLayout()
+        self.date_edit = QDateEdit(QDate.currentDate(), dateChanged=self.getCurrentFinanceCalendar)
+        self.date_edit.setDisplayFormat('yyyy-MM-dd')
+        self.date_edit.setCalendarPopup(True)
+        message_button_layout.addWidget(QLabel('日期:'))
+        message_button_layout.addWidget(self.date_edit)
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addStretch()  # 伸缩
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_finance_calendar), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.finance_table = FinanceCalendarTable()
+        self.finance_table.network_result.connect(self.network_message_label.setText)
+        layout.addWidget(self.finance_table)
+        self.setLayout(layout)
+
+    # 获取当前日期财经日历
+    def getCurrentFinanceCalendar(self):
+        current_date = self.date_edit.text()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/finance-calendar/?date=' + current_date + '&mc=' + settings.app_dawn.value(
+                    'machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.finance_table.showRowContents(response['data'])
+            self.network_message_label.setText(response['message'])
+
+
+    # 新增财经日历数据
+    def create_finance_calendar(self):
+        popup = CreateNewFinanceCalendarPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+
 """ 首页管理主页 """
 
 
@@ -589,6 +1023,17 @@ class HomePageCollector(QWidget):
                 frame_page = NormalReportPage(parent=self.operate_frame)
                 frame_page.getCategoryCombo()
                 frame_page.getVarietyCombo()
+                frame_page.getCurrentReports()
+            elif text == u'交易通知':
+                frame_page = TransactionNoticePage(parent=self.operate_frame)
+                frame_page.getCategoryCombo()
+                frame_page.getCurrentTransactionNotce()
+            elif text == u'现货报表':
+                frame_page = SpotCommodityPage(parent=self.operate_frame)
+                frame_page.getCurrentSpotCommodity()
+            elif text == u'财经日历':
+                frame_page = FinanceCalendarPage(parent=self.operate_frame)
+                frame_page.getCurrentFinanceCalendar()
             else:
                 frame_page = QLabel('【' + text + '】正在加紧开发中...')
             self.operate_frame.clear()
