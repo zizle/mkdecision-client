@@ -7,7 +7,7 @@ import requests
 from PIL import Image
 from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import QWidget, QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QComboBox, QLabel, QPushButton, QLineEdit, \
-    QTextEdit, QFileDialog, QTreeWidget, QTreeWidgetItem, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView
+    QTextEdit, QFileDialog, QTreeWidget, QTreeWidgetItem, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QListWidget, QListWidgetItem
 from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor
 import settings
@@ -416,7 +416,7 @@ class CreateReportPopup(QDialog):
             # 加入其它
             self.category_combo.addItem('其它', 0)
 
-    # 删除所属品种
+    # 清空所属品种
     def clear_attach_varieties(self):
         self.attach_varieties.setText('')
         self.attach_varieties.variety_ids.clear()  # id列表
@@ -574,6 +574,227 @@ class CreateReportPopup(QDialog):
             item.setForeground(QBrush(QColor(200, 20, 50)))
         if row == self.review_table.rowCount() - 1:
             self.commit_button.setEnabled(True)
+
+
+# 上传交易通知线程
+class UploadTransactionNoticeThread(QThread):
+    response_signal = pyqtSignal(int, bool)
+
+    def __init__(self, file_list, machine_code, token, *args, **kwargs):
+        super(UploadTransactionNoticeThread, self).__init__(*args, **kwargs)
+        self.file_list = file_list
+        self.machine_code = machine_code
+        self.token = token
+
+    def run(self):
+        for file_item in self.file_list:
+            # 读取文件
+            try:
+                data_file = dict()
+                # 增加其他字段
+                data_file['name'] = file_item['file_name']
+                data_file['date'] = file_item['file_date']
+                data_file['category_id'] = file_item['category_id']
+                # 读取文件
+                file = open(file_item['file_path'], "rb")
+                file_content = file.read()
+                file.close()
+                # 文件内容字段
+                data_file["file"] = (file_item['file_name'], file_content)
+                encode_data = encode_multipart_formdata(data_file)
+                data_file = encode_data[0]
+                # 发起上传请求
+                r = requests.post(
+                    url=settings.SERVER_ADDR + 'home/transaction_notice/?mc=' + self.machine_code,
+                    headers={
+                        'AUTHORIZATION': self.token,
+                        'Content-Type': encode_data[1]
+                    },
+                    data=data_file
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                with open('debug/home_notice.log', 'w') as f:
+                    f.write(str(e) + '\n')
+                self.response_signal.emit(file_item['row_index'], False)
+            else:
+                self.response_signal.emit(file_item['row_index'], True)
+
+
+# 新增交易通知
+class CreateTransactionNoticePopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(CreateTransactionNoticePopup, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout()
+        # 左侧上下布局
+        llayout = QVBoxLayout()
+        self.left_list = QListWidget(clicked=self.left_list_clicked)
+        self.left_list.setMaximumWidth(160)
+        llayout.addWidget(self.left_list)
+        llayout.addWidget(QPushButton('新增分类', clicked=self.add_new_category), alignment=Qt.AlignLeft)
+        layout.addLayout(llayout)
+        # 右侧上下布局
+        rlayout = QVBoxLayout()
+        attach_categoty_layout = QHBoxLayout()
+        attach_categoty_layout.addWidget(QLabel('所属分类:'))
+        self.attach_category = QLabel()
+        self.attach_category.category_id = None
+        attach_categoty_layout.addWidget(self.attach_category)
+        attach_categoty_layout.addStretch()
+        rlayout.addLayout(attach_categoty_layout)
+        rlayout.addWidget(QLabel(parent=self, objectName='categoryError'), alignment=Qt.AlignLeft)
+        # 选择文件
+        rlayout.addWidget(QPushButton('选择通知', clicked=self.select_notices), alignment=Qt.AlignLeft)
+        # 预览表格
+        self.review_table = QTableWidget()
+        rlayout.addWidget(self.review_table)
+        # 提交按钮
+        self.commit_button = QPushButton('确定提交')
+        rlayout.addWidget(self.commit_button, alignment=Qt.AlignRight)
+        layout.addLayout(rlayout)
+        self.setLayout(layout)
+        self.setMinimumWidth(800)
+
+    # 获取左侧通知分类
+    def getCategoryList(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/data-category/transaction_notice/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            self.left_list.clear()
+            for category_item in response['data']:
+                list_item = QListWidgetItem(category_item['name'])
+                list_item.category_id = category_item['id']
+                self.left_list.addItem(list_item)
+            # 加入其它
+            other_item = QListWidgetItem('其他')
+            other_item.category_id = 0
+            self.left_list.addItem(other_item)
+
+    # 点击左侧分类
+    def left_list_clicked(self):
+        current_item = self.left_list.currentItem()
+        self.attach_category.category_id = current_item.category_id
+        self.attach_category.setText(current_item.text())
+        print(current_item.text(), self.attach_category.category_id)
+
+
+    # 选择文件
+    def select_notices(self):
+        path_list, _ = QFileDialog.getOpenFileNames(self, '打开通知', '', "PDF files(*.pdf)")
+        # 遍历通知文件填充预览表格与设置状态
+        self.review_table.setRowCount(len(path_list))
+        self.review_table.setColumnCount(4)
+        self.review_table.setHorizontalHeaderLabels(['序号', '文件名', '通知日期', '状态'])
+        self.review_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.review_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, file_path in enumerate(path_list):
+            item_1 = QTableWidgetItem(str(row + 1))
+            item_1.file_path = file_path
+            item_1.setTextAlignment(Qt.AlignCenter)
+            self.review_table.setItem(row, 0, item_1)
+            file_name = file_path.rsplit('/', 1)[1]
+            item_2 = QTableWidgetItem(file_name)
+            item_2.setTextAlignment(Qt.AlignCenter)
+            self.review_table.setItem(row, 1, item_2)
+            # 日期控件
+            date_edit = QDateEdit(QDate.currentDate())
+            date_edit.setCalendarPopup(True)
+            date_edit.setDisplayFormat('yyyy-MM-dd')
+            self.review_table.setCellWidget(row, 2, date_edit)
+            # 装态
+            item_4 = QTableWidgetItem('等待上传')
+            item_4.setTextAlignment(Qt.AlignCenter)
+            self.review_table.setItem(row, 3, item_4)
+
+    # 确认上传交易通知
+    def commit_upload_report(self):
+        self.commit_button.setEnabled(False)
+        # 获取所属分类
+        attach_category = self.attach_category.category_id
+        # 遍历表格打包文件信息(上传线程处理，每上传一个发个信号过来修改上传状态)
+        file_message_list = list()
+        for row in range(self.review_table.rowCount()):
+            message_item = self.review_table.item(row, 3)  # 设置上传状态
+            message_item.setText('正在上传...')
+            message_item.setForeground(QBrush(QColor(20, 50, 200)))
+            # 设置颜色
+            file_message_list.append({
+                'file_name': self.review_table.item(row, 1).text(),
+                'file_path': self.review_table.item(row, 0).file_path,
+                'category_id': attach_category,
+                'file_date': self.review_table.cellWidget(row, 2).text(),
+                'row_index': row
+            })
+        # 开启线程
+        if hasattr(self, 'uploading_thread'):
+            del self.uploading_thread
+        self.uploading_thread = UploadTransactionNoticeThread(
+            file_list=file_message_list,
+            machine_code=settings.app_dawn.value('machine'),
+            token=settings.app_dawn.value('AUTHORIZATION'),
+        )
+        self.uploading_thread.finished.connect(self.uploading_thread.deleteLater)
+        self.uploading_thread.response_signal.connect(self.change_loading_state)
+        self.uploading_thread.start()
+
+    # 上传的线程返回消息
+    def change_loading_state(self, row, succeed):
+        item = self.review_table.item(row, 3)
+        if succeed:
+            item.setText('上传成功!')
+            item.setForeground(QBrush(QColor(20, 200, 50)))
+        else:
+            item.setText('上传失败...')
+            item.setForeground(QBrush(QColor(200, 20, 50)))
+        if row == self.review_table.rowCount() - 1:
+            self.commit_button.setEnabled(True)
+
+    # 新增交易通知分类
+    def add_new_category(self):
+        popup = QDialog(parent=self)
+        popup.setWindowTitle('新增通知分类')
+        def commit_new_category():
+            name = re.sub(r'\s+', '', popup.category_name_edit.text())
+            if not name:
+                popup.error_label.setText('请输入分类名称!')
+                return
+            # 提交请求
+            try:
+                r = requests.post(
+                    url=settings.SERVER_ADDR + 'home/data-category/transaction_notice/?mc=' + settings.app_dawn.value(
+                        'machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({'name': name})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                popup.error_label.setText(str(e))
+            else:
+                self.getCategoryList()
+                popup.close()
+        layout = QGridLayout()
+        layout.addWidget(QLabel('名称:'), 0, 1)
+        popup.category_name_edit = QLineEdit()
+        layout.addWidget(popup.category_name_edit, 0, 1)
+        popup.error_label = QLabel()
+        layout.addWidget(popup.error_label, 1, 0, 1,2)
+        layout.addWidget(QPushButton('确认提交', clicked=commit_new_category), 2, 0, 1, 2)
+        popup.setLayout(layout)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
 
 
 

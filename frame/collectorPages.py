@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout,QGridLayout, QList
 from PyQt5.Qt import Qt, pyqtSignal, QPoint
 from PyQt5.QtGui import QPixmap, QImage
 from widgets.base import LoadedPage, PDFContentPopup, TextContentPopup
-from popup.collectorPages import CreateNewsPopup, CreateAdvertisementPopup, CreateReportPopup
+from popup.collectorPages import CreateNewsPopup, CreateAdvertisementPopup, CreateReportPopup, CreateTransactionNoticePopup
 import settings
 from widgets.base import TableRowDeleteButton, TableRowReadButton
 from popup.tips import WarningPopup
@@ -551,6 +551,44 @@ class NormalReportPage(QWidget):
             del popup
 
 
+""" 交易通知 """
+
+
+# 交易通知表格
+class TransactionNoticeTable(QTableWidget):
+    pass
+
+# 交易通知管理页面
+class TransactionNoticePage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(TransactionNoticePage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 分类选择、信息展示与新增按钮
+        message_button_layout = QHBoxLayout()
+        self.category_combo = QComboBox()
+        message_button_layout.addWidget(QLabel('类别:'))
+        message_button_layout.addWidget(self.category_combo)
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addStretch()  # 伸缩
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_transaction_notice), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.notice_table = TransactionNoticeTable()
+        # self.report_table.network_result.connect(self.network_message_label.setText)
+        layout.addWidget(self.notice_table)
+        self.setLayout(layout)
+
+
+    # 新建交易通知
+    def create_transaction_notice(self):
+        popup = CreateTransactionNoticePopup(parent=self)
+        popup.getCategoryList()
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
 """ 首页管理主页 """
 
 
@@ -589,6 +627,8 @@ class HomePageCollector(QWidget):
                 frame_page = NormalReportPage(parent=self.operate_frame)
                 frame_page.getCategoryCombo()
                 frame_page.getVarietyCombo()
+            elif text == u'交易通知':
+                frame_page = TransactionNoticePage(parent=self.operate_frame)
             else:
                 frame_page = QLabel('【' + text + '】正在加紧开发中...')
             self.operate_frame.clear()
