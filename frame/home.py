@@ -409,7 +409,6 @@ class TransactionNoticePage(QWidget):
 
 # 现货报表表格
 class SpotCommodityTable(QTableWidget):
-    network_result = pyqtSignal(str)
     KEY_LABELS = [
         ('id', '序号'),
         ('name', '名称'),
@@ -496,8 +495,9 @@ class SpotCommodityPage(QWidget):
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
-        except Exception as e:
-            self.network_message_label.setText(str(e))
+        except Exception:
+            self.spot_table.hide()
+            self.no_data_label.show()
         else:
             if response['data']:
                 self.spot_table.showRowContents(response['data'])
@@ -505,6 +505,91 @@ class SpotCommodityPage(QWidget):
                 self.no_data_label.hide()
             else:
                 self.spot_table.hide()
+                self.no_data_label.show()
+
+
+""" 财经日历相关 """
+
+
+# 财经日历显示表格
+class FinanceCalendarTable(QTableWidget):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('date', '日期'),
+        ('time', '时间'),
+        ('country', '地区'),
+        ('event', '事件'),
+        ('expected', '预期值'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(FinanceCalendarTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS))
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+
+
+# 财经日历显示主页
+class FinanceCalendarPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(FinanceCalendarPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 日期选择
+        message_button_layout = QHBoxLayout()
+        self.date_edit = QDateEdit(QDate.currentDate(), dateChanged=self.getCurrentFinanceCalendar)
+        self.date_edit.setDisplayFormat('yyyy-MM-dd')
+        self.date_edit.setCalendarPopup(True)
+        message_button_layout.addWidget(QLabel('日期:'))
+        message_button_layout.addWidget(self.date_edit)
+        message_button_layout.addStretch()  # 伸缩
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.finance_table = FinanceCalendarTable()
+        layout.addWidget(self.finance_table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+        self.setLayout(layout)
+
+    # 获取当前日期财经日历
+    def getCurrentFinanceCalendar(self):
+        current_date = self.date_edit.text()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/finance-calendar/?date=' + current_date + '&mc=' + settings.app_dawn.value(
+                    'machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            self.finance_table.hide()
+            self.no_data_label.show()
+        else:
+            if response['data']:
+                self.finance_table.showRowContents(response['data'])
+                self.finance_table.show()
+                self.no_data_label.hide()
+            else:
+                self.finance_table.hide()
                 self.no_data_label.show()
 
 
@@ -541,7 +626,8 @@ class HomePage(QScrollArea):
         container.setLayout(layout)
         self.setWidget(container)
         self.setWidgetResizable(True)  # 内部控件可随窗口调整大小
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 始终不显示右侧滚动条
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         # 设置滚动条样式
         with open("media/ScrollBar.qss", "rb") as fp:
             content = fp.read()
@@ -655,7 +741,7 @@ class HomePage(QScrollArea):
             spot_head = self.folded_box.addHead('现货报表')
             finance_head = self.folded_box.addHead('财经日历')
             spot_body = self.folded_box.addBody(head=spot_head)
-            spot_body.addButtons([{'id': 0, 'name': '今日数据'}])
+            spot_body.addButtons([{'id': -1, 'name': '昨日数据'}])
             # spot_body.setHead(spot_head)
             finance_body = self.folded_box.addBody(head=finance_head)
             finance_body.addButtons([{'id': 0, 'name': '今日数据'}])
@@ -674,6 +760,9 @@ class HomePage(QScrollArea):
         elif head_text == u'现货报表':
             page = SpotCommodityPage(parent=self)
             page.getCurrentSpotCommodity()
+        elif head_text == u'财经日历':
+            page = FinanceCalendarPage(parent=self)
+            page.getCurrentFinanceCalendar()
         else:
             page = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
         self.frame_window.clear()

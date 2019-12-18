@@ -491,6 +491,8 @@ class FoldedHead(QWidget):
         self.setStyleSheet("""
         #headLabel{
             padding:8px 5px;
+            font-weight: bold;
+            font-size:12px;
         }
         """)
         self.moreButtonStyle()
