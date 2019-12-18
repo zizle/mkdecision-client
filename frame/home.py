@@ -5,7 +5,7 @@ import json
 import requests
 import chardet
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
-    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView
+    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QCalendarWidget
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint
 from PyQt5.QtGui import QPixmap
 import settings
@@ -318,6 +318,92 @@ class NormalReportPage(QWidget):
             self.report_table.showRowContents(response['data'])
 
 
+""" 交易通知显示相关 """
+
+
+# 交易通知表格
+class TransactionNoticeTable(QTableWidget):
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '通知文件'),
+        ('category', '通知类型'),
+        ('date', '通知日期'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(TransactionNoticeTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    # 显示报告内容
+    def showRowContents(self, report_list):
+        self.clear()
+        self.setRowCount(len(report_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        for row, content_item in enumerate(report_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                if col == len(self.KEY_LABELS) - 1:
+                    read_button = TableRowReadButton('阅读')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+
+    # 阅读一个通知
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        report_file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + report_file
+        popup = PDFContentPopup(title='阅读通知', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 显示交易通知
+class TransactionNoticePage(QWidget):
+    def __init__(self, category_id, *args, **kwargs):
+        super(TransactionNoticePage, self).__init__(*args, **kwargs)
+        self.category_id = category_id
+        layout = QVBoxLayout(margin=0)
+        self.notice_table = TransactionNoticeTable()
+        layout.addWidget(self.notice_table)
+        self.setLayout(layout)
+
+    # 获取当前通知
+    def getCurrentNotices(self):
+        try:
+            # 发起请求当前数据
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/transaction_notice/?mc=' + settings.app_dawn.value('machine'),
+                data=json.dumps({'category_id': self.category_id})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            self.notice_table.showRowContents(response['data'])
+
+
 # 首页主页面(可滚动)
 class HomePage(QScrollArea):
     more_news_signal = pyqtSignal(bool)
@@ -456,12 +542,19 @@ class HomePage(QScrollArea):
                 if group not in data_category.keys():
                     data_category[group] = list()
                 data_category[group].append({'id': category_item['id'], 'name': category_item['name']})
-
             for key, values in data_category.items():
                 head = self.folded_box.addHead(key)  # 一个group就得一个Head
                 body = self.folded_box.addBody(head=head)
                 body.addButtons(values)
-                body.setHead(head)
+                # body.setHead(head)
+            # 加入现货报表和财经日历
+            spot_head = self.folded_box.addHead('现货报表')
+            finance_head = self.folded_box.addHead('财经日历')
+            spot_body = self.folded_box.addBody(head=spot_head)
+            spot_body.addButtons([{'id': 0, 'name': '今日数据'}])
+            # spot_body.setHead(spot_head)
+            finance_body = self.folded_box.addBody(head=finance_head)
+            finance_body.addButtons([{'id': 0, 'name': '今日数据'}])
             self.folded_box.container.layout().addStretch()
 
     # 折叠盒子被点击
@@ -471,6 +564,9 @@ class HomePage(QScrollArea):
         if head_text == u'常规报告':
             page = NormalReportPage(category_id=category_id, parent=self.frame_window)
             page.getVarietyCombo()
+        elif head_text == u'交易通知':
+            page = TransactionNoticePage(category_id=category_id, parent=self.frame_window)
+            page.getCurrentNotices()
         else:
             page = QLabel('暂无数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
         self.frame_window.clear()

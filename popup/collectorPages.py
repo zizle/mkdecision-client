@@ -651,7 +651,7 @@ class CreateTransactionNoticePopup(QDialog):
         self.review_table = QTableWidget()
         rlayout.addWidget(self.review_table)
         # 提交按钮
-        self.commit_button = QPushButton('确定提交')
+        self.commit_button = QPushButton('确定提交', clicked=self.commit_upload_notice)
         rlayout.addWidget(self.commit_button, alignment=Qt.AlignRight)
         layout.addLayout(rlayout)
         self.setLayout(layout)
@@ -684,8 +684,6 @@ class CreateTransactionNoticePopup(QDialog):
         current_item = self.left_list.currentItem()
         self.attach_category.category_id = current_item.category_id
         self.attach_category.setText(current_item.text())
-        print(current_item.text(), self.attach_category.category_id)
-
 
     # 选择文件
     def select_notices(self):
@@ -716,10 +714,13 @@ class CreateTransactionNoticePopup(QDialog):
             self.review_table.setItem(row, 3, item_4)
 
     # 确认上传交易通知
-    def commit_upload_report(self):
+    def commit_upload_notice(self):
         self.commit_button.setEnabled(False)
         # 获取所属分类
         attach_category = self.attach_category.category_id
+        if not attach_category:
+            self.findChild(QLabel, 'categoryError').setText('请左侧选择通知分类!')
+            return
         # 遍历表格打包文件信息(上传线程处理，每上传一个发个信号过来修改上传状态)
         file_message_list = list()
         for row in range(self.review_table.rowCount()):
