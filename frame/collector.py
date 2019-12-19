@@ -154,6 +154,9 @@ class CollectorMaintain(QWidget):
         if current_block == u'首页管理':
             from frame.homeCollector import HomePageCollector
             detail_widget = HomePageCollector(parent=self.detail_collector)
+        elif current_block == u'数据分析':
+            from frame.trendCollector import TrendPageCollector
+            detail_widget = TrendPageCollector(parent=self.detail_collector)
         else:
             detail_widget = QLabel('【' + current_block + '】暂不支持数据管理...',
                                    styleSheet='font-size:16px;color:rgb(200, 120, 100);', alignment=Qt.AlignCenter)

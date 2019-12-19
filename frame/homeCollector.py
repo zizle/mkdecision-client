@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout,QGridLayout, QList
 from PyQt5.Qt import Qt, pyqtSignal, QPoint, QDate
 from PyQt5.QtGui import QPixmap, QImage
 from widgets.base import LoadedPage, PDFContentPopup, TextContentPopup
-from popup.collectorPages import CreateNewsPopup, CreateAdvertisementPopup, CreateReportPopup, CreateTransactionNoticePopup, \
+from popup.homeCollector import CreateNewsPopup, CreateAdvertisementPopup, CreateReportPopup, CreateTransactionNoticePopup, \
     CreateNewSpotTablePopup, CreateNewFinanceCalendarPopup
 import settings
 from widgets.base import TableRowDeleteButton, TableRowReadButton
