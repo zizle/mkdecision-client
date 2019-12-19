@@ -1012,31 +1012,29 @@ class HomePageCollector(QWidget):
     # 点击左侧按钮
     def left_menu_clicked(self):
         text = self.left_list.currentItem().text()
-        try:
-            if text == u'新闻公告':
-                frame_page = NewsBulletinPage(parent=self.operate_frame)
-                frame_page.getNewsBulletins()
-            elif text == u'广告设置':
-                frame_page = AdvertisementPage(parent=self.operate_frame)
-                frame_page.getAdvertisements()
-            elif text == u'常规报告':
-                frame_page = NormalReportPage(parent=self.operate_frame)
-                frame_page.getCategoryCombo()
-                frame_page.getVarietyCombo()
-                frame_page.getCurrentReports()
-            elif text == u'交易通知':
-                frame_page = TransactionNoticePage(parent=self.operate_frame)
-                frame_page.getCategoryCombo()
-                frame_page.getCurrentTransactionNotce()
-            elif text == u'现货报表':
-                frame_page = SpotCommodityPage(parent=self.operate_frame)
-                frame_page.getCurrentSpotCommodity()
-            elif text == u'财经日历':
-                frame_page = FinanceCalendarPage(parent=self.operate_frame)
-                frame_page.getCurrentFinanceCalendar()
-            else:
-                frame_page = QLabel('【' + text + '】正在加紧开发中...')
-            self.operate_frame.clear()
-            self.operate_frame.addWidget(frame_page)
-        except Exception as e:
-            print(e)
+        if text == u'新闻公告':
+            frame_page = NewsBulletinPage(parent=self.operate_frame)
+            frame_page.getNewsBulletins()
+        elif text == u'广告设置':
+            frame_page = AdvertisementPage(parent=self.operate_frame)
+            frame_page.getAdvertisements()
+        elif text == u'常规报告':
+            frame_page = NormalReportPage(parent=self.operate_frame)
+            frame_page.getCategoryCombo()
+            frame_page.getVarietyCombo()
+            frame_page.getCurrentReports()
+        elif text == u'交易通知':
+            frame_page = TransactionNoticePage(parent=self.operate_frame)
+            frame_page.getCategoryCombo()
+            frame_page.getCurrentTransactionNotce()
+        elif text == u'现货报表':
+            frame_page = SpotCommodityPage(parent=self.operate_frame)
+            frame_page.getCurrentSpotCommodity()
+        elif text == u'财经日历':
+            frame_page = FinanceCalendarPage(parent=self.operate_frame)
+            frame_page.getCurrentFinanceCalendar()
+        else:
+            frame_page = QLabel('【' + text + '】正在加紧开发中...')
+        self.operate_frame.clear()
+        self.operate_frame.addWidget(frame_page)
+
