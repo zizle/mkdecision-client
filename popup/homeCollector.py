@@ -959,7 +959,6 @@ class CreateNewFinanceCalendarPopup(QDialog):
                 # else:
                 row_content[col_keys[col]] = self.review_table.item(row, col).text()
             finance_data.append(row_content)
-        print(finance_data)
         try:
             r = requests.post(
                 url=settings.SERVER_ADDR + 'home/finance-calendar/?mc=' + settings.app_dawn.value('machine'),

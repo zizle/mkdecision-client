@@ -104,7 +104,7 @@ class CollectorMaintain(QWidget):
         horizontal_count = settings.COLLECTOR_BLOCK_ROWCOUNT
         row_index = 0
         col_index = 0
-        for block_item in [u'首页管理', u'模块1', u'模块2', u'模块2', u'模块2', u'模块2']:
+        for block_item in [u'首页管理', u'模块1', u'数据分析', u'模块2', u'模块2', u'模块2']:
             block = CollectorBlockIcon(text=block_item, parent=self, objectName='blockIcon')
             block.clicked_block.connect(self.enter_detail_collector)
             self.layout().addWidget(block, row_index, col_index)
@@ -152,8 +152,11 @@ class CollectorMaintain(QWidget):
         current_block = collector_block.block_button.text()
         # 初始化详情页显示控件
         if current_block == u'首页管理':
-            from frame.collectorPages import HomePageCollector
+            from frame.homeCollector import HomePageCollector
             detail_widget = HomePageCollector(parent=self.detail_collector)
+        elif current_block == u'数据分析':
+            from frame.trendCollector import TrendPageCollector
+            detail_widget = TrendPageCollector(parent=self.detail_collector)
         else:
             detail_widget = QLabel('【' + current_block + '】暂不支持数据管理...',
                                    styleSheet='font-size:16px;color:rgb(200, 120, 100);', alignment=Qt.AlignCenter)
