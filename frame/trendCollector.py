@@ -4,10 +4,10 @@ import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QComboBox, QTableWidget, \
     QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 import settings
-from widgets.base import LoadedPage, TableRowDeleteButton
-from popup.trendCollector import CreateNewTrendTablePopup
+from widgets.base import LoadedPage, TableRowReadButton
+from popup.trendCollector import CreateNewTrendTablePopup, ShowTableDetailPopup, EditTableDetailPopup
 
 
 """ 数据表管理相关 """
@@ -24,6 +24,7 @@ class TrendDataTable(QTableWidget):
         ('end_date', '结束时间'),
         ('update_time', '最近更新'),
         ('editor', '更新者'),
+        ('group', '所属组'),
     ]
 
     def __init__(self, *args, **kwargs):
@@ -35,13 +36,11 @@ class TrendDataTable(QTableWidget):
     def showRowContents(self, row_list):
         self.clear()
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         for row, content_item in enumerate(row_list):
-            print(content_item)
             for col, header in enumerate(self.KEY_LABELS):
                 if col == 0:
                     table_item = QTableWidgetItem(str(row + 1))
@@ -51,10 +50,65 @@ class TrendDataTable(QTableWidget):
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
                 if col == len(self.KEY_LABELS) - 1:
-                    # 增加【删除】按钮
-                    delete_button = TableRowDeleteButton('删除')
-                    delete_button.button_clicked.connect(self.delete_button_clicked)
-                    self.setCellWidget(row, col + 1, delete_button)
+                    # 增加【查看】按钮
+                    read_button = TableRowReadButton('查看')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+                    # 增加【编辑】按钮
+                    edit_button = TableRowReadButton('编辑')
+                    edit_button.button_clicked.connect(self.edit_button_clicked)
+                    self.setCellWidget(row, col + 2, edit_button)
+
+    # 查看表详细数据
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        table_id = self.item(current_row, 0).id
+        table_text = self.item(current_row, 1).text()
+        # 获取表详细数据
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(table_id) + '/?look=1&mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            popup = ShowTableDetailPopup(parent=self)
+            popup.setWindowTitle(table_text)
+            popup.showTableData(headers=response['data']['header_data'], table_contents=response['data']['table_data'])
+            self.network_result.emit(response['message'])
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
+
+    # 编辑详情表格
+    def edit_button_clicked(self, edit_button):
+        current_row, _ = self.get_widget_index(edit_button)
+        table_id = self.item(current_row, 0).id
+        table_text = self.item(current_row, 1).text()
+        # 获取表详细数据最后20条
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(table_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            popup = EditTableDetailPopup(table_id=table_id, parent=self)
+            popup.setWindowTitle(table_text)
+            table_contents = response['data']['table_data']
+            table_contents.reverse()
+            popup.showTableData(headers=response['data']['header_data'], table_contents=table_contents)
+            self.network_result.emit(response['message'])
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
 
     # 删除一条数据
     def delete_button_clicked(self, delete_button):
@@ -92,7 +146,6 @@ class TrendDataTable(QTableWidget):
         return index.row(), index.column()
 
 
-
 # 数据表管理页面
 class TrendTableManagePage(QWidget):
     def __init__(self, *args, **kwargs):
@@ -119,6 +172,7 @@ class TrendTableManagePage(QWidget):
         layout.addLayout(combo_link_layout)
         # 数据表显示
         self.trend_data_table = TrendDataTable()
+        self.trend_data_table.network_result.connect(self.network_message_label.setText)
         layout.addWidget(self.trend_data_table)
         self.setLayout(layout)
 
@@ -137,11 +191,14 @@ class TrendTableManagePage(QWidget):
             self.variety_group_combo.clear()
             self.variety_combo.clear()
             self.table_group_combo.clear()
-            for group_item in response['data']:
+            for index, group_item in enumerate(response['data']):
                 self.variety_group_combo.addItem(group_item['name'], group_item['id'])
+                if index == 0:  # 填充第一个品种组下的品种数据(初始化时少一次网络请求)
+                    for variety_item in group_item['varieties']:
+                        self.variety_combo.addItem(variety_item['name'], variety_item['id'])
             self.network_message_label.setText(response['message'])
 
-    # 当前组下的品种
+    # 当前组下的品种(当组点击时调用)
     def getCurrentVarieties(self):
         current_gid = self.variety_group_combo.currentData()
         try:
@@ -163,6 +220,8 @@ class TrendTableManagePage(QWidget):
     # 获取当前品种下的数据组
     def getCurrentTrendGroup(self):
         current_vid = self.variety_combo.currentData()
+        if not current_vid:
+            return
         try:
             r = requests.get(
                 url=settings.SERVER_ADDR + 'trend/' + str(current_vid) + '/group-tables/?mc=' + settings.app_dawn.value('machine')
@@ -174,14 +233,30 @@ class TrendTableManagePage(QWidget):
             self.network_message_label.setText(str(e))
         else:
             self.table_group_combo.clear()
+            self.table_group_combo.addItem('全部', 0)  # 填充第一个为【全部】
+            # 记录最长的的下拉选择
+            max_length_text = 2
+            # 整理所有的表数据填充显示表格(减少初始化一次网络请求)
+            all_tables = list()
             for group_item in response['data']:
                 self.table_group_combo.addItem(group_item['name'], group_item['id'])
+                # 调整宽度
+                if len(group_item['name']) > max_length_text:
+                    max_length_text = len(group_item['name'])
+                all_tables += group_item['tables']
+            print(max_length_text)
+            self.table_group_combo.view().setFixedWidth(max_length_text*12)
+            # 放到表格展示
+            self.trend_data_table.showRowContents(all_tables)
             self.network_message_label.setText(response['message'])
 
-    # 获取当前数据组下的所有数据表
+    # 获取当前数据组下的所有数据表(当数据组点击时调用)
     def getCurrentTrendTable(self):
         current_gid = self.table_group_combo.currentData()
-        if not current_gid:
+        if current_gid is None:
+            return
+        if current_gid == 0:  # 获取当前品种所有分组及表
+            self.getCurrentTrendGroup()
             return
         try:
             r = requests.get(
@@ -196,12 +271,6 @@ class TrendTableManagePage(QWidget):
         else:
             self.trend_data_table.showRowContents(response['data'])
             self.network_message_label.setText(response['message'])
-
-
-
-
-
-
 
     # 新建数据表
     def create_new_trend_table(self):
@@ -236,8 +305,7 @@ class TrendPageCollector(QWidget):
         text = self.left_list.currentItem().text()
         if text == u'数据表管理':
             frame_page = TrendTableManagePage(parent=self.frame_loaded)
-            frame_page.getGroups()  # 获取当前分组
-            frame_page.getCurrentVarieties()  # 获取当前组下的品种
+            frame_page.getGroups()  # 获取当前分组（连带品种,可填充第一个组的品种）
             frame_page.getCurrentTrendGroup()  # 获取当前品种下的数据组
             frame_page.getCurrentTrendTable()  # 获取当前数据组下的数据表
 

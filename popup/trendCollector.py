@@ -6,10 +6,12 @@ import xlrd
 import datetime
 import requests
 from xlrd import xldate_as_tuple
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QDialog, QTreeWidget, QWidget, QGridLayout, QLabel, QLineEdit,\
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QDialog, QTreeWidget, QWidget, QGridLayout, QLabel, QLineEdit,\
     QPushButton, QComboBox, QTableWidget, QTreeWidgetItem, QFileDialog, QHeaderView, QTableWidgetItem
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPoint
 import settings
+from widgets.base import TableRowDeleteButton
+from popup.tips import WarningPopup
 
 
 # 新建数据表
@@ -353,3 +355,237 @@ class CreateNewTrendTablePopup(QDialog):
                 error_label.setText('')
                 addBtn = self.ng_widget.findChild(QPushButton, 'addGroupBtn')
                 addBtn.setEnabled(True)
+                
+                
+# 显示当前数据表
+class ShowTableDetailPopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(ShowTableDetailPopup, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        self.table = QTableWidget()
+        layout.addWidget(self.table)
+        self.setMinimumSize(820, 450)
+        self.setLayout(layout)
+
+    # 显示数据
+    def showTableData(self, headers, table_contents):
+        # 设置行列
+        self.table.setRowCount(len(table_contents))
+        headers.pop(0)
+        col_count = len(headers)
+        self.table.setColumnCount(col_count)
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        for row, row_content in enumerate(table_contents):
+            for col in range(1, col_count + 1):
+                item = QTableWidgetItem(row_content[col])
+                item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(row, col-1, item)
+
+
+# 编辑当前数据表
+class EditTableDetailPopup(QDialog):
+    def __init__(self, table_id, *args, **kwargs):
+        super(EditTableDetailPopup, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        self.table_id = table_id
+        # 操作按钮布局
+        operate_button_layout = QHBoxLayout()
+        self.add_rows_button = QPushButton('粘贴新数据', clicked=self.copy_new_rows)  # 添加数据
+        operate_button_layout.addWidget(self.add_rows_button)
+        # 删除选中行
+        self.delete_current_button = QPushButton('删除选中行', clicked=self.delete_current_row)
+        operate_button_layout.addWidget(self.delete_current_button)
+        self.delete_current_button.hide()
+        # 新增一行
+        self.add_new_row_button = QPushButton('新增一行', clicked=self.new_table_add_row)
+        operate_button_layout.addWidget(self.add_new_row_button)
+        self.add_new_row_button.hide()
+        operate_button_layout.addStretch()
+        # 删除这张表
+        self.delete_table = QPushButton('删除整张表', styleSheet='color:rgb(240,20,50); border:none',
+                                        cursor=Qt.PointingHandCursor, clicked=self.delete_this_table)
+        operate_button_layout.addWidget(self.delete_table, alignment=Qt.AlignRight)
+        layout.addLayout(operate_button_layout)
+        self.table = QTableWidget()
+        layout.addWidget(self.table)
+        # 新数据的表格
+        self.new_table = QTableWidget()
+        self.new_table_headers = []
+        self.new_table.hide()
+        layout.addWidget(self.new_table)
+        # 确认增加新数据
+        self.commit_new_button = QPushButton('确认增加', clicked=self.commit_new_table_rows)
+        self.commit_new_button.hide()
+        layout.addWidget(self.commit_new_button, alignment=Qt.AlignRight)
+        # 错误提示
+        self.network_result_label = QLabel()
+        layout.addWidget(self.network_result_label, alignment=Qt.AlignLeft)
+        self.setMinimumSize(820, 450)
+        self.setLayout(layout)
+
+    # 黏贴新数据
+    def copy_new_rows(self):
+        self.table.hide()
+        self.new_table.show()
+        self.commit_new_button.show()
+        self.delete_current_button.show()
+        self.add_new_row_button.show()
+        # 获取当前剪贴板的内容
+        clipboard = QApplication.clipboard()
+        # 处理数据
+        contents = re.split(r'\n', clipboard.text())
+        # 在新表格中添加数据
+        new_row_count = len(self.new_table_headers)
+        self.new_table.setRowCount(len(contents))
+        self.new_table.setColumnCount(new_row_count)
+        self.new_table.setHorizontalHeaderLabels(self.new_table_headers)
+        self.new_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        for row, row_content in enumerate(contents):
+            row_content = re.split(r'\t', row_content)
+            if not row_content[0]:
+                continue
+            for col, item_text in enumerate(row_content):
+                if col > new_row_count - 1:
+                    continue
+                new_item = QTableWidgetItem(item_text)
+                new_item.setTextAlignment(Qt.AlignCenter)
+                self.new_table.setItem(row, col, new_item)
+
+    # 删除选中行（追加数据时）
+    def delete_current_row(self):
+        self.new_table.removeRow(self.new_table.currentRow())
+
+    # 新增一行(追加数据时)
+    def new_table_add_row(self):
+        self.new_table.insertRow(self.new_table.rowCount())
+
+    # 确认新增新数据
+    def commit_new_table_rows(self):
+        self.commit_new_button.setEnabled(False)
+        self.network_result_label.setText('上传中...')
+        # 读取表格中的数
+        row_count = self.new_table.rowCount()
+        column_count = self.new_table.columnCount()
+        data_dict = dict()
+        data_dict['value_list'] = list()
+        # data_dict['header_labels'] = list()
+        for row in range(row_count):
+            if not self.new_table.item(row, 0):
+                continue
+            row_content = list()
+            for col in range(column_count):
+                # if row == 0:  # 获取表头内容
+                #     data_dict['header_labels'].append(self.review_table.horizontalHeaderItem(col).text())
+                item = self.new_table.item(row, col)
+                row_content.append(item.text() if item else '')
+            data_dict['value_list'].append(row_content)
+        # # 添加第一行表头数据
+        # data_dict['value_list'].insert(0, data_dict['header_labels'])
+        # 上传新数据至当前表
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(self.table_id) + '/?look=1&mc=' + settings.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps(data_dict)
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result_label.setText(str(e))
+            self.commit_new_button.setEnabled(True)
+        else:
+            self.network_result_label.setText(response['message'])
+
+    # 显示数据
+    def showTableData(self, headers, table_contents):
+        # 设置行列
+        self.table.setRowCount(len(table_contents))
+        headers.pop(0)
+        self.new_table_headers = headers
+        col_count = len(headers) + 1
+        self.table.setColumnCount(col_count)
+        self.table.setHorizontalHeaderLabels(headers + [''])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        for row, row_content in enumerate(table_contents):
+            for col, col_text in enumerate(row_content):
+                if col == 0:
+                    continue
+                item = QTableWidgetItem(row_content[col])
+                item.setTextAlignment(Qt.AlignCenter)
+                if col == 1:
+                    item.col_id = row_content[0]
+                self.table.setItem(row, col - 1, item)
+                # 添加删除按钮
+                if col == len(row_content) - 1:
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.table.setCellWidget(row, col, delete_button)
+
+    # 删除一行数据
+    def delete_button_clicked(self, delete_button):
+        try:
+            current_row, _ = self.get_widget_index(delete_button)
+            row_id = self.table.item(current_row, 0).col_id
+            def delete_row_content():
+                try:
+                    r = requests.delete(
+                        url=settings.SERVER_ADDR + 'trend/table/' + str(
+                            self.table_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                        headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                        data=json.dumps({'row_id': row_id})
+                    )
+                    response = json.loads(r.content.decode('utf-8'))
+                    if r.status_code != 200:
+                        raise ValueError(response['message'])
+                except Exception as e:
+                    self.network_result_label.setText(str(e))
+                else:
+                    # 表格移除当前行
+                    self.table.removeRow(current_row)
+                    popup.close()
+                    self.network_result_label.setText(response['message'])
+            # 警示框
+            popup = WarningPopup(parent=self)
+            popup.confirm_button.connect(delete_row_content)
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
+        except Exception as e:
+            print(e)
+
+    # 删除整张表
+    def delete_this_table(self):
+        def delete_table():
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'trend/table/' + str(
+                        self.table_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({'operate': 'all'})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result_label.setText(str(e))
+            else:
+                popup.close()
+                self.close()
+        # 警示框
+        popup = WarningPopup(parent=self)
+        popup.confirm_button.connect(delete_table)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.table.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+
+
+
