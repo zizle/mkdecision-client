@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QLis
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 import settings
 from widgets.base import LoadedPage, TableRowReadButton
-from popup.trendCollector import CreateNewTrendTablePopup, ShowTableDetailPopup, EditTableDetailPopup
+from popup.trendCollector import CreateNewTrendTablePopup, ShowTableDetailPopup, EditTableDetailPopup, CreateNewVarietyChartPopup
 
 
 """ 数据表管理相关 """
@@ -109,36 +109,6 @@ class TrendDataTable(QTableWidget):
             if not popup.exec_():
                 popup.deleteLater()
                 del popup
-
-    # 删除一条数据
-    def delete_button_clicked(self, delete_button):
-        def delete_row_content():
-            current_row, _ = self.get_widget_index(delete_button)
-            spot_id = self.item(current_row, 0).id
-            # 发起删除通知请求
-            try:
-                r = requests.delete(
-                    url=settings.SERVER_ADDR + 'home/spot-commodity/' + str(
-                        spot_id) + '/?mc=' + settings.app_dawn.value('machine'),
-                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
-                )
-                response = json.loads(r.content.decode('utf-8'))
-                if r.status_code != 200:
-                    raise ValueError(response['message'])
-            except Exception as e:
-                self.network_result.emit(str(e))
-            else:
-                self.network_result.emit(response['message'])
-                popup.close()
-                # 移除本行
-                self.removeRow(current_row)
-
-        # 警示框
-        popup = WarningPopup(parent=self)
-        popup.confirm_button.connect(delete_row_content)
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
 
     # 获取控件所在行和列
     def get_widget_index(self, widget):
@@ -244,7 +214,6 @@ class TrendTableManagePage(QWidget):
                 if len(group_item['name']) > max_length_text:
                     max_length_text = len(group_item['name'])
                 all_tables += group_item['tables']
-            print(max_length_text)
             self.table_group_combo.view().setFixedWidth(max_length_text*12)
             # 放到表格展示
             self.trend_data_table.showRowContents(all_tables)
@@ -281,6 +250,90 @@ class TrendTableManagePage(QWidget):
             del popup
 
 
+""" 品种图表管理相关 """
+
+
+# 显示图表信息的表格
+class VarietyChartsInfoTable(QTableWidget):
+    pass
+
+
+class VarietyChartsManagePage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(VarietyChartsManagePage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        # 品种选择
+        select_variety_layout = QHBoxLayout()
+        select_variety_layout.addWidget(QLabel('分类:'))
+        self.variety_group_combo = QComboBox(activated=self.getCurrentVarieties)
+        select_variety_layout.addWidget(self.variety_group_combo)
+        select_variety_layout.addWidget(QLabel('品种:'))
+        self.variety_combo = QComboBox()
+        select_variety_layout.addWidget(self.variety_combo)
+        self.network_message_label = QLabel()
+        select_variety_layout.addWidget(self.network_message_label)
+        select_variety_layout.addStretch()
+        # 新增按钮
+        self.create_chart_button = QPushButton('新增', clicked=self.create_variety_chart)
+        select_variety_layout.addWidget(self.create_chart_button)
+        layout.addLayout(select_variety_layout)
+        # 显示信息的表格
+        self.chart_info_table = VarietyChartsInfoTable()
+        layout.addWidget(self.chart_info_table)
+        self.setLayout(layout)
+
+    # 请求组
+    def getGroups(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.variety_group_combo.clear()
+            self.variety_combo.clear()
+            for index, group_item in enumerate(response['data']):
+                self.variety_group_combo.addItem(group_item['name'], group_item['id'])
+                if index == 0:  # 填充第一个品种组下的品种数据(初始化时少一次网络请求)
+                    for variety_item in group_item['varieties']:
+                        self.variety_combo.addItem(variety_item['name'], variety_item['id'])
+            self.network_message_label.setText(response['message'])
+
+    # 当前组下的品种(当组点击时调用)
+    def getCurrentVarieties(self):
+        current_gid = self.variety_group_combo.currentData()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'group-varieties/' + str(
+                    current_gid) + '/?mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.variety_combo.clear()
+            for variety_item in response['data']:
+                self.variety_combo.addItem(variety_item['name'], variety_item['id'])
+            self.network_message_label.setText(response['message'])
+
+    # 新增品种页图表
+    def create_variety_chart(self):
+        current_variety = self.variety_combo.currentText()
+        current_vid = self.variety_combo.currentData()
+        # 弹窗设置
+        popup = CreateNewVarietyChartPopup(variety_id=current_vid, variety_text=current_variety, parent=self)
+        popup.getCurrentVarietyTables()
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
 # 数据分析管理主页
 class TrendPageCollector(QWidget):
     def __init__(self, *args, **kwargs):
@@ -297,7 +350,7 @@ class TrendPageCollector(QWidget):
 
     # 添加左侧管理菜单
     def _addLeftListMenu(self):
-        for item in [u'数据表管理', '品种页表管理']:
+        for item in [u'数据表管理', '品种图表管理']:
             self.left_list.addItem(QListWidgetItem(item))
 
     # 点击左侧菜单列表
@@ -308,6 +361,13 @@ class TrendPageCollector(QWidget):
             frame_page.getGroups()  # 获取当前分组（连带品种,可填充第一个组的品种）
             frame_page.getCurrentTrendGroup()  # 获取当前品种下的数据组
             frame_page.getCurrentTrendTable()  # 获取当前数据组下的数据表
+        elif text == u'品种图表管理':
+            try:
+                frame_page = VarietyChartsManagePage(parent=self.frame_loaded)
+                frame_page.getGroups()
+            except Exception as e:
+                print(e)
+
 
         else:
             frame_page = QLabel('【' + text + '】正在加紧开发中...')

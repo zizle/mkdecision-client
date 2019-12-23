@@ -7,10 +7,13 @@ import datetime
 import requests
 from xlrd import xldate_as_tuple
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QDialog, QTreeWidget, QWidget, QGridLayout, QLabel, QLineEdit,\
-    QPushButton, QComboBox, QTableWidget, QTreeWidgetItem, QFileDialog, QHeaderView, QTableWidgetItem
-from PyQt5.QtCore import Qt, QPoint
+    QPushButton, QComboBox, QTableWidget, QTreeWidgetItem, QFileDialog, QHeaderView, QTableWidgetItem, QAbstractItemView, \
+    QScrollArea, QListWidget, QListWidgetItem
+from PyQt5.QtChart import QChartView, QChart, QLineSeries
+from PyQt5.QtCore import Qt, QPoint, pyqtSignal
+from PyQt5.QtGui import QPainter
 import settings
-from widgets.base import TableRowDeleteButton
+from widgets.base import TableRowDeleteButton, TableRowReadButton
 from popup.tips import WarningPopup
 
 
@@ -585,6 +588,318 @@ class EditTableDetailPopup(QDialog):
         index = self.table.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
         return index.row(), index.column()
 
+
+""" 设置图表相关弹窗 """
+
+
+# 设置图表详情的弹窗
+class SetChartDetailPopup(QDialog):
+    def __init__(self, table_id, *args, **kwargs):
+        super(SetChartDetailPopup, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=2)
+        left_layout = QVBoxLayout()
+        self.table_id = table_id
+        left_layout.addWidget(QLabel('图表设置', objectName='headTip'))
+        # 图表名称
+        chart_name_layout = QHBoxLayout()
+        chart_name_layout.addWidget(QLabel('图表名称:'))
+        self.chart_name = QLineEdit()
+        chart_name_layout.addWidget(self.chart_name)
+        left_layout.addLayout(chart_name_layout)
+        # 图表类型
+        chart_category_layout = QHBoxLayout()
+        chart_category_layout.addWidget(QLabel('图表类型:'))
+        self.chart_category_combo = QComboBox()
+        self.chart_category_combo.addItems([u'折线图', u'柱形图', u'双轴折线图', u'双轴柱形图'])
+        chart_category_layout.addWidget(self.chart_category_combo)
+        chart_category_layout.addStretch()
+        left_layout.addLayout(chart_category_layout)
+        # 选择X轴
+        chart_xaxis_layout = QHBoxLayout()
+        chart_xaxis_layout.addWidget(QLabel('X 轴列名:'))
+        self.x_axis_combo = QComboBox()
+        chart_xaxis_layout.addWidget(self.x_axis_combo)
+        chart_xaxis_layout.addStretch()
+        left_layout.addLayout(chart_xaxis_layout)
+        # Y轴设置
+        left_layout.addWidget(QLabel('Y 轴列名:'))
+        yaxis_layout = QHBoxLayout()
+        # 左侧列头
+        left_yaxis_layout = QVBoxLayout()
+        self.column_header_list = QListWidget()
+        self.column_header_list.setMaximumWidth(180)
+        left_yaxis_layout.addWidget(self.column_header_list)
+        yaxis_layout.addLayout(left_yaxis_layout)
+        # 中间按钮
+        middle_yasis_layout = QVBoxLayout()
+        middle_yasis_layout.addWidget(QPushButton('左轴 →', clicked=self.add_y_left))
+        middle_yasis_layout.addWidget(QPushButton('右轴 →', clicked=self.add_y_right))
+        yaxis_layout.addLayout(middle_yasis_layout)
+        # 右侧列头显示
+        right_yaxis_layout = QVBoxLayout()
+        self.right_top_list = QListWidget(doubleClicked=self.remove_toplist_item)
+        self.right_top_list.setMaximumWidth(180)
+        right_yaxis_layout.addWidget(self.right_top_list)
+        self.right_bottom_list = QListWidget(doubleClicked=self.remove_bottomlist_item)
+        self.right_bottom_list.setMaximumWidth(180)
+        right_yaxis_layout.addWidget(self.right_bottom_list)
+        yaxis_layout.addLayout(right_yaxis_layout)
+        left_layout.addLayout(yaxis_layout)
+        # 预览
+        left_layout.addWidget(QPushButton('画图预览', clicked=self.review_chart_clicked), alignment=Qt.AlignRight)
+        # 右侧上下布局
+        right_layout = QVBoxLayout()
+        # 图表预览
+        right_layout.addWidget(QLabel('图表预览', objectName='headTip'))
+        self.review_chart = QChartView()
+        right_layout.addWidget(self.review_chart)
+        # 确定增加
+        right_layout.addWidget(QPushButton('确认设置'), alignment=Qt.AlignRight)
+        # 表详情数据显示
+        self.detail_trend_table = QTableWidget()
+        self.detail_trend_table.setMaximumHeight(200)
+        right_layout.addWidget(self.detail_trend_table)
+        # 总布局加入左右布局
+        layout.addLayout(left_layout)
+        layout.addLayout(right_layout)
+
+        self.setLayout(layout)
+        self.setMinimumSize(820,460)
+        self.setStyleSheet("""
+        #headTip{
+            color: rgb(50,80,180);
+            font-weight:bold
+        }
+        """)
+
+    # 移除当前列表中的item
+    def remove_toplist_item(self, index):
+        print('移除', index)
+        row = self.right_top_list.currentRow()
+        self.right_top_list.takeItem(row)
+
+    def remove_bottomlist_item(self, index):
+        row = self.right_bottom_list.currentRow()
+        self.right_bottom_list.takeItem(row)
+
+    # 加入左轴
+    def add_y_left(self):
+        text_in = list()
+        for i in range(self.right_top_list.count()):
+            text_in.append(self.right_top_list.item(i).text())
+        item = self.column_header_list.currentItem() # 获取item
+        if item is not None:
+            if item.text() not in text_in:
+                self.right_top_list.addItem(item.text())
+
+    # 加入右轴
+    def add_y_right(self):
+        text_in = list()
+        for i in range(self.right_bottom_list.count()):
+            text_in.append(self.right_bottom_list.item(i).text())
+        item = self.column_header_list.currentItem()  # 获取item
+        if item is not None:
+            if item.text() not in text_in:
+                self.right_bottom_list.addItem(item.text())
+
+    # 预览数据
+    def review_chart_clicked(self):
+        chart_name = self.chart_name.text()
+        chart_category = self.chart_category_combo.currentText()
+        # 根据设置从表格中获取画图源数据
+        x_axis = self.x_axis_combo.currentText()  # x轴
+        left_y_axis = [self.right_top_list.item(i).text() for i in range(self.right_top_list.count())]
+        right_y_axis = [self.right_bottom_list.item(i).text() for i in range(self.right_bottom_list.count())]
+        # 根据表头将这些列名称换为索引
+        x_axis_col = None
+        left_y_cols = list()
+        right_y_cols = list()
+        header_data = list()
+        for header_index in range(self.detail_trend_table.horizontalHeader().count()):
+            text = self.detail_trend_table.horizontalHeaderItem(header_index).text()
+            header_data.append(text)
+            if text == x_axis:
+                x_axis_col = header_index
+            for y_left in left_y_axis:
+                if y_left == text:
+                    left_y_cols.append(header_index)
+            for y_right in right_y_axis:
+                if y_right == text:
+                    right_y_cols.append(header_index)
+        # 获取表格数据
+        table_data = list()
+        for row in range(self.detail_trend_table.rowCount()):
+            row_content = list()
+            for col in range(self.detail_trend_table.columnCount()):
+                row_content.append(self.detail_trend_table.item(row, col).text())
+            table_data.append(row_content)
+
+        # print(header_data)
+        # print(table_data)
+        # 绘图
+        try:
+            chart = QChart()
+            chart.setTitle(chart_name)
+            if chart_category == u'折线图':
+                for line in left_y_cols:
+                    series = QLineSeries()
+                    series.setName(header_data[line])
+                    series.xlables = list()  # 绑定label属性
+                    for index, item_list in enumerate(table_data):
+                        series.append(index, float(item_list[line]))
+                        series.xlables.append(item_list[x_axis_col])
+                    chart.addSeries(series)
+            chart.createDefaultAxes()
+            chart.legend()
+            self.review_chart.setRenderHint(QPainter.Antialiasing)
+            self.review_chart.setChart(chart)
+        except Exception as e:
+            print(e)
+
+    # 获取当前表的数据
+    def getCurrentTrendTable(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(
+                    self.table_id) + '/?look=1&mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            column_headers = response['data']['header_data']
+            self.x_axis_combo.addItems(column_headers[1:])  # X轴选择
+            self.column_header_list.addItems(column_headers[2:])  # 列头待选表
+            # 填充表格
+            self.showTableData(response['data']['header_data'], response['data']['table_data'])
+
+    # 设置表格显示表数据内容
+    def showTableData(self, headers, table_contents):
+        # 设置行列
+        self.detail_trend_table.setRowCount(len(table_contents))
+        headers.pop(0)
+        col_count = len(headers)
+        self.detail_trend_table.setColumnCount(col_count)
+        self.detail_trend_table.setHorizontalHeaderLabels(headers)
+        self.detail_trend_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        for row, row_content in enumerate(table_contents):
+            for col in range(1, col_count + 1):
+                item = QTableWidgetItem(row_content[col])
+                item.setTextAlignment(Qt.AlignCenter)
+                self.detail_trend_table.setItem(row, col - 1, item)
+
+
+# 创建品种页的数据选择设置表
+class VarietyTrendTablesShow(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '名称'),
+        ('start_date', '起始时间'),
+        ('end_date', '结束时间'),
+        ('update_time', '最近更新'),
+        ('editor', '更新者'),
+        ('group', '所属组'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(VarietyTrendTablesShow, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【设置】按钮
+                    option_button = TableRowReadButton('设置')
+                    option_button.button_clicked.connect(self.option_button_clicked)
+                    self.setCellWidget(row, col + 1, option_button)
+
+    # 设置图表
+    def option_button_clicked(self, option_button):
+        current_row, _ = self.get_widget_index(option_button)
+        table_id = self.item(current_row, 0).id
+        table_text = self.item(current_row, 1).text()
+        # 弹窗设置
+        try:
+            popup = SetChartDetailPopup(table_id, parent=self)
+            popup.setWindowTitle(table_text)
+            popup.getCurrentTrendTable()
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
+        except Exception as e:
+            print(e)
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 创建品种页图表
+class CreateNewVarietyChartPopup(QDialog):
+    def __init__(self, variety_id, variety_text, *args, **kwargs):
+        super(CreateNewVarietyChartPopup, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=2)
+        self.variety_id = variety_id
+        # 显示品种
+        show_info_layout = QHBoxLayout()
+        show_info_layout.addWidget(QLabel('当前品种:'))
+        show_info_layout.addWidget(QLabel(variety_text, objectName='attachVariety'))
+        show_info_layout.addStretch()
+        self.network_message_label = QLabel()
+        show_info_layout.addWidget(self.network_message_label)
+        layout.addLayout(show_info_layout)
+        # 当前品种数据表格
+        self.variety_tables = VarietyTrendTablesShow()
+        layout.addWidget(self.variety_tables)
+        self.setLayout(layout)
+        self.setWindowTitle('创建图表')
+        self.setMinimumSize(900, 500)
+        self.setStyleSheet("""
+        #attachVariety{
+            color: rgb(200,20,50);
+            font-weight:bold;
+        }
+        """)
+
+    # 获取当前品种的所有数据表
+    def getCurrentVarietyTables(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/' + str(
+                    self.variety_id) + '/group-tables/?mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            all_tables = list()
+            for group_item in response['data']:
+                all_tables += group_item['tables']
+            # 显示表格
+            self.variety_tables.showRowContents(all_tables)
 
 
 
