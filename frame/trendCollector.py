@@ -262,6 +262,8 @@ class VarietyChartsInfoTable(QTableWidget):
         ('id', '序号'),
         ('name', '图表名称'),
         ('variety', '所属品种'),
+        ('creator', '创建者'),
+        ('is_top', '主页展示'),
     ]
 
     def __init__(self, *args, **kwargs):
@@ -278,6 +280,7 @@ class VarietyChartsInfoTable(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         for row, content_item in enumerate(row_list):
+            print(content_item)
             for col, header in enumerate(self.KEY_LABELS):
                 if col == 0:
                     table_item = QTableWidgetItem(str(row + 1))
