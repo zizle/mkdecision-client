@@ -3,7 +3,7 @@
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout,QGridLayout, QListWidget, QLabel, QDialog, QComboBox, \
-    QTextEdit, QPushButton, QHeaderView, QTableWidget, QAbstractItemView, QTableWidgetItem, QDateEdit
+    QPushButton, QHeaderView, QTableWidget, QAbstractItemView, QTableWidgetItem, QDateEdit
 from PyQt5.Qt import Qt, pyqtSignal, QPoint, QDate
 from PyQt5.QtGui import QPixmap, QImage
 from widgets.base import LoadedPage, PDFContentPopup, TextContentPopup

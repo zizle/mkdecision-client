@@ -3,7 +3,7 @@
 import fitz
 import chardet
 import requests
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QTabWidget, QGridLayout, QScrollArea,\
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QCheckBox, QGridLayout, QScrollArea,\
     QVBoxLayout, QStackedWidget, QDialog, QTextBrowser
 from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
@@ -15,6 +15,7 @@ __all__ = [
     'NavigationBar',
     'LoadedPage',
     'ScrollFoldedBox',
+    'TableCheckBox',
     'TableRowDeleteButton',
     'TableRowReadButton',
     'PDFContentPopup',
@@ -581,7 +582,7 @@ class FoldedBody(QWidget):
 
 # 滚动折叠盒子
 class ScrollFoldedBox(QScrollArea):
-    left_mouse_clicked = pyqtSignal(int, str)
+    left_mouse_clicked = pyqtSignal(int, str)  # 当前id 与父级的text
 
     def __init__(self, *args, **kwargs):
         super(ScrollFoldedBox, self).__init__(*args, **kwargs)
@@ -671,6 +672,20 @@ class ScrollFoldedBox(QScrollArea):
 
 
 """ 表格控件 """
+
+
+# 复选框
+class TableCheckBox(QWidget):
+    check_activated = pyqtSignal(QWidget)
+
+    def __init__(self, checked=False, *args, **kwargs):
+        super(TableCheckBox, self).__init__(*args, **kwargs)
+        self.check_box = QCheckBox(checked=checked)
+        self.check_box.setMinimumHeight(14)
+        layout = QVBoxLayout()
+        layout.addWidget(self.check_box, alignment=Qt.AlignCenter)
+        self.setLayout(layout)
+        self.check_box.stateChanged.connect(lambda: self.check_activated.emit(self))
 
 
 # 删除一条记录

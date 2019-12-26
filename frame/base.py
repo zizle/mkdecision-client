@@ -394,6 +394,11 @@ class BaseWindow(QWidget):
                     page.getCurrentNews()
                     page.getCurrentSliderAdvertisement()
                     page.getFoldedBoxContent()
+                elif module_text == '数据分析':
+                    from frame.trend import TrendPage
+                    page = TrendPage(parent=self.page_container)
+                    page.getGroupVarieties()
+                    page.getTrendPageCharts()
                 elif module_text == '数据管理':
                     from frame.collector import CollectorMaintain
                     page = CollectorMaintain(parent=self.page_container)
