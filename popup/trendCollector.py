@@ -1103,11 +1103,62 @@ class ShowChartPopup(QDialog):
 
     # 初始化图表
     def _initial_chart(self, chart_data):
-        header_data = chart_data['header_data']
-        table_data = chart_data['table_data']
+        print(chart_data)
         # 绘图
         chart = QChart()
-        chart.layout().setContentsMargins(0,0,0,0)  # chart的外边距
+        chart.layout().setContentsMargins(0, 0, 0, 0)  # chart的外边距
+        chart.setTitle(chart_data['name'])
+        header_data = chart_data['header_data']
+        header_data.pop(0)  # 去掉id
+        table_data = chart_data['table_data']
+        # 转为pandas DataFrame
+        table_df = pd.DataFrame(table_data)
+        table_df.drop(columns=[0], inplace=True)  # 删除id列
+        table_df.columns = [i for i in range(table_df.shape[1])]  # 重置列索引
+        table_df[0] = pd.to_datetime(table_df[0])  # 第一列转为时间类型
+        table_df.sort_values(by=0, inplace=True)
+        try:
+            x_bottom = (json.loads(chart_data['x_bottom']))[0]
+            y_left = json.loads(chart_data['y_left'])
+            if x_bottom == 0:  # 以时间序列画图（目前仅支持一个x轴）
+                # 计算x轴的最值
+                x_axis_data = table_df.iloc[:, [x_bottom]]  # 取得第一列数据
+                min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
+                if chart_data['category'] == 'line':  # 折线图
+                    for line in y_left:
+                        line_data = table_df.iloc[:, [x_bottom, line]]  # 取得图线的源数据
+                        series = QLineSeries()
+                        series.setName(header_data[line])
+                        for point_item in line_data.values.tolist():
+                            series.append(QDateTime(point_item[0]).toMSecsSinceEpoch(), float(point_item[1]))
+                        chart.addSeries(series)
+                        # 设置X轴
+                        axis_X = QDateTimeAxis()
+                        axis_X.setRange(min_x, max_x)
+                        axis_X.setFormat('yyyy-MM-dd')
+                        axis_X.setLabelsAngle(-90)
+                        axis_X.setTickCount(40)
+                        font = QFont()
+                        font.setPointSize(7)
+                        axis_X.setLabelsFont(font)
+                        # 设置Y轴
+                        axix_Y = QValueAxis()
+                        axix_Y.setLabelsFont(font)
+                        series = chart.series()[0]
+                        chart.createDefaultAxes()
+                        chart.setAxisX(axis_X, series)
+                        min_y, max_y = int(chart.axisY().min()), int(chart.axisY().max())
+                        # 根据位数取整数
+                        axix_Y.setRange(min_y, max_y)
+                        axix_Y.setLabelFormat('%i')
+                        chart.setAxisY(axix_Y, series)
+        except Exception as e:
+            print(e)
+
+        return chart
+        header_data = chart_data['header_data']
+        table_data = chart_data['table_data']
+
         # chart.setMargins(QMargins(0,0,0,0))  # chart的内边距
         # chart.setBackgroundRoundness(0)
         chart.setTitle(chart_data['name'])
