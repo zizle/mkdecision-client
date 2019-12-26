@@ -6,6 +6,8 @@ from PyQt5.QtCore import Qt, pyqtSignal, QPropertyAnimation, QRect
 from PyQt5.QtGui import QFont
 import settings
 from widgets.base import LoadedPage
+from frame.homeCollector import HomePageCollector
+from frame.trendCollector import TrendPageCollector
 
 
 # 管理的功能块
@@ -152,10 +154,8 @@ class CollectorMaintain(QWidget):
         current_block = collector_block.block_button.text()
         # 初始化详情页显示控件
         if current_block == u'首页管理':
-            from frame.homeCollector import HomePageCollector
             detail_widget = HomePageCollector(parent=self.detail_collector)
         elif current_block == u'数据分析':
-            from frame.trendCollector import TrendPageCollector
             detail_widget = TrendPageCollector(parent=self.detail_collector)
         else:
             detail_widget = QLabel('【' + current_block + '】暂不支持数据管理...',

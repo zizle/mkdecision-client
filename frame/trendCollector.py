@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QLis
     QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 import settings
-from widgets.base import LoadedPage, TableRowReadButton, TableRowDeleteButton
+from widgets.base import LoadedPage, TableRowReadButton, TableRowDeleteButton, TableCheckBox
 from popup.trendCollector import CreateNewTrendTablePopup, ShowTableDetailPopup, EditTableDetailPopup, CreateNewVarietyChartPopup, \
     ShowChartPopup
 
@@ -262,9 +262,12 @@ class VarietyChartsInfoTable(QTableWidget):
         ('id', '序号'),
         ('name', '图表名称'),
         ('variety', '所属品种'),
-        ('creator', '创建者'),
         ('is_top', '主页展示'),
+        ('is_show', '品种页展示'),
+        ('creator', '创建者'),
     ]
+
+    COLUMNS_CHECKED = [3, 4]
 
     def __init__(self, *args, **kwargs):
         super(VarietyChartsInfoTable, self).__init__(*args, **kwargs)
@@ -280,7 +283,6 @@ class VarietyChartsInfoTable(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         for row, content_item in enumerate(row_list):
-            print(content_item)
             for col, header in enumerate(self.KEY_LABELS):
                 if col == 0:
                     table_item = QTableWidgetItem(str(row + 1))
@@ -289,6 +291,10 @@ class VarietyChartsInfoTable(QTableWidget):
                     table_item = QTableWidgetItem(str(content_item[header[0]]))
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
+                if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                    check_button = TableCheckBox(checked=content_item[header[0]])
+                    check_button.check_activated.connect(self.checked_button_changed)
+                    self.setCellWidget(row, col, check_button)
                 if col == len(self.KEY_LABELS) - 1:
                     # 增加【查看】按钮
                     read_button = TableRowReadButton('查看图表')
@@ -336,13 +342,33 @@ class VarietyChartsInfoTable(QTableWidget):
         else:
             self.removeRow(current_row)
 
+    # 主页显示复选框状态
+    def checked_button_changed(self, checked_button):
+        current_row, current_column = self.get_widget_index(checked_button)
+        chart_id = self.item(current_row, 0).id
+        operate = self.KEY_LABELS[current_column][0]
+        # 请求改变主页展示状态
+        try:
+            r = requests.patch(
+                url=settings.SERVER_ADDR + 'trend/chart/' + str(chart_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({operate: checked_button.check_box.isChecked()})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.network_result.emit(response['message'])
+
     # 获取控件所在行和列
     def get_widget_index(self, widget):
         index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
         return index.row(), index.column()
 
 
-# 品种表管理主页
+# 品种图表管理主页
 class VarietyChartsManagePage(QWidget):
     def __init__(self, *args, **kwargs):
         super(VarietyChartsManagePage, self).__init__(*args, **kwargs)
@@ -364,6 +390,7 @@ class VarietyChartsManagePage(QWidget):
         layout.addLayout(select_variety_layout)
         # 显示信息的表格
         self.chart_info_table = VarietyChartsInfoTable()
+        self.chart_info_table.network_result.connect(self.network_message_label.setText)
         layout.addWidget(self.chart_info_table)
         self.setLayout(layout)
 
@@ -413,7 +440,7 @@ class VarietyChartsManagePage(QWidget):
         try:
             r = requests.get(
                 url=settings.SERVER_ADDR + 'trend/' + str(
-                    current_vid) + '/chart/?mc=' + settings.app_dawn.value('machine')
+                    current_vid) + '/chart/?all=1&mc=' + settings.app_dawn.value('machine')
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -464,11 +491,9 @@ class TrendPageCollector(QWidget):
             frame_page.getCurrentTrendGroup()  # 获取当前品种下的数据组
             frame_page.getCurrentTrendTable()  # 获取当前数据组下的数据表
         elif text == u'图表管理':
-            try:
-                frame_page = VarietyChartsManagePage(parent=self.frame_loaded)
-                frame_page.getGroups()
-            except Exception as e:
-                print(e)
+            frame_page = VarietyChartsManagePage(parent=self.frame_loaded)
+            frame_page.getGroups()  # 获取当前品种组
+            frame_page.getCurrentVarietyCharts()  # 获取当前的品种下的数据表
         else:
             frame_page = QLabel('【' + text + '】正在加紧开发中...')
         self.frame_loaded.clear()
