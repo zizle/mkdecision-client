@@ -8,6 +8,7 @@ import settings
 from widgets.base import LoadedPage
 from frame.homeCollector import HomePageCollector
 from frame.trendCollector import TrendPageCollector
+from frame.infoServiceCollector import InfoServicePageCollector
 
 
 # 管理的功能块
@@ -106,7 +107,7 @@ class CollectorMaintain(QWidget):
         horizontal_count = settings.COLLECTOR_BLOCK_ROWCOUNT
         row_index = 0
         col_index = 0
-        for block_item in [u'首页管理', u'模块1', u'数据分析', u'模块2', u'模块2', u'模块2']:
+        for block_item in [u'首页管理', u'产品服务', u'数据分析', u'模块2', u'模块2', u'模块2']:
             block = CollectorBlockIcon(text=block_item, parent=self, objectName='blockIcon')
             block.clicked_block.connect(self.enter_detail_collector)
             self.layout().addWidget(block, row_index, col_index)
@@ -155,6 +156,9 @@ class CollectorMaintain(QWidget):
         # 初始化详情页显示控件
         if current_block == u'首页管理':
             detail_widget = HomePageCollector(parent=self.detail_collector)
+        elif current_block == u'产品服务':
+            detail_widget = InfoServicePageCollector(parent=self.detail_collector)
+            detail_widget.getServiceContents()  # 获取左侧服务的内容
         elif current_block == u'数据分析':
             detail_widget = TrendPageCollector(parent=self.detail_collector)
         else:

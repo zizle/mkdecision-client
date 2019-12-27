@@ -1,0 +1,11 @@
+文件注释：
+base-基础主页，主窗口
+operate-运营管理窗口
+collector-数据管理窗口
+home-首页窗口
+homeCollector-数据管理中的首页管理
+trend-数据分析窗口
+trendCollector-数据管理中的数据分析管理
+infoService-产品服务窗口
+infoServiceCollector-数据管理中的产品服务管理
+authority-权限管理窗口

@@ -421,81 +421,6 @@ class VarietyManagePage(QWidget):
             del popup
 
 
-""" 数据分析 数据表管理相关 """
-
-
-# 显示数据表的表格
-class TrendDataTable(QTableWidget):
-    pass
-
-
-# 【数据分析】数据表管理
-class TrendTableManagePage(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(TrendTableManagePage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
-        # 品种三联动菜单
-        combo_link_layout = QHBoxLayout(spacing=2)
-        combo_link_layout.addWidget(QLabel('类别:'))
-        self.variety_group_combo = QComboBox()
-        combo_link_layout.addWidget(self.variety_group_combo)
-        combo_link_layout.addWidget(QLabel('品种:'))
-        self.variety_combo = QComboBox()
-        combo_link_layout.addWidget(self.variety_combo)
-        combo_link_layout.addWidget(QLabel('数据:'))
-        self.table_group_combo = QComboBox()
-        combo_link_layout.addWidget(self.table_group_combo)
-        # 网络请求信息
-        self.network_message_label = QLabel()
-        combo_link_layout.addWidget(self.network_message_label)
-        combo_link_layout.addStretch()
-        layout.addLayout(combo_link_layout)
-        # 数据表显示
-        self.trend_data_table = TrendDataTable()
-        layout.addWidget(self.trend_data_table)
-        self.setLayout(layout)
-
-    # 获取品种分组及品种
-    def getGroupVarieties(self):
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value('machine')
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            self.network_message_label.setText(str(e))
-        else:
-            print(response)
-            for index, group_item in enumerate(response['data']):
-                self.variety_group_combo.addItem(group_item['name'], group_item['id'])
-                if index == 0:  # 只能填充第一个
-                    for variety_item in group_item['varieties']:
-                        self.variety_combo.addItem(variety_item['name'], variety_item['id'])
-            self.network_message_label.setText(response['message'])
-
-    # 获取当前品种下的数据分组及组下的所有数据表
-    def getGroupsTables(self):
-        current_variety_id = self.variety_combo.currentData()
-        print('当前品种的id', current_variety_id)
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'trend/' + str(current_variety_id) + '/group-tables/?mc=' + settings.app_dawn.value('machine')
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            self.network_message_label.setText(str(e))
-        else:
-            print(response['data'])
-
-            for group_item in response['data']:
-                print(group_item)
-            self.network_message_label.setText(response['message'])
-
-
 """ 运营管理主页 """
 
 
@@ -517,7 +442,7 @@ class OperatorMaintain(QWidget):
 
     # 加入运营管理菜单
     def addListItem(self):
-        self.operate_list.addItems([u'用户管理', u'客户端管理', u'模块管理', u'品种管理', u'【数据分析】表管理'])
+        self.operate_list.addItems([u'用户管理', u'客户端管理', u'模块管理', u'品种管理'])
 
     # 点击左侧管理菜单
     def operate_list_clicked(self):
@@ -536,10 +461,6 @@ class OperatorMaintain(QWidget):
             tab = VarietyManagePage(parent=self)
             tab.getVarietyGroup()
             tab.getCurrentVarieties()
-        elif text == u'【数据分析】表管理':
-            tab = TrendTableManagePage(parent=self)
-            tab.getGroupVarieties()
-            tab.getGroupsTables()
         else:
             tab = QLabel(parent=self,
                          styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
