@@ -193,8 +193,6 @@ class BaseWindow(QWidget):
         # 移除token
         settings.app_dawn.remove('AUTHORIZATION')
         self.navigation_bar.permit_bar.user_logout()  # 注销
-        # 返回首页
-        self.module_clicked(module_id=0, module_text='首页')
 
     # 事件过滤器, 用于解决鼠标进入其它控件后还原为标准鼠标样式
     def eventFilter(self, obj, event):
@@ -394,6 +392,10 @@ class BaseWindow(QWidget):
                     page.getCurrentNews()
                     page.getCurrentSliderAdvertisement()
                     page.getFoldedBoxContent()
+                elif module_text == u'产品服务':
+                    from frame.infoService import InfoServicePage
+                    page = InfoServicePage(parent=self.page_container)
+
                 elif module_text == '数据分析':
                     from frame.trend import TrendPage
                     page = TrendPage(parent=self.page_container)
@@ -407,6 +409,10 @@ class BaseWindow(QWidget):
                     from frame.operator import OperatorMaintain
                     page = OperatorMaintain(parent=self.page_container)
                     page.addListItem()  # 加入管理项目
+                elif module_text == u'权限管理':
+                    from frame.authority import AuthorityMaintain
+                    page = AuthorityMaintain(parent=self.page_container)
+                    page.getCurrentUsers()
                 # elif module_text == u'数据管理':
                 #     from windows.maintenance import MaintenanceHome
                 #     tab = MaintenanceHome(parent=self.tab_loaded)

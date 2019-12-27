@@ -960,7 +960,6 @@ class CreateNewVarietyPopup(QDialog):
             response = json.loads(r.content.decode('utf-8'))
         except Exception:
             return
-        print(response)
         # 填充品种树
         for group_item in response['data']:
             group = QTreeWidgetItem(self.group_tree)
