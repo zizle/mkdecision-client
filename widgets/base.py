@@ -564,6 +564,24 @@ class FoldedBody(QWidget):
                 row_index += 1
                 col_index = 0
 
+    def addNoIdButtons(self, button_list, horizontal_count=3):
+        if horizontal_count != 3:
+            horizontal_count = 3
+        row_index = 0
+        col_index = 0
+        for index, button_item in enumerate(button_list):
+            button = FoldedBodyButton(
+                text=button_item['name'],
+                bid=0,
+                parent=self
+            )
+            button.mouse_clicked.connect(self.body_button_clicked)
+            self.layout().addWidget(button, row_index, col_index)
+            col_index += 1
+            if col_index == horizontal_count:  # 因为col_index先+1,此处应相等
+                row_index += 1
+                col_index = 0
+
     # 按钮被点击
     def body_button_clicked(self, bid):
         # 获取body的parent

@@ -158,7 +158,6 @@ class CollectorMaintain(QWidget):
             detail_widget = HomePageCollector(parent=self.detail_collector)
         elif current_block == u'产品服务':
             detail_widget = InfoServicePageCollector(parent=self.detail_collector)
-            detail_widget.getServiceContents()  # 获取左侧服务的内容
         elif current_block == u'数据分析':
             detail_widget = TrendPageCollector(parent=self.detail_collector)
         else:
