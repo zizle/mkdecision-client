@@ -1,7 +1,88 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel
+import json
+import chardet
+import requests
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QTableWidget, QTextBrowser
 from widgets.base import ScrollFoldedBox, LoadedPage
+from PyQt5.QtCore import Qt, QDate, QTime, QMargins
+import settings
+
+""" 市场分析 """
+
+
+# 市场分析主页
+class MarketAnalysisPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(MarketAnalysisPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        self.table = QTableWidget()
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+
+""" 短信通 """
+
+
+# 短信通控件
+class SMSLinkWidget(QWidget):
+    def __init__(self, sms_data, *args, **kwargs):
+        super(SMSLinkWidget, self).__init__(*args, **kwargs)
+        self.sms_id = sms_data['id']
+        layout = QVBoxLayout(margin=0, spacing=1)
+        date = QDate.fromString(sms_data['date'], 'yyyy-MM-dd')
+        time = QTime.fromString(sms_data['time'], 'HH:mm:ss')
+        date_time = date.toString('yyyy-MM-dd ') + time.toString('HH:mm') if date != QDate.currentDate() else time.toString('HH:mm')
+        layout.addWidget(QLabel(date_time, objectName='timeLabel'))
+        self.text_browser = QTextBrowser(objectName='textBrowser')
+        self.text_browser.setText(sms_data['content'])
+        layout.addWidget(self.text_browser)
+        self.setLayout(layout)
+        self.setStyleSheet("""
+        #timeLabel{
+            font-size:12px;
+            color: rgb(50,70,100);
+            font-weight: bold;
+        }
+        #textBrowser{
+            margin:0 0 2px 25px;
+            border:1px solid rgb(210,210,210);
+            font-size:13px;
+            color: rgb(0,0,0);
+            border-radius: 5px;
+            background-color:rgb(225,225,225)
+        }
+        """)
+
+
+# 短信通主页
+class SMSLinkPage(QScrollArea):
+    def __init__(self, *args, **kwargs):
+        super(SMSLinkPage, self).__init__(*args, **kwargs)
+        self.container = QWidget()
+        layout = QVBoxLayout()
+        self.container.setLayout(layout)
+        self.setWidget(self.container)
+        self.setWidgetResizable(True)
+        # # 设置滚动条样式
+        # with open("media/ScrollBar.qss", "rb") as fp:
+        #     content = fp.read()
+        #     encoding = chardet.detect(content) or {}
+        #     content = content.decode(encoding.get("encoding") or "utf-8")
+        # self.setStyleSheet(content)
+
+    # 请求数据
+    def getSMSContents(self):
+        try:
+            r = requests.get(url=settings.SERVER_ADDR + 'info/sms/?mc=' + settings.app_dawn.value('machine'))
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError('获取数据失败.')
+        except Exception:
+            return
+        else:
+            for sms_item in response['data']:
+                self.container.layout().addWidget(SMSLinkWidget(sms_item))
 
 
 # 产品服务主页
@@ -67,4 +148,13 @@ class InfoServicePage(QWidget):
 
     # 点击服务，显示页面
     def enter_service(self, sid, text):
-        print(sid, text)
+        if sid == 1:  # 短信通
+            page = SMSLinkPage(parent=self.frame)
+            page.getSMSContents()
+        elif sid == 2: # 市场分析
+            page = MarketAnalysisPage(parent=self.frame)
+        else:
+            page = QLabel('当前模块正在加紧开放...',
+                          styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)
+        self.frame.clear()
+        self.frame.addWidget(page)
