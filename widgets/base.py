@@ -19,7 +19,8 @@ __all__ = [
     'TableRowDeleteButton',
     'TableRowReadButton',
     'PDFContentPopup',
-    'TextContentPopup'
+    'TextContentPopup',
+    'Paginator'
 ]  # 别的模块 import * 时控制可导入的类
 
 
@@ -463,6 +464,11 @@ class FoldedBodyButton(QPushButton):
         #button:hover{
             color:rgb(200,120,200);
         }
+        #button:pressed{
+            background-color:rgb(150,150,180);
+            color:rgb(250,250,250);
+            border-radius:5px;
+        }
         """)
 
     def left_mouse_clicked(self):
@@ -814,5 +820,91 @@ class TextContentPopup(QDialog):
         layout.addWidget(text_browser)
         self.setWindowTitle(title)
         self.setLayout(layout)
+
+
+""" 分页 """
+
+
+# 页码控制区
+class Paginator(QWidget):
+    clicked = pyqtSignal(int)
+
+    def __init__(self, total_pages=1, *args, **kwargs):
+        super(Paginator, self).__init__(*args, **kwargs)
+        layout = QHBoxLayout(margin=0)
+        self.total_pages = total_pages
+        self.current_page = 1
+        self.home_button = QPushButton('首页', objectName='pageButton', cursor=Qt.PointingHandCursor, clicked=self.go_home_page)
+        self.pre_button = QPushButton('上一页', objectName='pageButton', cursor=Qt.PointingHandCursor, clicked=self.go_pre_page)
+        self.current_label = QLabel(objectName='pageLabel')
+        self.current_label.setText(str(self.current_page) + '/' + str(self.total_pages))
+        self.next_button = QPushButton('下一页', objectName='pageButton', cursor=Qt.PointingHandCursor, clicked=self.go_next_page)
+        self.final_button = QPushButton('尾页', objectName='pageButton', cursor=Qt.PointingHandCursor, clicked=self.go_final_page)
+        layout.addWidget(self.home_button)
+        layout.addWidget(self.pre_button)
+        layout.addWidget(self.current_label)
+        layout.addWidget(self.next_button)
+        layout.addWidget(self.final_button)
+        self.setLayout(layout)
+        self.setStyleSheet("""
+        #pageButton{
+            border:none;
+            color:rgb(100,100,100);
+            font-size:12px;
+        }
+        #pageButton:hover{
+            border-bottom:1px solid rgb(95,95,95);
+        }
+        #pageLabel{
+            color:rgb(100,100,100);
+        }
+        """)
+
+    # 设置外边距
+    def setMargins(self, a, b, c, d):
+        self.layout().setContentsMargins(a, b, c, d)
+
+    # 设置总页数
+    def setTotalPages(self, total_pages):
+        self.total_pages = total_pages
+        self.current_page = self.current_page
+        self.setCurrentPageLable()
+
+    # 设置当前页
+    def setCurrentPageLable(self):
+        self.current_label.setText(str(self.current_page) + '/' + str(self.total_pages))
+
+    # 点击首页
+    def go_home_page(self):
+        if self.current_page == 1:
+            return
+        self.current_page = 1
+        self.setCurrentPageLable()
+        self.clicked.emit(self.current_page)
+
+    # 点击尾页
+    def go_final_page(self):
+        if self.current_page == self.total_pages:
+            return
+        self.current_page = self.total_pages
+        self.setCurrentPageLable()
+        self.clicked.emit(self.current_page)
+
+    # 点击上一页
+    def go_pre_page(self):
+        if self.current_page == 1:
+            return
+        self.current_page -= 1
+        self.setCurrentPageLable()
+        self.clicked.emit(self.current_page)
+
+    # 点击下一页
+    def go_next_page(self):
+        if self.current_page == self.total_pages:
+            return
+        self.current_page += 1
+        self.setCurrentPageLable()
+        self.clicked.emit(self.current_page)
+
 
 

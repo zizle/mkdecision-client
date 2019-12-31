@@ -187,7 +187,9 @@ class BaseWindow(QWidget):
 
     # 用户点击【注销】
     def user_to_logout(self):
-        print('用户点击注销按钮')
+        if self.navigation_bar.permit_bar.username_shown.isHidden():
+            return
+        print('用户点击注销按钮生效')
         # 清除菜单
         self.navigation_bar.module_bar.clearActionMenu()
         # 移除token
@@ -383,6 +385,8 @@ class BaseWindow(QWidget):
             if not info_popup.exec_():
                 info_popup.deleteLater()
                 del info_popup
+            # 注销
+            self.user_to_logout()
             return
         else:  # 模块权限验证通过
             try:

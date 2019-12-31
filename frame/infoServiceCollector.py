@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem, 
 from widgets.base import LoadedPage
 from PyQt5.QtCore import Qt, QDate, pyqtSignal, QPoint
 import settings
-from widgets.base import TableRowReadButton, TableRowDeleteButton, PDFContentPopup
+from widgets.base import TableRowReadButton, TableRowDeleteButton, PDFContentPopup, Paginator
 from popup.infoServiceCollector import CreateNewMarketAnalysisPopup
 
 
@@ -20,6 +20,7 @@ class MarketAnalysisMaintainTable(QTableWidget):
     KEY_LABELS = [
         ('id', '序号'),
         ('name', '文件名称'),
+        ('update_time', '日期'),
         ('creator', '创建者'),
     ]
 
@@ -101,6 +102,10 @@ class MarketAnalysisMaintain(QWidget):
         super(MarketAnalysisMaintain, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0)
         message_button_layout = QHBoxLayout()
+        self.paginator = Paginator()
+        self.paginator.clicked.connect(self.getFileContents)
+        message_button_layout.addWidget(self.paginator)
+        message_button_layout.addStretch()
         self.network_message_label = QLabel()
         message_button_layout.addWidget(self.network_message_label)
         message_button_layout.addWidget(QPushButton('新增', clicked=self.create_analysis_file), alignment=Qt.AlignRight)
@@ -112,16 +117,20 @@ class MarketAnalysisMaintain(QWidget):
 
     # 获取内容
     def getFileContents(self):
+        current_page = self.paginator.current_page
         try:
-            r = requests.get(url=settings.SERVER_ADDR + 'info/market-analysis/?mc=' + settings.app_dawn.value('machine'))
+            url = settings.SERVER_ADDR + 'info/market-analysis/?page=' + str(
+                current_page) + '&mc=' + settings.app_dawn.value('machine')
+
+            r = requests.get(url=url)
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            print(response)
-            self.table.showRowContents(response['data'])
+            self.paginator.setTotalPages(response['data']['total_page'])
+            self.table.showRowContents(response['data']['contacts'])
             self.network_message_label.setText(response['message'])
 
     # 新增一个文件
