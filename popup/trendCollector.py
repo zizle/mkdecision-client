@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QDialog, QTr
     QListWidget, QDateEdit, QCheckBox
 from PyQt5.QtChart import QChartView, QChart, QLineSeries, QCategoryAxis, QDateTimeAxis, QValueAxis
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDateTime, QDate
-from PyQt5.QtGui import QPainter, QFont
+from PyQt5.QtGui import QPainter, QFont, QIntValidator
 import settings
 from widgets.base import TableRowDeleteButton, TableRowReadButton
 from popup.tips import WarningPopup, InformationPopup
@@ -602,6 +602,7 @@ class SetChartDetailPopup(QDialog):
         layout = QHBoxLayout(margin=2)
         # left_layout = QVBoxLayout()
         self.table_id = table_id
+        self.table_data_frame = None  # 表格数据的pandas Data Frame对象
         # 图表参数设置的控件
         self.chart_parameter = QWidget(parent=self)
         parameter_layout = QVBoxLayout(margin=0)
@@ -616,14 +617,14 @@ class SetChartDetailPopup(QDialog):
         chart_category_layout = QHBoxLayout()
         chart_category_layout.addWidget(QLabel('图表类型：', objectName='headTip'))
         self.chart_category_combo = QComboBox()
-        self.chart_category_combo.addItems([u'折线图', u'柱形图', u'双轴折线图', u'双轴柱形图'])
+        self.chart_category_combo.addItems([u'折线图', u'柱形图'])
         chart_category_layout.addWidget(self.chart_category_combo)
         chart_category_layout.addStretch()
         parameter_layout.addLayout(chart_category_layout)
         # 选择X轴
         chart_xaxis_layout = QHBoxLayout()
         chart_xaxis_layout.addWidget(QLabel('X 轴列名：', objectName='headTip'))
-        self.x_axis_combo = QComboBox(currentIndexChanged=self.x_axis_changed)
+        self.x_axis_combo = QComboBox(currentTextChanged=self.x_axis_changed)
         chart_xaxis_layout.addWidget(self.x_axis_combo)
         chart_xaxis_layout.addStretch()
         parameter_layout.addLayout(chart_xaxis_layout)
@@ -674,24 +675,13 @@ class SetChartDetailPopup(QDialog):
         self.scope_start_date = QDateEdit()
         self.scope_start_date.setCalendarPopup(True)
         self.scope_start_date.setEnabled(False)
-        self.scope_start_date.disconnect()
         chart_scope_layout1.addWidget(self.scope_start_date)
         chart_scope_layout1.addWidget(QLabel('截止日期:'))
         self.scope_end_date = QDateEdit()
         self.scope_end_date.setCalendarPopup(True)
         self.scope_end_date.setEnabled(False)
-        self.scope_end_date.disconnect()
         chart_scope_layout1.addWidget(self.scope_end_date)
         parameter_layout.addLayout(chart_scope_layout1)
-        # 个数范围
-        chart_scope_layout2 = QHBoxLayout()
-        chart_scope_layout2.addWidget(QLabel('起始记录:'))
-        self.scope_start_record = QLineEdit()
-        chart_scope_layout2.addWidget(self.scope_start_record)
-        chart_scope_layout2.addWidget(QLabel('截止记录:'))
-        self.scope_end_record = QLineEdit()
-        chart_scope_layout2.addWidget(self.scope_end_record)
-        parameter_layout.addLayout(chart_scope_layout2)
         parameter_layout.addWidget(QPushButton('画图预览', clicked=self.review_chart_clicked), alignment=Qt.AlignRight)
         self.chart_parameter.setMaximumWidth(350)
         self.chart_parameter.setLayout(parameter_layout)
@@ -744,10 +734,12 @@ class SetChartDetailPopup(QDialog):
             if text == self.x_axis_combo.currentText():
                 continue
             self.column_header_list.addItem(text)
+        # 清空左轴和右轴的设置
+        self.right_top_list.clear()
+        self.right_bottom_list.clear()
 
     # 移除当前列表中的item
     def remove_toplist_item(self, index):
-        print('移除', index)
         row = self.right_top_list.currentRow()
         self.right_top_list.takeItem(row)
 
@@ -807,58 +799,20 @@ class SetChartDetailPopup(QDialog):
                     popup.deleteLater()
                     del popup
                 return
-            # 获取表格数据
-            table_data = list()
-            for row in range(self.detail_trend_table.rowCount()):
-                row_content = list()
-                for col in range(self.detail_trend_table.columnCount()):
-                    row_content.append(self.detail_trend_table.item(row, col).text())
-                table_data.append(row_content)
-            # 表格数据转为pandas DataFrame
-            table_df = pd.DataFrame(table_data)
-            """ 硬性要求第一列为时间类型的字符串列 """
-            table_df[0] = pd.to_datetime(table_df[0])  # 第一列转为时间类型
-            table_df.sort_values(by=0, inplace=True)  # 根据时间排序
-            # 判断x轴的数据类型
-            x_bottom = x_axis_col[0]
-            print(table_df[x_bottom].dtype)
-            if is_datetime64_any_dtype(table_df[x_bottom]):
-                print('时间类型x轴')
-                # 计算数据时间跨度大小
-                x_axis_data = table_df.iloc[:, [0]]  # 取得第一行数据
-                min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
-                # self.scope_start_date.setDisplayFormat('yyyy-MM-dd')
-                # self.scope_end_date.setDisplayFormat('yyyy-MM-dd')
-                self.scope_start_date.setDateRange(QDate(min_x), QDate(max_x))
-                self.scope_end_date.setDateRange(QDate(min_x), QDate(max_x))
-                self.scope_start_date.setEnabled(True)
-                self.scope_end_date.setEnabled(True)
-                self.scope_end_date.setDate(self.scope_end_date.maximumDate())
-                self.scope_start_date.dateChanged.connect(self.date_scope_changed)
-                self.scope_end_date.dateChanged.connect(self.date_scope_changed)
-                # 记录不可选择
-                self.scope_start_record.setEnabled(False)
-                self.scope_end_record.setEnabled(False)
-                # self.scope_start_record.disconnect()
-                # self.scope_end_record.disconnect()
-            else:
-                print('非时间类型x轴')
-                self.scope_start_record.setEnabled(True)
-                self.scope_end_record.setEnabled(True)
-                self.scope_start_record.setText('1')
-                self.scope_end_record.setText(str(table_df.shape[0]))
-                # 时间不可选择
-                self.scope_start_date.setEnabled(False)
-                self.scope_end_date.setEnabled(False)
-                self.scope_start_date.disconnect()
-                self.scope_end_date.disconnect()
+            # 根据设置画图
+            start_date = self.scope_start_date.date().toString('yyyy-MM-dd')
+            start_date = pd.to_datetime(start_date)
+            end_date = self.scope_end_date.date().toString('yyyy-MM-dd')
+            end_date = pd.to_datetime(end_date)
+            df = self.table_data_frame.copy()
+            final_df = df.loc[(df[0] >= start_date) & (df[0] <= end_date)].copy()  # 根据时间范围取数
             # 根据类型进行画图
             if chart_category == u'折线图':  # 折线图
-                chart = draw_lines_stacked(name=chart_name, table_df=table_df, x_bottom=x_axis_col, y_left=left_y_cols,
-                                          legends=header_data, tick_count=12)
+                chart = draw_lines_stacked(name=chart_name, table_df=final_df, x_bottom=x_axis_col, y_left=left_y_cols,
+                                           legends=header_data, tick_count=12)
             elif chart_category == u'柱形图':
-                chart = draw_bars_stacked(name=chart_name, table_df=table_df, x_bottom=x_axis_col, y_left=left_y_cols,
-                                          legends=header_data, tick_count=100)
+                chart = draw_bars_stacked(name=chart_name, table_df=final_df, x_bottom=x_axis_col, y_left=left_y_cols,
+                                          legends=header_data, tick_count=12)
             else:
                 popup = InformationPopup(message='当前设置不适合作图或系统暂不支持作图。', parent=self)
                 if not popup.exec_():
@@ -867,50 +821,11 @@ class SetChartDetailPopup(QDialog):
                 return
             self.review_chart.setChart(chart)
             self.has_review_chart = True
-            return
-
-
-
-
-            # 计算数据时间跨度大小
-            x_axis_data = table_df.iloc[:, [0]]  # 取得第一行数据
-            min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
-            # self.scope_start_date.setDisplayFormat('yyyy-MM-dd')
-            # self.scope_end_date.setDisplayFormat('yyyy-MM-dd')
-            self.scope_start_date.setDateRange(QDate(min_x), QDate(max_x))
-            self.scope_end_date.setDateRange(QDate(min_x), QDate(max_x))
-            if x_axis_col[0] == 0 and chart_category == u'折线图':  # x轴为时间画图
-                # 绘图
-                chart = draw_line_series(name=chart_name, table_df=table_df, x_bottom=x_axis_col, y_left=left_y_cols,
-                                         legends=header_data, tick_count=12)
-                self.review_chart.setChart(chart)
-            elif chart_category == u'柱形图':
-                chart = draw_bar_series(name=chart_name, table_df=table_df, x_bottom=x_axis_col, y_left=left_y_cols,
-                                        legends=header_data, tick_count=12)
-                self.review_chart.setChart(chart)
-            else:
-                popup = InformationPopup(message='当前设置不适合作图或系统暂不支持作图。', parent=self)
-                if not popup.exec_():
-                    popup.deleteLater()
-                    del popup
-                return
-            self.scope_start_date.setEnabled(True)
-            self.scope_end_date.setEnabled(True)
-            self.scope_end_date.setDate(self.scope_end_date.maximumDate())
-            self.scope_start_date.dateChanged.connect(self.date_scope_changed)
-            self.scope_end_date.dateChanged.connect(self.date_scope_changed)
-            self.has_review_chart = True
         except Exception as e:
-            print(e)
-
-    # 时间范围改变
-    def date_scope_changed(self):
-        start_date = self.scope_start_date.date()
-        end_date = self.scope_end_date.date()
-        if start_date >= end_date:  # 开始时间大于等于结束时间
-            return
-        # 改变图表的范围
-        self.review_chart.chart().axisX().setRange(QDateTime(start_date), QDateTime(end_date))
+            popup = InformationPopup(message=str(e), parent=self)
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
 
     # 确认添加本张图表
     def commit_add_chart(self):
@@ -923,8 +838,6 @@ class SetChartDetailPopup(QDialog):
         category_dict = {
             '折线图': 'line',
             '柱形图': 'bar',
-            '双轴折线图': 'double_line',
-            '双轴柱形图': 'double_bar'
         }
         chart_name = re.sub(r'\s+', '', self.chart_name.text())
         category = category_dict.get(self.chart_category_combo.currentText(), None)
@@ -965,7 +878,7 @@ class SetChartDetailPopup(QDialog):
                 del info
             return
         # 获取轴名称
-        x_bottom_labels = re.split(r';',self.bottom_x_label_edit.text())
+        x_bottom_labels = re.split(r';', self.bottom_x_label_edit.text())
         y_left_labels = re.split(r';', self.left_y_label_edit.text())
         y_right_labels = re.split(r';', self.right_y_label_edit.text())
         chart_params = dict()
@@ -1020,29 +933,50 @@ class SetChartDetailPopup(QDialog):
             pass
         else:
             column_headers = response['data']['header_data']
-            self.x_axis_combo.addItems(column_headers[1:])  # X轴选择
-            print(column_headers)
-            for text in column_headers[1:]:
+            column_headers.pop(0)
+            self.x_axis_combo.addItems(column_headers)  # X轴选择
+            for text in column_headers:
                 if text in self.x_axis_combo.currentText():
                     continue
                 self.column_header_list.addItem(text)  # 列头待选表
+            # pandas处理数据
+            self.table_data_frame = self.pd_handler_data(response['data']['table_data'])
             # 填充表格
-            self.showTableData(response['data']['header_data'], response['data']['table_data'])
+            self.showTableData(column_headers, self.table_data_frame)
+
+    # pandas 处理数据
+    def pd_handler_data(self, table_data):
+        # 转为DF
+        table_df = pd.DataFrame(table_data)
+        table_df.drop(columns=[0], inplace=True)  # 删除id列
+        table_df.columns = [i for i in range(table_df.shape[1])]  # 重置列索引
+        table_df[0] = pd.to_datetime(table_df[0])  # 第一列转为时间类型
+        table_df.sort_values(by=0, inplace=True)  # 根据时间排序数据
+        # 计算数据时间跨度大小显示在范围上
+        x_axis_data = table_df.iloc[:, [0]]  # 取得第一列数据
+        min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
+        self.scope_start_date.setDateRange(QDate(min_x), QDate(max_x))
+        self.scope_end_date.setDateRange(QDate(min_x), QDate(max_x))
+        self.scope_start_date.setEnabled(True)
+        self.scope_end_date.setEnabled(True)
+        self.scope_end_date.setDate(self.scope_end_date.maximumDate())
+        return table_df
 
     # 设置表格显示表数据内容
-    def showTableData(self, headers, table_contents):
+    def showTableData(self, headers, table_df):
         # 设置行列
-        self.detail_trend_table.setRowCount(len(table_contents))
-        headers.pop(0)
+        self.detail_trend_table.setRowCount(table_df.shape[0])
         col_count = len(headers)
         self.detail_trend_table.setColumnCount(col_count)
         self.detail_trend_table.setHorizontalHeaderLabels(headers)
         self.detail_trend_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        for row, row_content in enumerate(table_contents):
-            for col in range(1, col_count + 1):
-                item = QTableWidgetItem(row_content[col])
+        for row, row_content in enumerate(table_df.values.tolist()):
+            for col, value in enumerate(row_content):
+                if col == 0:  # 时间类
+                    value = value.strftime('%Y-%m-%d')
+                item = QTableWidgetItem(value)
                 item.setTextAlignment(Qt.AlignCenter)
-                self.detail_trend_table.setItem(row, col - 1, item)
+                self.detail_trend_table.setItem(row, col, item)
 
 
 # 创建品种页的数据选择设置表
@@ -1194,44 +1128,17 @@ class ShowChartPopup(QDialog):
                 table_df = table_df[(table_df[0] <= end_date)]
             else:
                 pass
-            x_bottom = (json.loads(chart_data['x_bottom']))[0]
+            x_bottom = (json.loads(chart_data['x_bottom']))
             y_left = json.loads(chart_data['y_left'])
-            if x_bottom == 0:  # 以时间序列画图（目前仅支持一个x轴）
-                chart = draw_line_series(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom, y_left=y_left,
-                                         legends=header_data, tick_count=40)
-                # # 计算x轴的最值
-                # x_axis_data = table_df.iloc[:, [x_bottom]]  # 取得第一列数据
-                # min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
-                # if chart_data['category'] == 'line':  # 折线图
-                #     for line in y_left:
-                #         line_data = table_df.iloc[:, [x_bottom, line]]  # 取得图线的源数据
-                #         series = QLineSeries()
-                #         series.setName(header_data[line])
-                #         for point_item in line_data.values.tolist():
-                #             series.append(QDateTime(point_item[0]).toMSecsSinceEpoch(), float(point_item[1]))
-                #         chart.addSeries(series)
-                #         # 设置X轴
-                #         axis_X = QDateTimeAxis()
-                #         axis_X.setRange(min_x, max_x)
-                #         axis_X.setFormat('yyyy-MM-dd')
-                #         axis_X.setLabelsAngle(-90)
-                #         axis_X.setTickCount(40)
-                #         font = QFont()
-                #         font.setPointSize(7)
-                #         axis_X.setLabelsFont(font)
-                #         # 设置Y轴
-                #         axix_Y = QValueAxis()
-                #         axix_Y.setLabelsFont(font)
-                #         series = chart.series()[0]
-                #         chart.createDefaultAxes()
-                #         chart.setAxisX(axis_X, series)
-                #         min_y, max_y = int(chart.axisY().min()), int(chart.axisY().max())
-                #         # 根据位数取整数
-                #         axix_Y.setRange(min_y, max_y)
-                #         axix_Y.setLabelFormat('%i')
-                #         chart.setAxisY(axix_Y, series)
-                #         chart.legend().setAlignment(Qt.AlignBottom)
-        except Exception as e:
-            print(e)
-
+            # 根据图表类型画图
+            if chart_data['category'] == 'line':
+                chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
+                                           y_left=y_left, legends=header_data, tick_count=40)
+            elif chart_data['category'] == 'bar':
+                chart = draw_bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
+                                          y_left=y_left, legends=header_data, tick_count=40)
+            else:
+                chart = QChart()
+        except Exception:
+            chart = QChart()
         return chart
