@@ -1128,44 +1128,17 @@ class ShowChartPopup(QDialog):
                 table_df = table_df[(table_df[0] <= end_date)]
             else:
                 pass
-            x_bottom = (json.loads(chart_data['x_bottom']))[0]
+            x_bottom = (json.loads(chart_data['x_bottom']))
             y_left = json.loads(chart_data['y_left'])
-            if x_bottom == 0:  # 以时间序列画图（目前仅支持一个x轴）
-                chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom, y_left=y_left,
-                                         legends=header_data, tick_count=40)
-                # # 计算x轴的最值
-                # x_axis_data = table_df.iloc[:, [x_bottom]]  # 取得第一列数据
-                # min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
-                # if chart_data['category'] == 'line':  # 折线图
-                #     for line in y_left:
-                #         line_data = table_df.iloc[:, [x_bottom, line]]  # 取得图线的源数据
-                #         series = QLineSeries()
-                #         series.setName(header_data[line])
-                #         for point_item in line_data.values.tolist():
-                #             series.append(QDateTime(point_item[0]).toMSecsSinceEpoch(), float(point_item[1]))
-                #         chart.addSeries(series)
-                #         # 设置X轴
-                #         axis_X = QDateTimeAxis()
-                #         axis_X.setRange(min_x, max_x)
-                #         axis_X.setFormat('yyyy-MM-dd')
-                #         axis_X.setLabelsAngle(-90)
-                #         axis_X.setTickCount(40)
-                #         font = QFont()
-                #         font.setPointSize(7)
-                #         axis_X.setLabelsFont(font)
-                #         # 设置Y轴
-                #         axix_Y = QValueAxis()
-                #         axix_Y.setLabelsFont(font)
-                #         series = chart.series()[0]
-                #         chart.createDefaultAxes()
-                #         chart.setAxisX(axis_X, series)
-                #         min_y, max_y = int(chart.axisY().min()), int(chart.axisY().max())
-                #         # 根据位数取整数
-                #         axix_Y.setRange(min_y, max_y)
-                #         axix_Y.setLabelFormat('%i')
-                #         chart.setAxisY(axix_Y, series)
-                #         chart.legend().setAlignment(Qt.AlignBottom)
-        except Exception as e:
-            print(e)
-
+            # 根据图表类型画图
+            if chart_data['category'] == 'line':
+                chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
+                                           y_left=y_left, legends=header_data, tick_count=40)
+            elif chart_data['category'] == 'bar':
+                chart = draw_bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
+                                          y_left=y_left, legends=header_data, tick_count=40)
+            else:
+                chart = QChart()
+        except Exception:
+            chart = QChart()
         return chart

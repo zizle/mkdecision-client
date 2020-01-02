@@ -89,7 +89,6 @@ class ChartsFrameView(QScrollArea):
     def draw_chart(self, index_id):
         for chart_view in self.chart_view_list:
             try:
-                # print(index_id, chart_view.chart_data)
                 if chart_view.index_id == index_id:
                     chart_data = chart_view.chart_data
                     header_data = chart_data['header_data'][1:]
@@ -115,7 +114,6 @@ class ChartsFrameView(QScrollArea):
                     x_bottom = (json.loads(chart_data['x_bottom']))
                     y_left = json.loads(chart_data['y_left'])
                     # 根据图表类型画图
-                    print(chart_data)
                     if chart_data['category'] == 'line':
                         chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
                                                    y_left=y_left, legends=header_data, tick_count=10)
@@ -126,11 +124,7 @@ class ChartsFrameView(QScrollArea):
                         chart = QChart()
                     chart_view.setChart(chart)
                     break
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                print(e)
-
+            except Exception:
                 continue
 
 
