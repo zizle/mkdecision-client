@@ -9,7 +9,7 @@ from PyQt5.QtGui import QPainter
 from PyQt5.QtChart import QChart, QChartView
 from widgets.base import ScrollFoldedBox, LoadedPage
 import settings
-from utils.charts import draw_line_series
+from utils.charts import draw_lines_stacked, draw_bars_stacked
 
 
 # 展示图表的线程
@@ -112,15 +112,27 @@ class ChartsFrameView(QScrollArea):
                         table_df = table_df[(table_df[0] <= end_date)]
                     else:
                         pass
-                    x_bottom = (json.loads(chart_data['x_bottom']))[0]
+                    x_bottom = (json.loads(chart_data['x_bottom']))
                     y_left = json.loads(chart_data['y_left'])
-                    if x_bottom == 0:  # 以时间序列画图（目前仅支持一个x轴）
-                        chart = draw_line_series(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
-                                                 y_left=y_left, legends=header_data, tick_count=10)
-                        chart_view.setChart(chart)
-                        break
-            except Exception:
+                    # 根据图表类型画图
+                    print(chart_data)
+                    if chart_data['category'] == 'line':
+                        chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
+                                                   y_left=y_left, legends=header_data, tick_count=10)
+                    elif chart_data['category'] == 'bar':
+                        chart = draw_bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
+                                                  y_left=y_left, legends=header_data, tick_count=10)
+                    else:
+                        chart = QChart()
+                    chart_view.setChart(chart)
+                    break
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(e)
+
                 continue
+
 
 # 数据分析主页
 class TrendPage(QWidget):
