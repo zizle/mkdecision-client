@@ -24,6 +24,7 @@ class TrendDataTable(QTableWidget):
         ('start_date', '起始时间'),
         ('end_date', '结束时间'),
         ('update_time', '最近更新'),
+        ('origin_note', '数据来源'),
         ('editor', '更新者'),
         ('group', '所属组'),
     ]
