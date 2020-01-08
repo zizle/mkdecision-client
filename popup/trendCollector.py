@@ -43,19 +43,24 @@ class CreateNewTrendTablePopup(QDialog):
         self.attach_group.gid = None
         udwlayout.addWidget(self.attach_group, 2, 1)
         udwlayout.addWidget(QLabel('数据名称:'), 4, 0)
-        udwlayout.addWidget(QLabel(parent=self, objectName='tbnameError'), 5, 0, 1, 2)
         self.tnedit = QLineEdit()  # table name edit数据组名称编辑
         self.tnedit.textChanged.connect(self.tbname_changed)
         udwlayout.addWidget(self.tnedit, 4, 1)
-        udwlayout.addWidget(QLabel('时间类型:'), 6, 0)
+        udwlayout.addWidget(QLabel(parent=self, objectName='tbnameError'), 5, 0, 1, 2)
+        # 备注数据来源
+        udwlayout.addWidget(QLabel('数据来源:'), 6, 0)
+        self.origin_note = QLineEdit()
+        udwlayout.addWidget(self.origin_note, 6, 1)
+        udwlayout.addWidget(QLabel(parent=self, objectName='originNoteError'), 7, 0, 1, 2)
+        udwlayout.addWidget(QLabel('时间类型:'), 8, 0)
         self.date_type = QComboBox(parent=self, objectName='dateTypeCombo')
         self.date_type.currentTextChanged.connect(self.change_date_type)
-        udwlayout.addWidget(self.date_type, 6, 1)
-        udwlayout.addWidget(QPushButton('导入', objectName='selectTable', clicked=self.select_data_table), 7, 0)
-        udwlayout.addWidget(QLabel(parent=self, objectName='commitError'), 7, 1)
+        udwlayout.addWidget(self.date_type, 8, 1)
+        udwlayout.addWidget(QPushButton('导入', objectName='selectTable', clicked=self.select_data_table), 9, 0)
+        udwlayout.addWidget(QLabel(parent=self, objectName='commitError'), 9, 1)
         self.review_table = QTableWidget(objectName='reviewTable')
         # self.review_table.verticalHeader().hide()
-        udwlayout.addWidget(self.review_table, 8, 0, 1, 2)
+        udwlayout.addWidget(self.review_table, 10, 0, 1, 2)
         # 上传添加数据表按钮布局
         addlayout = QHBoxLayout()
         self.add_table_btn = QPushButton('确认添加', parent=self, objectName='addTable', clicked=self.add_new_table)
@@ -290,6 +295,12 @@ class CreateNewTrendTablePopup(QDialog):
             el.setText('请输入数据表名称.')
             self.add_table_btn.setEnabled(True)
             return
+        # 数据来源备注
+        origin_note = re.sub(r'\s+', '', self.origin_note.text())
+        if not origin_note:
+            self.findChild(QLabel, 'originNoteError').setText('请备注数据来源。')
+            self.add_table_btn.setEnabled(True)
+            return
         # 读取预览表格的数据
         table_data = self._read_review_data()
         if not table_data['value_list']:
@@ -304,7 +315,8 @@ class CreateNewTrendTablePopup(QDialog):
                 headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
                 data=json.dumps({
                     "table_name": tbname,
-                    "table_data": table_data
+                    "table_data": table_data,
+                    "origin_note": origin_note
                 }),
             )
             response = json.loads(r.content.decode('utf-8'))
