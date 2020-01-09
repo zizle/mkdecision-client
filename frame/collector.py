@@ -3,7 +3,7 @@
 
 from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt5.QtCore import Qt, pyqtSignal, QPropertyAnimation, QRect
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap
 import settings
 from widgets.base import LoadedPage
 from frame.homeCollector import HomePageCollector
@@ -15,24 +15,36 @@ from frame.infoServiceCollector import InfoServicePageCollector
 class CollectorBlockIcon(QWidget):
     clicked_block = pyqtSignal(QWidget)
 
-    def __init__(self, text, *args, **kwargs):
+    def __init__(self, text, icon_path, *args, **kwargs):
         super(CollectorBlockIcon, self).__init__(*args, **kwargs)
         layout = QVBoxLayout()
         self.icon_label = QLabel()
+        self.icon_label.setPixmap(QPixmap(icon_path))
+        self.icon_label.setScaledContents(True)
         layout.addWidget(self.icon_label)
-        self.block_button = QPushButton(text)
+        self.block_button = QPushButton(text, objectName='nameBtn')
         self.block_button.clicked.connect(lambda: self.clicked_block.emit(self))
         layout.addWidget(self.block_button, alignment=Qt.AlignBottom)
         self.setLayout(layout)
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
-        # self.setFixedSize(250, 220)
+        self.setFixedSize(250, 220)
         # 保存点击之间的原始位置
         self.original_x = 0
         self.original_y = 0
         # 保存原始大小
         self.original_width = 0
         self.original_height = 0
+        self.setObjectName('blockIcon')
+        self.setStyleSheet("""
+        #blockIcon{
+            background:rgb(189,255,245)
+        }
+        #nameBtn{
+            border:none;
+            font-size:13px;
+        }
+        """)
 
     # 记录原始位置
     def set_original_rect(self, x, y, w, h):
@@ -40,6 +52,35 @@ class CollectorBlockIcon(QWidget):
         self.original_y = y
         self.original_width = w
         self.original_height = h
+
+    # 鼠标进入
+    def enterEvent(self, event):
+        self.setCursor(Qt.PointingHandCursor)
+        self.setStyleSheet("""
+        #blockIcon{
+            background:rgb(170,243,217)
+        }
+        #nameBtn{
+            border:none;
+            font-size:13px;
+        }
+        """)
+
+    # 鼠标退出
+    def leaveEvent(self, event):
+        self.setStyleSheet("""
+        #blockIcon{
+            background:rgb(189,255,245)
+        }
+        #nameBtn{
+            border:none;
+            font-size:13px;
+        }
+        """)
+
+    # 鼠标点击
+    def mousePressEvent(self, event):
+        self.block_button.click()
 
 
 # 详情管理页容器
@@ -93,9 +134,6 @@ class CollectorMaintain(QWidget):
         self.detail_collector_animation = QPropertyAnimation(self.detail_collector, b'geometry')
         self.detail_collector_animation.setDuration(500)
         self.setStyleSheet("""
-        #blockIcon{
-            background:rgb(100,200,160)
-        }
         #detailCollector{
             background:rgb(230, 235, 230)
         }
@@ -107,8 +145,12 @@ class CollectorMaintain(QWidget):
         horizontal_count = settings.COLLECTOR_BLOCK_ROWCOUNT
         row_index = 0
         col_index = 0
-        for block_item in [u'首页管理', u'产品服务', u'数据分析', u'模块2', u'模块2', u'模块2']:
-            block = CollectorBlockIcon(text=block_item, parent=self, objectName='blockIcon')
+        for block_item in [
+            {'text': u'首页管理', 'icon': 'media/collector_icon/home.png'},
+            {'text': u'产品服务', 'icon': 'media/collector_icon/service.png'},
+            {'text': u'数据分析', 'icon': 'media/collector_icon/trend.png'},
+        ]:
+            block = CollectorBlockIcon(text=block_item['text'], icon_path=block_item['icon'], parent=self)
             block.clicked_block.connect(self.enter_detail_collector)
             self.layout().addWidget(block, row_index, col_index)
             col_index += 1
