@@ -127,7 +127,6 @@ class BaseWindow(QWidget):
 
     # 用户点击【登录】
     def user_to_login(self):
-        print('用户点击登录按钮')
         from popup.base import LoginPopup
         login_popup = LoginPopup(parent=self)
         login_popup.user_listed.connect(self.user_login_successfully)
@@ -137,31 +136,30 @@ class BaseWindow(QWidget):
 
     # 启动自动登录
     def running_auto_login(self):
-        machine_code = settings.app_dawn.value('machine')
-        token = settings.app_dawn.value('AUTHORIZATION')
-        print('启动客户端自动登录', token)
-        if not machine_code or not token:
-            print('windows.base.BaseWindows.running_auto_login 没有机器码或token,不用自动登录')
-            return
-        print('windows.base.BaseWindows.running_auto_login 有机器码或token,自动登录')
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'user/keep-online/?mc=' + machine_code,
-                headers={'AUTHORIZATION': token}
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            settings.app_dawn.remove('AUTHORIZATION')  # 状态保持失败移除token
-            return  # 自动登录失败
-        else:
-            if response['data']:
-                self.user_login_successfully(response['data'])
+        if settings.app_dawn.value('auto') == '1':  # 自动登录
+            machine_code = settings.app_dawn.value('machine')
+            token = settings.app_dawn.value('AUTHORIZATION')
+            if not machine_code or not token:
+                self.user_to_login()
+                return
+            try:
+                r = requests.get(
+                    url=settings.SERVER_ADDR + 'user/keep-online/?mc=' + machine_code,
+                    headers={'AUTHORIZATION': token}
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception:
+                settings.app_dawn.remove('AUTHORIZATION')  # 状态保持失败移除token
+                self.user_to_login()
+                return  # 自动登录失败
+            else:
+                if response['data']:
+                    self.user_login_successfully(response['data'])
 
     # 用户登录成功(注册成功)
     def user_login_successfully(self, response_data):
-        print(response_data)
         # 保存token
         token = response_data['Authorization']
         settings.app_dawn.setValue('AUTHORIZATION', token)
