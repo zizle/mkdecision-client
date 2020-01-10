@@ -4,7 +4,7 @@ import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QTableWidget, QTextBrowser, \
     QAbstractItemView, QHeaderView, QTableWidgetItem
-from widgets.base import ScrollFoldedBox, LoadedPage, Paginator, TableRowReadButton, PDFContentPopup
+from widgets.base import ScrollFoldedBox, LoadedPage, Paginator, TableRowReadButton, PDFContentPopup, PDFContentShower
 from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal, QPoint
 import settings
 
@@ -439,6 +439,12 @@ class InfoServicePage(QWidget):
         elif sid == 4:  # 调研报告
             page = SearchReportPage(parent=self.frame)
             page.getCurrentReportContents()
+        elif sid == 6:  # 顾问服务-人才培养
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/personTra/产品服务_人才培养.pdf', parent=self.frame)
+        elif sid == 7:  # 顾问服务-部门组建
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/deptBuild/产品服务_部门组建.pdf', parent=self.frame)
+        elif sid == 8:  # 顾问服务-制度考核
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/instExamine/产品服务_制度考核.pdf', parent=self.frame)
         else:
             page = QLabel('当前模块正在加紧开放...',
                           styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)

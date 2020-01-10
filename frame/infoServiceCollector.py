@@ -7,8 +7,75 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem, 
 from widgets.base import LoadedPage
 from PyQt5.QtCore import Qt, QDate, pyqtSignal, QPoint
 import settings
-from widgets.base import TableRowReadButton, TableRowDeleteButton, PDFContentPopup, Paginator
-from popup.infoServiceCollector import CreateNewMarketAnalysisPopup, CreateNewSearchReportPopup, CreateNewTopicSearchPopup
+from widgets.base import TableRowReadButton, TableRowDeleteButton, PDFContentPopup, Paginator, PDFContentShower
+from popup.infoServiceCollector import CreateNewMarketAnalysisPopup, CreateNewSearchReportPopup, \
+    CreateNewTopicSearchPopup, ModifyPersonnelTrainPopup, ModifyDeptBuildPopup, ModifyInstExaminePopup
+
+
+"""" 顾问服务-制度考核 """
+
+
+# 制度考核管理
+class InstExamineMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(InstExamineMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        layout.addWidget(QPushButton('修改', clicked=self.modify_file), alignment=Qt.AlignRight)
+        # 显示服务端pdf文件
+        content_show = PDFContentShower(file=settings.STATIC_PREFIX + 'info/instExamine/产品服务_制度考核.pdf', parent=self)
+        layout.addWidget(content_show)
+        self.setLayout(layout)
+
+    # 修改部门组建显示的文件
+    def modify_file(self):
+        popup = ModifyInstExaminePopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 顾问服务-部门组建 """
+
+
+# 部门组建管理
+class DeptBuildMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(DeptBuildMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        layout.addWidget(QPushButton('修改', clicked=self.modify_file), alignment=Qt.AlignRight)
+        # 显示服务端pdf文件
+        content_show = PDFContentShower(file=settings.STATIC_PREFIX + 'info/deptBuild/产品服务_部门组建.pdf', parent=self)
+        layout.addWidget(content_show)
+        self.setLayout(layout)
+
+    # 修改部门组建显示的文件
+    def modify_file(self):
+        popup = ModifyDeptBuildPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 顾问服务-人才培养 """
+
+
+# 人才培养数据管理主页
+class PersonnelTrainMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(PersonnelTrainMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        layout.addWidget(QPushButton('修改', clicked=self.modify_file), alignment=Qt.AlignRight)
+        # 显示服务端pdf文件
+        content_show = PDFContentShower(file=settings.STATIC_PREFIX + 'info/personTra/产品服务_人才培养.pdf', parent=self)
+        layout.addWidget(content_show)
+        self.setLayout(layout)
+
+    # 修改人才培养显示的文件
+    def modify_file(self):
+        popup = ModifyPersonnelTrainPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
 
 
 """ 专题研究相关 """
@@ -652,6 +719,12 @@ class InfoServicePageCollector(QWidget):
         elif service_id == 4:  # 调研报告
             page = SearchReportMaintain()
             page.getFileContents()
+        elif service_id == 6:  # 人才培养
+            page = PersonnelTrainMaintain()
+        elif service_id == 7:  # 部门组建
+            page = DeptBuildMaintain()
+        elif service_id == 8:  # 制度考核
+            page = InstExamineMaintain()
         else:
             page = QLabel('【' + text + '】还不能进行数据管理...',
                           styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)
