@@ -1,13 +1,207 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
 import json
-import chardet
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QTableWidget, QTextBrowser, \
     QAbstractItemView, QHeaderView, QTableWidgetItem
 from widgets.base import ScrollFoldedBox, LoadedPage, Paginator, TableRowReadButton, PDFContentPopup
 from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal, QPoint
 import settings
+
+
+""" 调研报告相关 """
+
+
+# 调研报告显示表格
+class SearchReportTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '文件名称'),
+        ('update_time', '日期'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(SearchReportTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                #     check_button = TableCheckBox(checked=content_item[header[0]])
+                #     check_button.check_activated.connect(self.checked_button_changed)
+                #     self.setCellWidget(row, col, check_button)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【查看】按钮
+                    read_button = TableRowReadButton('阅读')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+                    # # 增加【删除】按钮
+                    # delete_button = TableRowDeleteButton('删除')
+                    # delete_button.button_clicked.connect(self.delete_button_clicked)
+                    # self.setCellWidget(row, col + 2, delete_button)
+
+    # 查看一个调研报告
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + file
+        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 调研报告主页
+class SearchReportPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(SearchReportPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        # 页码控制布局
+        self.paginator = Paginator()
+        self.paginator.setMargins(0, 10, 3, 0)
+        self.paginator.clicked.connect(self.getCurrentReportContents)
+        layout.addWidget(self.paginator, alignment=Qt.AlignRight)
+        self.table = TopicSearchTable()
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+    # 请求数据
+    def getCurrentReportContents(self):
+        current_page = self.paginator.current_page
+        try:
+            url = settings.SERVER_ADDR + 'info/search-report/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
+            r = requests.get(url=url)
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.paginator.setTotalPages(response['data']['total_page'])
+            self.table.showRowContents(response['data']['contacts'])
+
+
+""" 专题研究 """
+
+
+# 专题研究显示表格
+class TopicSearchTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '文件名称'),
+        ('update_time', '日期'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(TopicSearchTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                #     check_button = TableCheckBox(checked=content_item[header[0]])
+                #     check_button.check_activated.connect(self.checked_button_changed)
+                #     self.setCellWidget(row, col, check_button)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【查看】按钮
+                    read_button = TableRowReadButton('阅读')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+                    # # 增加【删除】按钮
+                    # delete_button = TableRowDeleteButton('删除')
+                    # delete_button.button_clicked.connect(self.delete_button_clicked)
+                    # self.setCellWidget(row, col + 2, delete_button)
+
+    # 查看一个专题研究
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + file
+        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 专题研究主页
+class TopicSearchPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(TopicSearchPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        # 页码控制布局
+        self.paginator = Paginator()
+        self.paginator.setMargins(0, 10, 3, 0)
+        self.paginator.clicked.connect(self.getCurrentTopicContents)
+        layout.addWidget(self.paginator, alignment=Qt.AlignRight)
+        self.table = TopicSearchTable()
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+    # 请求数据
+    def getCurrentTopicContents(self):
+        current_page = self.paginator.current_page
+        try:
+            url = settings.SERVER_ADDR + 'info/topic-search/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
+            r = requests.get(url=url)
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.paginator.setTotalPages(response['data']['total_page'])
+            self.table.showRowContents(response['data']['contacts'])
+
 
 """ 市场分析 """
 
@@ -104,7 +298,6 @@ class MarketAnalysisPage(QWidget):
         else:
             self.paginator.setTotalPages(response['data']['total_page'])
             self.table.showRowContents(response['data']['contacts'])
-
 
 
 """ 短信通 """
@@ -237,9 +430,15 @@ class InfoServicePage(QWidget):
         if sid == 1:  # 短信通
             page = SMSLinkPage(parent=self.frame)
             page.getSMSContents()
-        elif sid == 2: # 市场分析
+        elif sid == 2:  # 市场分析
             page = MarketAnalysisPage(parent=self.frame)
             page.getCurrentMarketContents()
+        elif sid == 3:  # 专题研究
+            page = TopicSearchPage(parent=self.frame)
+            page.getCurrentTopicContents()
+        elif sid == 4:  # 调研报告
+            page = SearchReportPage(parent=self.frame)
+            page.getCurrentReportContents()
         else:
             page = QLabel('当前模块正在加紧开放...',
                           styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)
