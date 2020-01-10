@@ -7,8 +7,748 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem, 
 from widgets.base import LoadedPage
 from PyQt5.QtCore import Qt, QDate, pyqtSignal, QPoint
 import settings
-from widgets.base import TableRowReadButton, TableRowDeleteButton, PDFContentPopup, Paginator
-from popup.infoServiceCollector import CreateNewMarketAnalysisPopup
+from widgets.base import TableRowReadButton, TableRowDeleteButton, PDFContentPopup, Paginator, PDFContentShower
+from popup.infoServiceCollector import CreateNewSMSLink, EditSMSLink, CreateNewMarketAnalysisPopup, \
+    CreateNewSearchReportPopup, CreateNewTopicSearchPopup, ModifyPersonnelTrainPopup, ModifyDeptBuildPopup, \
+    ModifyInstExaminePopup, CreateNewTradePolicyPopup, EditTradePolicy, CreateNewInvestPlanPopup, CreateNewHedgePlanPopup
+
+
+""" 策略服务-套保方案 """
+
+
+# 显示套保方案表格
+class HedgePlanMaintainTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '文件名称'),
+        ('update_time', '日期'),
+        ('creator', '创建者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(HedgePlanMaintainTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                #     check_button = TableCheckBox(checked=content_item[header[0]])
+                #     check_button.check_activated.connect(self.checked_button_changed)
+                #     self.setCellWidget(row, col, check_button)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【查看】按钮
+                    read_button = TableRowReadButton('查看')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+                    # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 2, delete_button)
+
+    # 查看一个套保方案
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + file
+        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 删除一个套保方案
+    def delete_button_clicked(self, delete_button):
+        current_row, _ = self.get_widget_index(delete_button)
+        file_id = self.item(current_row, 0).id
+        try:
+            r = requests.delete(
+                url=settings.SERVER_ADDR + 'info/hedge-plan/' + str(file_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.removeRow(current_row)
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 套保方案管理
+class HedgePlanMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(HedgePlanMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        message_button_layout = QHBoxLayout()
+        self.paginator = Paginator()
+        self.paginator.clicked.connect(self.getFileContents)
+        message_button_layout.addWidget(self.paginator)
+        message_button_layout.addStretch()
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_topic_file), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 显示的表格
+        self.table = HedgePlanMaintainTable()
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+    # 获取内容
+    def getFileContents(self):
+        current_page = self.paginator.current_page
+        try:
+            url = settings.SERVER_ADDR + 'info/hedge-plan/?page=' + str(
+                current_page) + '&mc=' + settings.app_dawn.value('machine')
+
+            r = requests.get(url=url)
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.paginator.setTotalPages(response['data']['total_page'])
+            self.table.showRowContents(response['data']['contacts'])
+            self.network_message_label.setText(response['message'])
+
+    # 上传套保方案文件
+    def create_topic_file(self):
+        popup = CreateNewHedgePlanPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 策略服务-投资方案相关 """
+
+
+# 显示投资方案表格
+class InvestPlanMaintainTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '文件名称'),
+        ('update_time', '日期'),
+        ('creator', '创建者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(InvestPlanMaintainTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                #     check_button = TableCheckBox(checked=content_item[header[0]])
+                #     check_button.check_activated.connect(self.checked_button_changed)
+                #     self.setCellWidget(row, col, check_button)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【查看】按钮
+                    read_button = TableRowReadButton('查看')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+                    # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 2, delete_button)
+
+    # 查看一个投资方案
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + file
+        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 删除一个投资方案
+    def delete_button_clicked(self, delete_button):
+        current_row, _ = self.get_widget_index(delete_button)
+        file_id = self.item(current_row, 0).id
+        try:
+            r = requests.delete(
+                url=settings.SERVER_ADDR + 'info/invest-plan/' + str(file_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.removeRow(current_row)
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 投资方案管理
+class InvestPlanMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(InvestPlanMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        message_button_layout = QHBoxLayout()
+        self.paginator = Paginator()
+        self.paginator.clicked.connect(self.getFileContents)
+        message_button_layout.addWidget(self.paginator)
+        message_button_layout.addStretch()
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_topic_file), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 显示的表格
+        self.table = InvestPlanMaintainTable()
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+    # 获取内容
+    def getFileContents(self):
+        current_page = self.paginator.current_page
+        try:
+            url = settings.SERVER_ADDR + 'info/invest-plan/?page=' + str(
+                current_page) + '&mc=' + settings.app_dawn.value('machine')
+
+            r = requests.get(url=url)
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.paginator.setTotalPages(response['data']['total_page'])
+            self.table.showRowContents(response['data']['contacts'])
+            self.network_message_label.setText(response['message'])
+
+    # 上传投资方案文件
+    def create_topic_file(self):
+        popup = CreateNewInvestPlanPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+"""策略服务-交易策略相关 """
+
+
+# 维护表格
+class TradePolicyTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('date', '日期'),
+        ('time', '时间'),
+        ('content', '内容'),
+        ('creator', '创建者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(TradePolicyTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                #     check_button = TableCheckBox(checked=content_item[header[0]])
+                #     check_button.check_activated.connect(self.checked_button_changed)
+                #     self.setCellWidget(row, col, check_button)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【查看】按钮
+                    edit_button = TableRowReadButton('编辑')
+                    edit_button.button_clicked.connect(self.edit_button_clicked)
+                    self.setCellWidget(row, col + 1, edit_button)
+                    # # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 2, delete_button)
+
+    # 编辑按钮
+    def edit_button_clicked(self, edit_button):
+        current_row, _ = self.get_widget_index(edit_button)
+        message_id = self.item(current_row, 0).id
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'info/trade-policy/' + str(message_id) + '/?mc=' + settings.app_dawn.value('machine'),
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.network_result.emit(response['message'])
+            # 弹窗设置
+            edit_popup = EditTradePolicy(sms_data=response['data'], parent=self)
+            if not edit_popup.exec_():
+                edit_popup.deleteLater()
+                del edit_popup
+
+    # 删除按钮
+    def delete_button_clicked(self, delete_button):
+        current_row, _ = self.get_widget_index(delete_button)
+        message_id = self.item(current_row, 0).id
+        try:
+            r = requests.delete(
+                url=settings.SERVER_ADDR + 'info/trade-policy/' + str(message_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.removeRow(current_row)
+            self.network_result.emit(response['message'])
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+# 策略服务-交易策略维护主页
+class TradePolicyMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(TradePolicyMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        combo_message_layout = QHBoxLayout()
+        self.date_combo = QComboBox(activated=self.getCurrentPolicy)
+        combo_message_layout.addWidget(self.date_combo, alignment=Qt.AlignLeft)
+        self.network_message_label = QLabel()
+        combo_message_layout.addWidget(self.network_message_label)
+        combo_message_layout.addWidget(QPushButton('新增', clicked=self.create_new_policy), alignment=Qt.AlignRight)
+        layout.addLayout(combo_message_layout)
+        # 展示短信通的表格
+        self.policy_table = TradePolicyTable()
+        layout.addWidget(self.policy_table)
+        self.setLayout(layout)
+        self._addCombo()
+
+    # 添加时间选择
+    def _addCombo(self):
+        for date_item in [
+            {'name': '今日', 'days': 0},
+            {'name': '最近3天', 'days': -3},
+            {'name': '最近7天', 'days': -7},
+            {'name': '全部', 'days': 'all'},
+        ]:
+            self.date_combo.addItem(date_item['name'], date_item['days'])
+
+    # 获取当前短信通信息
+    def getCurrentPolicy(self):
+        current_data = self.date_combo.currentData()
+        current_date = QDate.currentDate()
+        if current_data != 'all':
+            min_date = current_date.addDays(current_data)
+            url = settings.SERVER_ADDR + 'info/trade-policy/?mc='+settings.app_dawn.value('machine')+'&min_date=' + min_date.toString('yyyy-MM-dd')
+        else:
+            url = settings.SERVER_ADDR + 'info/trade-policy/?mc=' + settings.app_dawn.value('machine')
+        try:
+            r = requests.get(url=url)
+            response = json.loads(r.content.decode('utf-8'))
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.policy_table.showRowContents(response['data'])
+
+    # 新增一条交易策略
+    def create_new_policy(self):
+        popup = CreateNewTradePolicyPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+"""" 顾问服务-制度考核 """
+
+
+# 制度考核管理
+class InstExamineMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(InstExamineMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        layout.addWidget(QPushButton('修改', clicked=self.modify_file), alignment=Qt.AlignRight)
+        # 显示服务端pdf文件
+        content_show = PDFContentShower(file=settings.STATIC_PREFIX + 'info/instExamine/产品服务_制度考核.pdf', parent=self)
+        layout.addWidget(content_show)
+        self.setLayout(layout)
+
+    # 修改部门组建显示的文件
+    def modify_file(self):
+        popup = ModifyInstExaminePopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 顾问服务-部门组建 """
+
+
+# 部门组建管理
+class DeptBuildMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(DeptBuildMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        layout.addWidget(QPushButton('修改', clicked=self.modify_file), alignment=Qt.AlignRight)
+        # 显示服务端pdf文件
+        content_show = PDFContentShower(file=settings.STATIC_PREFIX + 'info/deptBuild/产品服务_部门组建.pdf', parent=self)
+        layout.addWidget(content_show)
+        self.setLayout(layout)
+
+    # 修改部门组建显示的文件
+    def modify_file(self):
+        popup = ModifyDeptBuildPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 顾问服务-人才培养 """
+
+
+# 人才培养数据管理主页
+class PersonnelTrainMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(PersonnelTrainMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        layout.addWidget(QPushButton('修改', clicked=self.modify_file), alignment=Qt.AlignRight)
+        # 显示服务端pdf文件
+        content_show = PDFContentShower(file=settings.STATIC_PREFIX + 'info/personTra/产品服务_人才培养.pdf', parent=self)
+        layout.addWidget(content_show)
+        self.setLayout(layout)
+
+    # 修改人才培养显示的文件
+    def modify_file(self):
+        popup = ModifyPersonnelTrainPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+""" 专题研究相关 """
+
+
+# 显示专题研究表格
+class TopicSearchMaintainTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '文件名称'),
+        ('update_time', '日期'),
+        ('creator', '创建者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(TopicSearchMaintainTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                #     check_button = TableCheckBox(checked=content_item[header[0]])
+                #     check_button.check_activated.connect(self.checked_button_changed)
+                #     self.setCellWidget(row, col, check_button)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【查看】按钮
+                    read_button = TableRowReadButton('查看')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+                    # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 2, delete_button)
+
+    # 查看一个专题研究
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + file
+        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 删除一个专题研究
+    def delete_button_clicked(self, delete_button):
+        current_row, _ = self.get_widget_index(delete_button)
+        file_id = self.item(current_row, 0).id
+        try:
+            r = requests.delete(
+                url=settings.SERVER_ADDR + 'info/topic-search/' + str(file_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.removeRow(current_row)
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+class TopicSearchMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(TopicSearchMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        message_button_layout = QHBoxLayout()
+        self.paginator = Paginator()
+        self.paginator.clicked.connect(self.getFileContents)
+        message_button_layout.addWidget(self.paginator)
+        message_button_layout.addStretch()
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_topic_file), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 显示的表格
+        self.table = TopicSearchMaintainTable()
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+    # 获取内容
+    def getFileContents(self):
+        current_page = self.paginator.current_page
+        try:
+            url = settings.SERVER_ADDR + 'info/topic-search/?page=' + str(
+                current_page) + '&mc=' + settings.app_dawn.value('machine')
+
+            r = requests.get(url=url)
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.paginator.setTotalPages(response['data']['total_page'])
+            self.table.showRowContents(response['data']['contacts'])
+            self.network_message_label.setText(response['message'])
+
+    # 上传调研报告文件
+    def create_topic_file(self):
+        popup = CreateNewTopicSearchPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+
+
+""" 调研报告相关 """
+
+
+# 显示调研报告表格
+class SearchReportMaintainTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '文件名称'),
+        ('update_time', '日期'),
+        ('creator', '创建者'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(SearchReportMaintainTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def showRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, content_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = content_item[header[0]]
+                    table_item.file = content_item['file']
+                else:
+                    table_item = QTableWidgetItem(str(content_item[header[0]]))
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
+                #     check_button = TableCheckBox(checked=content_item[header[0]])
+                #     check_button.check_activated.connect(self.checked_button_changed)
+                #     self.setCellWidget(row, col, check_button)
+                if col == len(self.KEY_LABELS) - 1:
+                    # 增加【查看】按钮
+                    read_button = TableRowReadButton('查看')
+                    read_button.button_clicked.connect(self.read_button_clicked)
+                    self.setCellWidget(row, col + 1, read_button)
+                    # 增加【删除】按钮
+                    delete_button = TableRowDeleteButton('删除')
+                    delete_button.button_clicked.connect(self.delete_button_clicked)
+                    self.setCellWidget(row, col + 2, delete_button)
+
+    # 查看一个调研报告
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        file = self.item(current_row, 0).file
+        # 显示文件
+        file = settings.STATIC_PREFIX + file
+        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 删除一个调研报告
+    def delete_button_clicked(self, delete_button):
+        current_row, _ = self.get_widget_index(delete_button)
+        file_id = self.item(current_row, 0).id
+        try:
+            r = requests.delete(
+                url=settings.SERVER_ADDR + 'info/search-report/' + str(file_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.removeRow(current_row)
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+class SearchReportMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(SearchReportMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        message_button_layout = QHBoxLayout()
+        self.paginator = Paginator()
+        self.paginator.clicked.connect(self.getFileContents)
+        message_button_layout.addWidget(self.paginator)
+        message_button_layout.addStretch()
+        self.network_message_label = QLabel()
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_report_file), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 显示的表格
+        self.table = SearchReportMaintainTable()
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+
+    # 获取内容
+    def getFileContents(self):
+        current_page = self.paginator.current_page
+        try:
+            url = settings.SERVER_ADDR + 'info/search-report/?page=' + str(
+                current_page) + '&mc=' + settings.app_dawn.value('machine')
+
+            r = requests.get(url=url)
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            self.paginator.setTotalPages(response['data']['total_page'])
+            self.table.showRowContents(response['data']['contacts'])
+            self.network_message_label.setText(response['message'])
+
+    # 上传调研报告文件
+    def create_report_file(self):
+        popup = CreateNewSearchReportPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
 
 
 """ 市场分析相关 """
@@ -208,14 +948,10 @@ class SMSTable(QTableWidget):
         else:
             self.network_result.emit(response['message'])
             # 弹窗设置
-            try:
-                from popup.infoServiceCollector import EditSMSLink
-                edit_popup = EditSMSLink(sms_data=response['data'], parent=self)
-                if not edit_popup.exec_():
-                    edit_popup.deleteLater()
-                    del edit_popup
-            except Exception as e:
-                print(e)
+            edit_popup = EditSMSLink(sms_data=response['data'], parent=self)
+            if not edit_popup.exec_():
+                edit_popup.deleteLater()
+                del edit_popup
 
 
     # 删除按钮
@@ -288,10 +1024,8 @@ class MessageServiceMaintain(QWidget):
             print(response)
             self.sms_table.showRowContents(response['data'])
 
-
     # 新增一条短信通
     def create_new_sms(self):
-        from popup.infoServiceCollector import CreateNewSMSLink
         popup = CreateNewSMSLink(parent=self)
         if not popup.exec_():
             popup.deleteLater()
@@ -384,10 +1118,29 @@ class InfoServicePageCollector(QWidget):
         elif service_id == 2:  # 市场分析
             page = MarketAnalysisMaintain()
             page.getFileContents()
+        elif service_id == 3:  # 专题研究
+            page = TopicSearchMaintain()
+            page.getFileContents()
+        elif service_id == 4:  # 调研报告
+            page = SearchReportMaintain()
+            page.getFileContents()
+        elif service_id == 6:  # 人才培养
+            page = PersonnelTrainMaintain()
+        elif service_id == 7:  # 部门组建
+            page = DeptBuildMaintain()
+        elif service_id == 8:  # 制度考核
+            page = InstExamineMaintain()
+        elif service_id == 9:  # 交易策略
+            page = TradePolicyMaintain()
+        elif service_id == 10:  # 投资方案
+            page = InvestPlanMaintain()
+            page.getFileContents()
+        elif service_id == 11:  # 套保方案
+            page = HedgePlanMaintain()
+            page.getFileContents()
         else:
             page = QLabel('【' + text + '】还不能进行数据管理...',
                           styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)
-
         self.right_frame.clear()
         self.right_frame.addWidget(page)
 
