@@ -219,7 +219,16 @@ class CreateNewTrendTablePopup(QDialog):
         tbname = re.sub(r'\s+', '', file_name)
         self.tnedit.setText(tbname)
         # 读取文件内容预览
-        self._show_file_data(file_path)
+        try:
+            self._show_file_data(file_path)
+        except Exception as e:
+            popup = InformationPopup(parent=self, message='文件中第%s行中第一列数据格式错误!' % e)
+            self.review_table.clear()
+            self.review_table.setRowCount(0)
+            self.review_table.setColumnCount(0)
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
 
     # 读取文件内容填入预览表格
     def _show_file_data(self, file_path):
@@ -243,16 +252,26 @@ class CreateNewTrendTablePopup(QDialog):
             for col in range(ncols):
                 ctype = sheet1.cell(row, col).ctype
                 cell = sheet1.cell_value(row, col)
+                # 第一列限制为可转为时间类型的数据
+                try:
+                    if col == 0:
+                        date = datetime.datetime(*xldate_as_tuple(cell, 0))
+                        cell = date.strftime(date_type)
+                        # 填入预览表格cell就是每个数据
+                        item = QTableWidgetItem(str(cell))
+                        item.date = date
+                except Exception:
+                    raise ValueError(row + 1)
                 if ctype == 2 and cell % 1 == 0:  # 如果是整形
                     cell = int(cell)
                     item = QTableWidgetItem(str(cell))
-                elif ctype == 3:
-                    # 转成datetime对象
-                    date = datetime.datetime(*xldate_as_tuple(cell, 0))
-                    cell = date.strftime(date_type)
-                    # 填入预览表格cell就是每个数据
-                    item = QTableWidgetItem(str(cell))
-                    item.date = date
+                # elif ctype == 3:
+                #     # 转成datetime对象
+                #     date = datetime.datetime(*xldate_as_tuple(cell, 0))
+                #     cell = date.strftime(date_type)
+                #     # 填入预览表格cell就是每个数据
+                #     item = QTableWidgetItem(str(cell))
+                #     item.date = date
                 else:
                     item = QTableWidgetItem(str(cell))
                 item.setTextAlignment(Qt.AlignCenter)

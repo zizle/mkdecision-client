@@ -113,7 +113,6 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
     chart.legend().setAlignment(Qt.AlignBottom)
     return chart
 
-
 # 画堆叠柱状图
 def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
     """

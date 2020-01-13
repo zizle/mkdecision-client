@@ -87,7 +87,7 @@ class CollectorBlockIcon(QWidget):
 class DetailCollector(QWidget):
     def __init__(self, *args, **kwargs):
         super(DetailCollector, self).__init__(*args, **kwargs)
-        # 详细页面布
+        # 详细页布局
         layout = QVBoxLayout(margin=2, spacing=2)
         message_button_layout = QHBoxLayout(margin=0)
         font = QFont()
