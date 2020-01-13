@@ -422,13 +422,13 @@ class LoadedPage(QStackedWidget):
         self.setMouseTracking(True)
         self.setObjectName('pageContainer')
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
-        extra_style = "#pageContainer{background-color: rgb(230, 235, 230)}"
-        # 设置滚动条样式(全局设置滚动条样式)
-        with open("media/ScrollBar.qss", "rb") as fp:
-            content = fp.read()
-            encoding = chardet.detect(content) or {}
-            content = content.decode(encoding.get("encoding") or "utf-8")
-        self.setStyleSheet(content + extra_style)
+        # extra_style = "#pageContainer{background-color: rgb(230, 235, 230)}"
+        # # 设置滚动条样式(全局设置滚动条样式)
+        # with open("media/ScrollBar.qss", "rb") as fp:
+        #     content = fp.read()
+        #     encoding = chardet.detect(content) or {}
+        #     content = content.decode(encoding.get("encoding") or "utf-8")
+        # self.setStyleSheet(content + extra_style)
 
 
     # 鼠标移动事件
