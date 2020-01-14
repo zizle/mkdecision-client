@@ -149,6 +149,7 @@ class ChartsFrameView(QScrollArea):
         # 数据画图，将图和数据展示在相应的控件中
         chart, table_df = self.data_to_chart(chart_data, tick_count=40)
         self.chart_detail.chart_view.setChart(chart)
+        self.chart_detail.chart_view.setDateCategoryXaxis(chart.date_xaxis_category)  # 根据x轴是否是时间轴设置鼠标动作
         self.chart_detail.chart_view.installMouseHoverEvent()
         # 数据入表
         header_data = chart_data['header_data'][1:]
@@ -168,7 +169,6 @@ class ChartsFrameView(QScrollArea):
                 self.chart_detail.table_view.setItem(row, col, item)
                 self.chart_detail.table_view.setRowHeight(row, 23)  # 行高
         self.chart_detail.show()
-
 
     # 删除掉详情页
     def delete_chart_detail(self):

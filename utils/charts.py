@@ -37,7 +37,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         # 取数据画图
         for y_col in y_left:
             if is_datetime64_any_dtype(table_df[y_col]):  # 如果y轴数据是时间类型
-                print('y轴数据有时间类型， 未实现-跳过')
+                # print('y轴数据有时间类型， 未实现-跳过')
                 continue
             table_df[y_col] = table_df[y_col].apply(covert_float)  # y轴列转为浮点数值
             line_data = table_df.iloc[:, [x_bottom, y_col]]  # 取得图线的源数据
@@ -56,6 +56,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         font = QFont()
         font.setPointSize(7)
         axis_X.setLabelsFont(font)
+        axis_X.setGridLineVisible(False)
         # 设置Y轴
         axix_Y = QValueAxis()
         axix_Y.setLabelsFont(font)
@@ -66,6 +67,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         axix_Y.setRange(min_y, max_y)
         axix_Y.setLabelFormat('%i')
         chart.setAxisY(axix_Y, series)
+        chart.date_xaxis_category = True
     else:  # 非时间轴数据作图
         # 转化x轴数据转为字符串
         table_df[x_bottom] = table_df[x_bottom].apply(lambda x: str(x))
@@ -110,6 +112,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         axix_Y.setRange(min_y, max_y)
         axix_Y.setLabelFormat('%i')
         chart.setAxisY(axix_Y, series)
+        chart.date_xaxis_category = False
     chart.legend().setAlignment(Qt.AlignBottom)
     return chart
 

@@ -36,7 +36,6 @@ class ToolTipItem(QWidget):
 
     def setText(self, text):
         self.textLabel.setText(text)
-        print('改变显示', text)
 
 
 class ToolTipWidget(QWidget):
@@ -55,7 +54,6 @@ class ToolTipWidget(QWidget):
         self.titleLabel.setText(title)
         for serie, point in points:
             if serie not in self.Cache:
-                print('不在')
                 item = ToolTipItem(
                     serie.color(),
                     (serie.name() or "-") + ":" + str(point.y()), self)
@@ -95,19 +93,28 @@ class DetailChartView(QChartView):
         self.setRenderHint(QPainter.Antialiasing)
         self.setMaximumHeight(320)
         self.c_chart = None  # customer chart
+        self.date_category_xaxis = False
+
+    def setDateCategoryXaxis(self, flag):
+        if flag:
+            self.date_category_xaxis = True
+        else:
+            self.date_category_xaxis = False
 
     def installMouseHoverEvent(self):
         for series in self.chart().series():
             series.hovered.connect(self.series_hovered)  # 鼠标悬停信号连接
-        # 线条对象
-        self.line_item = QGraphicsLineItem(self.c_chart)
-        # # 提示块
-        self.tips_tool = GraphicsProxyWidget(self.c_chart)
+        if self.date_category_xaxis:
+            # 线条对象
+            self.line_item = QGraphicsLineItem(self.c_chart)
+            # # 提示块
+            self.tips_tool = GraphicsProxyWidget(self.c_chart)
 
-        axis_X = self.c_chart.axisX()
-        axis_Y = self.c_chart.axisY()
-        self.min_x, self.max_x = axis_X.min().toMSecsSinceEpoch(), axis_X.max().toMSecsSinceEpoch()
-        self.min_y, self.max_y = axis_Y.min(), axis_Y.max()
+            axis_X = self.c_chart.axisX()
+            axis_Y = self.c_chart.axisY()
+            self.min_x, self.max_x = axis_X.min().toMSecsSinceEpoch(), axis_X.max().toMSecsSinceEpoch()
+            self.min_y, self.max_y = axis_Y.min(), axis_Y.max()
+
 
     def series_hovered(self, point, state):
         # 鼠标悬停信号槽函数：state表示鼠标是否在线上(布尔值)
@@ -124,104 +131,49 @@ class DetailChartView(QChartView):
 
     def mouseMoveEvent(self, event):
         super(DetailChartView, self).mouseMoveEvent(event)  # 原先的hover事件
-        pos = event.pos()
-        # 鼠标位置转为坐标点
-        x = self.c_chart.mapToValue(pos).x()
-        y = self.c_chart.mapToValue(pos).y()
-        # start_time = QDateTime.fromMSecsSinceEpoch(self.min_x).toTime_t()
-        # current_time = QDateTime.fromMSecsSinceEpoch(x).toTime_t()
-        # days = (current_time - start_time) / (86400) + ((current_time - start_time) % (86400) + (86400 - 1)) / (86400) - 1
-        # index = round(days / self.step_x)
-        # print(days, index)
-        points = list()
-        for series in self.c_chart.series():
-            series_points = list()
+        if self.date_category_xaxis:
+            pos = event.pos()
+            # 鼠标位置转为坐标点
+            x, y = self.c_chart.mapToValue(pos).x(), self.c_chart.mapToValue(pos).y()
             if self.min_x <= x <= self.max_x and self.min_y <= y <= self.max_y:
-                for i in range(series.count()):
-                    series_points.append((series, series.at(i)))
-            points += series_points
-        # points = [(series, series.at(i)) for i in range(series.count()) for series in self.c_chart.series()
-        #           if self.min_x <= x <= self.max_x and self.min_y <= y <= self.max_y
-        #           ]
-        # points  是当前鼠标位置所有可用的点
-
-        if points:
-            pos_x = self.c_chart.mapToPosition(QPointF(x, self.min_y))  # 算出当前鼠标所在的x位置
-            # 自定义指示线
-            self.line_item.setLine(pos_x.x(), self.point_top.y(),
-                                   pos_x.x(), self.point_bottom.y())
-            self.line_item.show()
-            try:
-                title = QDateTime.fromMSecsSinceEpoch(x).toString("yyyy-MM-dd")
-            except Exception:
-                title = ''
-            tips_width = self.tips_tool.width()
-            tips_height = self.tips_tool.height()
-            # 如果鼠标位置离右侧的距离小于tip宽度
-            x = pos.x() - tips_width if self.width() - \
-                                        pos.x() - 20 < tips_width else pos.x()
-            # 如果鼠标位置离底部的高度小于tip高度
-            y = pos.y() - tips_height if self.height() - \
-                                         pos.y() - 20 < tips_height else pos.y()
-            print(title, points, QPoint(x, y))
-            self.tips_tool.show(
-                title, points, QPoint(x, y))
-
-        else:
-            self.tips_tool.hide()
-            self.line_item.hide()
-        return
-        # print(self.chart.axisX().tickCount(), self.min_x, self.max_x)
-        # step_x = (self.max_x - self.min_x) / (self.chart.axisX().tickCount() - 1)
-        index = round((x - self.min_x) / self.step_x)
-        # 坐标系中的所有正常显示的series的类型和点
-        points = [(serie, serie.at(index))
-                  for serie in self.c_chart.series()
-                  if self.min_x <= x <= self.max_x and
-                  self.min_y <= y <= self.max_y]
-        # point_top = self.chart.mapToPosition(QPointF(self.min_x, self.max_y))  # y轴最高点
-        # point_bottom = self.chart.mapToPosition(QPointF(self.min_x, self.min_y))
-        if points:
-            pos_x = self.c_chart.mapToPosition(QPointF(index * self.step_x + self.min_x, self.min_y))  # 算出当前鼠标所在的x位置
-            # 自定义指示线
-            self.line_item.setLine(pos_x.x(), self.point_top.y(),
-                                   pos_x.x(), self.point_bottom.y())
-            self.line_item.show()
-            try:
-                title = self.x_category[index]
-            except Exception:
-                title = ''
-            tips_width = self.tips_tool.width()
-            tips_height = self.tips_tool.height()
-            # 如果鼠标位置离右侧的距离小于tip宽度
-            x = pos.x() - tips_width if self.width() - \
-                                        pos.x() - 20 < tips_width else pos.x()
-            # 如果鼠标位置离底部的高度小于tip高度
-            y = pos.y() - tips_height if self.height() - \
-                                         pos.y() - 20 < tips_height else pos.y()
-            # print(title, points, QPoint(x, y))
-            self.tips_tool.show(
-                title, points, QPoint(x, y))
-
-        else:
-            self.tips_tool.hide()
-            self.line_item.hide()
+                points = []
+                for series in self.c_chart.series():
+                    for point in series.pointsVector():
+                        if QDateTime.fromMSecsSinceEpoch(point.x()).date() == QDateTime.fromMSecsSinceEpoch(x).date():
+                            points.append((series, point))
+                            break
+                if points:
+                    pos_x = self.c_chart.mapToPosition(QPointF(x, self.min_y))  # 算出当前鼠标所在的x位置
+                    # 自定义指示线
+                    self.line_item.setLine(pos_x.x(), self.point_top.y(),
+                                           pos_x.x(), self.point_bottom.y())
+                    self.line_item.show()
+                    try:
+                        title = QDateTime.fromMSecsSinceEpoch(x).toString("yyyy-MM-dd")
+                    except Exception:
+                        title = ''
+                    tips_width = self.tips_tool.width()
+                    tips_height = self.tips_tool.height()
+                    # 如果鼠标位置离右侧的距离小于tip宽度
+                    x = pos.x() - tips_width if self.width() - \
+                                                pos.x() - 20 < tips_width else pos.x()
+                    # 如果鼠标位置离底部的高度小于tip高度
+                    y = pos.y() - tips_height if self.height() - \
+                                                 pos.y() - 20 < tips_height else pos.y()
+                    # print(title, points, QPoint(x, y))
+                    self.tips_tool.show(
+                        title, points, QPoint(x, y))
+            else:
+                self.tips_tool.hide()
+                self.line_item.hide()
 
     def resizeEvent(self, event):
         super(DetailChartView, self).resizeEvent(event)
-        # 当窗口大小改变时需要重新计算
-        # 坐标系中左上角顶点
-        self.point_top = self.c_chart.mapToPosition(
-            QPointF(self.min_x, self.max_y))
-        # 坐标原点坐标
-        self.point_bottom = self.c_chart.mapToPosition(
-            QPointF(self.min_x, self.min_y))
-        start_time = QDateTime.fromMSecsSinceEpoch(self.min_x).toTime_t()
-        end_time = QDateTime.fromMSecsSinceEpoch(self.max_x).toTime_t()
-        days = (end_time - start_time) / (86400) + ((end_time - start_time) % (86400) + (86400 - 1)) / (86400) - 1
-        print(days)
-        self.step_x = days / 1
-
-
-
-
+        if self.date_category_xaxis:
+            # 当窗口大小改变时需要重新计算
+            # 坐标系中左上角顶点
+            self.point_top = self.c_chart.mapToPosition(
+                QPointF(self.min_x, self.max_y))
+            # 坐标原点坐标
+            self.point_bottom = self.c_chart.mapToPosition(
+                QPointF(self.min_x, self.min_y))
