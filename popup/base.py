@@ -203,9 +203,10 @@ class ImageCodeLabel(QLabel):
         try:
             r = requests.get(url=settings.SERVER_ADDR + 'image_code/' + image_uuid + '/')
             response_img = r.content
-            if r.status_code != 200:
-                raise ValueError('get screeen image error.')
-        except Exception:
+            # if r.status_code != 200:
+            #     raise ValueError('get image code error.')
+        except Exception as e:
+            print(e)
             pass
         else:
             # 保存uuid

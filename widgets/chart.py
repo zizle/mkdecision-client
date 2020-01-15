@@ -101,9 +101,9 @@ class DetailChartView(QChartView):
         else:
             self.date_category_xaxis = False
 
-    def installMouseHoverEvent(self):
+    def linesInstallHoverEvent(self):
         for series in self.chart().series():
-            series.hovered.connect(self.series_hovered)  # 鼠标悬停信号连接
+            series.hovered.connect(self.lines_hovered)  # 鼠标悬停信号连接
         if self.date_category_xaxis:
             # 线条对象
             self.line_item = QGraphicsLineItem(self.c_chart)
@@ -116,7 +116,7 @@ class DetailChartView(QChartView):
             self.min_y, self.max_y = axis_Y.min(), axis_Y.max()
 
 
-    def series_hovered(self, point, state):
+    def lines_hovered(self, point, state):
         # 鼠标悬停信号槽函数：state表示鼠标是否在线上(布尔值)
         series = self.sender()  # 获取获得鼠标信号的那条线
         pen = series.pen()
@@ -124,6 +124,24 @@ class DetailChartView(QChartView):
             return
         pen.setWidth(pen.width() + (1 if state else -1))
         series.setPen(pen)
+
+    def barsInstallHoverEvent(self):
+        for series in self.chart().series():
+            # print(series, type(series))
+            for bar in series.barSets():
+                bar.hovered.connect(self.bars_hovered)  # 鼠标悬停信号连接
+
+    def bars_hovered(self, status, index):
+        # status 是否在柱子上
+        # index 第几组柱形图
+        bar = self.sender()
+        pen = bar.pen()
+        if not pen:
+            return
+        pen.setWidth(pen.width() + (1 if status else -1))
+        bar.setPen(pen)
+
+
 
     def setChart(self, chart):
         super(DetailChartView, self).setChart(chart)

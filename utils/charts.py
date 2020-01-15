@@ -135,6 +135,8 @@ def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
     chart.x_labels = list()  # 绑定chart一个x轴的刻度列表
     # 根据x轴的列，进行大小排序
     x_bottom = x_bottom[0]
+    # if is_datetime64_any_dtype(table_df[x_bottom]):  # 如果x轴是时间轴
+    chart.date_xaxis_category = False
     # 进行数据画图
     table_df[0] = table_df[0].apply(lambda x: x.strftime('%Y-%m-%d'))  # 将0列转为时间字符串
     series = QBarSeries()
