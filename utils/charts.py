@@ -103,6 +103,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         font.setPointSize(7)
         axis_X.setLabelsFont(font)
         axis_X.setLabelsAngle(-90)
+        axis_X.setGridLineVisible(False)
         chart.setAxisX(axis_X, series)
         # 设置Y轴
         axix_Y = QValueAxis()
@@ -115,6 +116,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         chart.date_xaxis_category = False
     chart.legend().setAlignment(Qt.AlignBottom)
     return chart
+
 
 # 画堆叠柱状图
 def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
@@ -163,14 +165,18 @@ def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
     step_x = int((x_max - x_min) / (tick_count - 1))  # 根据步长设置x轴
     if step_x != 0:
         for i in range(x_min, x_max, step_x):
-            axis_X.append(chart.x_labels[i], i + 1)
+            print(i)
+            axis_X.append(chart.x_labels[i - 1], i - 1)
+        axis_X.append(chart.x_labels[-1], x_max - 1)
     else:
         for i in range(x_min, x_max):
-            axis_X.append(chart.x_labels[i], i + 1)
+            axis_X.append(chart.x_labels[i - 1], i - 1)
+        axis_X.append(chart.x_labels[-1], x_max - 1)
     font = QFont()
     font.setPointSize(7)
     axis_X.setLabelsFont(font)
     axis_X.setLabelsAngle(-90)
+    axis_X.setGridLineVisible(False)
     chart.setAxisX(axis_X, series)
     # 设置Y轴
     axix_Y = QValueAxis()
