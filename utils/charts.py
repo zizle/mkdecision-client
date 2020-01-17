@@ -1,6 +1,5 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
-import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype
 from PyQt5.QtChart import QChart, QLineSeries, QDateTimeAxis, QCategoryAxis, QValueAxis, QBarSeries, QBarSet
 from PyQt5.QtCore import Qt, QDateTime, QMargins
@@ -11,6 +10,15 @@ from PyQt5.QtGui import QFont
 def covert_float(str_value):
     str_value = str_value.replace(",", "").replace("-", "")
     return float(str_value) if str_value else 0.0
+
+
+# 计算数据个数，超出隔行读取
+def filter_data(table_df):
+    if table_df.shape[0] <= 600:
+        return table_df
+    row = [i for i in range(0, table_df.shape[0], 2)]
+    table_df = table_df.iloc[row, :]
+    return filter_data(table_df)
 
 
 # 画堆叠折线图
@@ -37,7 +45,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         # 取数据画图
         for y_col in y_left:
             if is_datetime64_any_dtype(table_df[y_col]):  # 如果y轴数据是时间类型
-                print('y轴数据有时间类型， 未实现-跳过')
+                # print('y轴数据有时间类型， 未实现-跳过')
                 continue
             table_df[y_col] = table_df[y_col].apply(covert_float)  # y轴列转为浮点数值
             line_data = table_df.iloc[:, [x_bottom, y_col]]  # 取得图线的源数据
@@ -56,6 +64,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         font = QFont()
         font.setPointSize(7)
         axis_X.setLabelsFont(font)
+        axis_X.setGridLineVisible(False)
         # 设置Y轴
         axix_Y = QValueAxis()
         axix_Y.setLabelsFont(font)
@@ -66,6 +75,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         axix_Y.setRange(min_y, max_y)
         axix_Y.setLabelFormat('%i')
         chart.setAxisY(axix_Y, series)
+        chart.date_xaxis_category = True
     else:  # 非时间轴数据作图
         # 转化x轴数据转为字符串
         table_df[x_bottom] = table_df[x_bottom].apply(lambda x: str(x))
@@ -101,6 +111,7 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         font.setPointSize(7)
         axis_X.setLabelsFont(font)
         axis_X.setLabelsAngle(-90)
+        axis_X.setGridLineVisible(False)
         chart.setAxisX(axis_X, series)
         # 设置Y轴
         axix_Y = QValueAxis()
@@ -110,8 +121,10 @@ def draw_lines_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
         axix_Y.setRange(min_y, max_y)
         axix_Y.setLabelFormat('%i')
         chart.setAxisY(axix_Y, series)
+        chart.date_xaxis_category = False
     chart.legend().setAlignment(Qt.AlignBottom)
     return chart
+
 
 # 画堆叠柱状图
 def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
@@ -132,6 +145,10 @@ def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
     chart.x_labels = list()  # 绑定chart一个x轴的刻度列表
     # 根据x轴的列，进行大小排序
     x_bottom = x_bottom[0]
+    # if is_datetime64_any_dtype(table_df[x_bottom]):  # 如果x轴是时间轴
+    chart.date_xaxis_category = False
+    # 过滤数据个数
+    table_df = filter_data(table_df)
     # 进行数据画图
     table_df[0] = table_df[0].apply(lambda x: x.strftime('%Y-%m-%d'))  # 将0列转为时间字符串
     series = QBarSeries()
@@ -158,14 +175,18 @@ def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
     step_x = int((x_max - x_min) / (tick_count - 1))  # 根据步长设置x轴
     if step_x != 0:
         for i in range(x_min, x_max, step_x):
-            axis_X.append(chart.x_labels[i], i + 1)
+            print(i)
+            axis_X.append(chart.x_labels[i - 1], i - 1)
+        axis_X.append(chart.x_labels[-1], x_max - 1)
     else:
         for i in range(x_min, x_max):
-            axis_X.append(chart.x_labels[i], i + 1)
+            axis_X.append(chart.x_labels[i - 1], i - 1)
+        axis_X.append(chart.x_labels[-1], x_max - 1)
     font = QFont()
     font.setPointSize(7)
     axis_X.setLabelsFont(font)
     axis_X.setLabelsAngle(-90)
+    axis_X.setGridLineVisible(False)
     chart.setAxisX(axis_X, series)
     # 设置Y轴
     axix_Y = QValueAxis()

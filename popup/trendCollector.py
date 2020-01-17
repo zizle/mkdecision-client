@@ -118,7 +118,7 @@ class CreateNewTrendTablePopup(QDialog):
         ]
         for t in date_type:
             self.date_type.addItem(t['name'], t['fmt'])
-        self.date_type.setCurrentIndex(self.date_type.count() - 1)
+        self.date_type.setCurrentIndex(2)
 
     # 该变时间类型
     def change_date_type(self, t):
@@ -725,6 +725,11 @@ class SetChartDetailPopup(QDialog):
         self.review_chart = QChartView()
         self.review_chart.setRenderHint(QPainter.Antialiasing)
         review_layout.addWidget(self.review_chart)
+        # # 图例显示区
+        # self.legend_view = QWidget(parent=self.review_widget)
+        # legend_layout = QGridLayout()
+        # self.legend_view.setLayout(legend_layout)
+        # review_layout.addWidget(self.legend_view)
         # 确认设置
         commit_layout = QHBoxLayout()
         commit_layout.addStretch()
@@ -841,6 +846,24 @@ class SetChartDetailPopup(QDialog):
             if chart_category == u'折线图':  # 折线图
                 chart = draw_lines_stacked(name=chart_name, table_df=final_df, x_bottom=x_axis_col, y_left=left_y_cols,
                                            legends=header_data, tick_count=12)
+                # 设置图例
+                # chart.legend().hide()
+                # markers = chart.legend().markers()
+                # print(markers)
+                # row_index = 0
+                # col_index = 0
+                # for marker in chart.legend().markers():
+                #     print(marker.series().name())
+                #     # from PyQt5.QtChart import QLineSeries
+                #     # QLineSeries.name()
+                #     # 每条线设置一个label
+                #     legend_label = QLabel(marker.series().name())
+                #     self.legend_view.layout().addWidget(legend_label, row_index, col_index)
+                #     col_index += 1
+                #     if col_index >= 3:
+                #         row_index += 1
+                #         col_index = 0
+
             elif chart_category == u'柱形图':
                 chart = draw_bars_stacked(name=chart_name, table_df=final_df, x_bottom=x_axis_col, y_left=left_y_cols,
                                           legends=header_data, tick_count=12)

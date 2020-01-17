@@ -111,19 +111,23 @@ class LoginPopup(QDialog):
             self.remember_psd.setChecked(remember_psd_flag)
             # 取消自动登录
             settings.app_dawn.setValue('auto', 0)
+            # 删除token
+            settings.app_dawn.remove('AUTHORIZATION')
 
     # 读取用户名填入
     def _init_account(self):
-        account = base64.b64decode(settings.app_dawn.value('user').encode('utf-8'))
-        account = json.loads(account.decode('utf-8'))
-        phone = account.get('phone', '')
-        password = account.get('password', '')
-        self.phone_edit.setText(phone)
-        self.password_edit.setText(password)
-        if password:
-            self.remember_psd.setChecked(True)
-        if settings.app_dawn.value('auto') == '1':
-            self.remember_login.setChecked(True)
+        user = settings.app_dawn.value('user')
+        if user:
+            account = base64.b64decode(user.encode('utf-8'))
+            account = json.loads(account.decode('utf-8'))
+            phone = account.get('phone', '')
+            password = account.get('password', '')
+            self.phone_edit.setText(phone)
+            self.password_edit.setText(password)
+            if password:
+                self.remember_psd.setChecked(True)
+            if settings.app_dawn.value('auto') == '1':
+                self.remember_login.setChecked(True)
 
     # 获取手机号和密码
     def get_account(self):
@@ -171,7 +175,7 @@ class LoginPopup(QDialog):
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.login_error.setText(str(e))
+            self.findChild(QLabel, 'loginError').setText(str(e))
             # 移除token
             settings.app_dawn.remove('AUTHORIZATION')
             return False
@@ -201,9 +205,10 @@ class ImageCodeLabel(QLabel):
         try:
             r = requests.get(url=settings.SERVER_ADDR + 'image_code/' + image_uuid + '/')
             response_img = r.content
-            if r.status_code != 200:
-                raise ValueError('get screeen image error.')
-        except Exception:
+            # if r.status_code != 200:
+            #     raise ValueError('get image code error.')
+        except Exception as e:
+            print(e)
             pass
         else:
             # 保存uuid
