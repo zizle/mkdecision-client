@@ -111,6 +111,8 @@ class LoginPopup(QDialog):
             self.remember_psd.setChecked(remember_psd_flag)
             # 取消自动登录
             settings.app_dawn.setValue('auto', 0)
+            # 删除token
+            settings.app_dawn.remove('AUTHORIZATION')
 
     # 读取用户名填入
     def _init_account(self):

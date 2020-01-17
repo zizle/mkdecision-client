@@ -157,6 +157,9 @@ class BaseWindow(QWidget):
             else:
                 if response['data']:
                     self.user_login_successfully(response['data'])
+        else:
+            # 删除token
+            settings.app_dawn.remove('AUTHORIZATION')
 
     # 用户登录成功(注册成功)
     def user_login_successfully(self, response_data):

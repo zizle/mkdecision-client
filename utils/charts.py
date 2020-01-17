@@ -1,6 +1,5 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
-import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype
 from PyQt5.QtChart import QChart, QLineSeries, QDateTimeAxis, QCategoryAxis, QValueAxis, QBarSeries, QBarSet
 from PyQt5.QtCore import Qt, QDateTime, QMargins
@@ -11,6 +10,15 @@ from PyQt5.QtGui import QFont
 def covert_float(str_value):
     str_value = str_value.replace(",", "").replace("-", "")
     return float(str_value) if str_value else 0.0
+
+
+# 计算数据个数，超出隔行读取
+def filter_data(table_df):
+    if table_df.shape[0] <= 600:
+        return table_df
+    row = [i for i in range(0, table_df.shape[0], 2)]
+    table_df = table_df.iloc[row, :]
+    return filter_data(table_df)
 
 
 # 画堆叠折线图
@@ -139,6 +147,8 @@ def draw_bars_stacked(name, table_df, x_bottom, y_left, legends, tick_count):
     x_bottom = x_bottom[0]
     # if is_datetime64_any_dtype(table_df[x_bottom]):  # 如果x轴是时间轴
     chart.date_xaxis_category = False
+    # 过滤数据个数
+    table_df = filter_data(table_df)
     # 进行数据画图
     table_df[0] = table_df[0].apply(lambda x: x.strftime('%Y-%m-%d'))  # 将0列转为时间字符串
     series = QBarSeries()
