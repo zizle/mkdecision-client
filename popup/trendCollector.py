@@ -693,10 +693,10 @@ class SetChartDetailPopup(QDialog):
         # Y轴
         yaxis_name_layout = QHBoxLayout()
         yaxis_name_layout.addWidget(QLabel('左轴:'))
-        self.left_y_label_edit = QLineEdit(placeholderText='据左轴名分号";"间隔')
+        self.left_y_label_edit = QLineEdit(placeholderText='请输入左轴名称')
         yaxis_name_layout.addWidget(self.left_y_label_edit)
         yaxis_name_layout.addWidget(QLabel('右轴:'))
-        self.right_y_label_edit = QLineEdit(placeholderText='据右轴名分号";"间隔')
+        self.right_y_label_edit = QLineEdit(placeholderText='请输入右轴名称')
         yaxis_name_layout.addWidget(self.right_y_label_edit)
         parameter_layout.addLayout(yaxis_name_layout)
         # 数据范围
@@ -842,10 +842,11 @@ class SetChartDetailPopup(QDialog):
             end_date = pd.to_datetime(end_date)
             df = self.table_data_frame.copy()
             final_df = df.loc[(df[0] >= start_date) & (df[0] <= end_date)].copy()  # 根据时间范围取数
+
             # 根据类型进行画图
             if chart_category == u'折线图':  # 折线图
-                chart = draw_lines_stacked(name=chart_name, table_df=final_df, x_bottom=x_axis_col, y_left=left_y_cols,
-                                           legends=header_data, tick_count=12)
+                chart = draw_lines_stacked(name=chart_name, table_df=final_df, x_bottom_cols=x_axis_col, y_left_cols=left_y_cols,
+                                           y_right_cols=right_y_cols, legend_labels=header_data, tick_count=12)
                 # 设置图例
                 # chart.legend().hide()
                 # markers = chart.legend().markers()
@@ -876,6 +877,8 @@ class SetChartDetailPopup(QDialog):
             self.review_chart.setChart(chart)
             self.has_review_chart = True
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             popup = InformationPopup(message=str(e), parent=self)
             if not popup.exec_():
                 popup.deleteLater()
@@ -949,12 +952,12 @@ class SetChartDetailPopup(QDialog):
         chart_params['y_right_label'] = y_right_labels
         chart_params['is_top'] = False
         if self.current_start.isChecked():
-            print('设置当前起始范围')
+            # print('设置当前起始范围')
             chart_params['start'] = self.scope_start_date.date().toString('yyyy-MM-dd')
         if self.current_end.isChecked():
-            print('设置当前截止')
+            # print('设置当前截止')
             chart_params['end'] = self.scope_end_date.date().toString('yyyy-MM-dd')
-        print(chart_params)
+        # print(chart_params)
         # 上传数据
         try:
             r = requests.post(
@@ -973,7 +976,7 @@ class SetChartDetailPopup(QDialog):
             info.deleteLater()
             del info
 
-    # 获取当前表的数据
+    # 获取当前表的数据（预用来设置显示图的数据）
     def getCurrentTrendTable(self):
         try:
             r = requests.get(
@@ -1007,8 +1010,7 @@ class SetChartDetailPopup(QDialog):
         table_df[0] = pd.to_datetime(table_df[0])  # 第一列转为时间类型
         table_df.sort_values(by=0, inplace=True)  # 根据时间排序数据
         # 计算数据时间跨度大小显示在范围上
-        x_axis_data = table_df.iloc[:, [0]]  # 取得第一列数据
-        min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
+        min_x, max_x = table_df[0].min(), table_df[0].max()  # 第一列时间数据(x轴)的最大值和最小值
         self.scope_start_date.setDateRange(QDate(min_x), QDate(max_x))
         self.scope_end_date.setDateRange(QDate(min_x), QDate(max_x))
         self.scope_start_date.setEnabled(True)
