@@ -178,7 +178,7 @@ class BaseWindow(QWidget):
 
     # 用户点击【注册】
     def user_to_register(self):
-        print('用户点击注册按钮')
+        # print('用户点击注册按钮')
         from popup.base import RegisterPopup
         register_popup = RegisterPopup(parent=self)
         register_popup.user_registered.connect(self.user_login_successfully)
@@ -190,7 +190,7 @@ class BaseWindow(QWidget):
     def user_to_logout(self):
         if self.navigation_bar.permit_bar.username_shown.isHidden():
             return
-        print('用户点击注销按钮生效')
+        # print('用户点击注销按钮生效')
         # 清除菜单
         self.navigation_bar.module_bar.clearActionMenu()
         # 移除token
@@ -225,7 +225,7 @@ class BaseWindow(QWidget):
         pos_x, pos_y = pos.x(), pos.y()
         print(pos_x, pos_y)
         wm, hm = self.width() - self.MARGIN, self.height() - self.MARGIN
-        print(wm, hm)
+        # print(wm, hm)
         # 窗口最大无需事件
         if self.isMaximized() or self.isFullScreen():
             self._direction = None
@@ -368,7 +368,7 @@ class BaseWindow(QWidget):
 
     # 点击模块菜单事件(接受到模块的id和模块名称)
     def module_clicked(self, module_id, module_text):
-        print(module_id, module_text)
+        # print(module_id, module_text)
         # 查询权限
         machine_code = settings.app_dawn.value('machine')
         machine_code = machine_code if machine_code else ''
@@ -386,8 +386,6 @@ class BaseWindow(QWidget):
             if not info_popup.exec_():
                 info_popup.deleteLater()
                 del info_popup
-            # 注销
-            self.user_to_logout()
             return
         else:  # 模块权限验证通过
             try:
@@ -432,7 +430,7 @@ class BaseWindow(QWidget):
                     page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
 
                 self.page_container.clear()
-                print('当前窗体个数：', self.page_container.count())
+                # print('当前窗体个数：', self.page_container.count())
                 self.page_container.addWidget(page)
                 # self.page_container.removeWidget(self.page_container.widget(0))
                 # print('当前窗体个数：', self.page_container.count())
