@@ -6,18 +6,17 @@ import xlrd
 import datetime
 import requests
 import pandas as pd
-from pandas.api.types import is_datetime64_any_dtype
 from xlrd import xldate_as_tuple
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QDialog, QTreeWidget, QWidget, QGridLayout, QLabel, QLineEdit,\
     QPushButton, QComboBox, QTableWidget, QTreeWidgetItem, QFileDialog, QHeaderView, QTableWidgetItem, QAbstractItemView, \
     QListWidget, QDateEdit, QCheckBox
-from PyQt5.QtChart import QChartView, QChart, QLineSeries, QCategoryAxis, QDateTimeAxis, QValueAxis
-from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDateTime, QDate
-from PyQt5.QtGui import QPainter, QFont, QIntValidator
+from PyQt5.QtChart import QChartView, QChart
+from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
+from PyQt5.QtGui import QPainter
 import settings
 from widgets.base import TableRowDeleteButton, TableRowReadButton
 from popup.tips import WarningPopup, InformationPopup
-from utils.charts import draw_lines_stacked, draw_bars_stacked
+from utils.charts import lines_stacked, bars_stacked
 
 
 # 新建数据表
@@ -842,11 +841,10 @@ class SetChartDetailPopup(QDialog):
             end_date = pd.to_datetime(end_date)
             df = self.table_data_frame.copy()
             final_df = df.loc[(df[0] >= start_date) & (df[0] <= end_date)].copy()  # 根据时间范围取数
-
             # 根据类型进行画图
             if chart_category == u'折线图':  # 折线图
-                chart = draw_lines_stacked(name=chart_name, table_df=final_df, x_bottom_cols=x_axis_col, y_left_cols=left_y_cols,
-                                           y_right_cols=right_y_cols, legend_labels=header_data, tick_count=12)
+                chart = lines_stacked(name=chart_name, table_df=final_df, x_bottom_cols=x_axis_col, y_left_cols=left_y_cols,
+                                      y_right_cols=right_y_cols, legend_labels=header_data, tick_count=12)
                 # 设置图例
                 # chart.legend().hide()
                 # markers = chart.legend().markers()
@@ -866,8 +864,8 @@ class SetChartDetailPopup(QDialog):
                 #         col_index = 0
 
             elif chart_category == u'柱形图':
-                chart = draw_bars_stacked(name=chart_name, table_df=final_df, x_bottom=x_axis_col, y_left=left_y_cols,
-                                          legends=header_data, tick_count=12)
+                chart = bars_stacked(name=chart_name, table_df=final_df, x_bottom_cols=x_axis_col,
+                                      y_left_cols=left_y_cols, y_right_cols=right_y_cols, legend_labels=header_data, tick_count=12)
             else:
                 popup = InformationPopup(message='当前设置不适合作图或系统暂不支持作图。', parent=self)
                 if not popup.exec_():
@@ -1184,15 +1182,17 @@ class ShowChartPopup(QDialog):
                 table_df = table_df[(table_df[0] <= end_date)]
             else:
                 pass
+            print(chart_data)
             x_bottom = (json.loads(chart_data['x_bottom']))
             y_left = json.loads(chart_data['y_left'])
+            y_right = json.loads(chart_data['y_right'])
             # 根据图表类型画图
             if chart_data['category'] == 'line':
-                chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
-                                           y_left=y_left, legends=header_data, tick_count=40)
+                chart = lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom_cols=x_bottom, y_left_cols=y_left,
+                                      y_right_cols=y_right, legend_labels=header_data, tick_count=40)
             elif chart_data['category'] == 'bar':
-                chart = draw_bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
-                                          y_left=y_left, legends=header_data, tick_count=40)
+                chart = bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom_cols=x_bottom, y_left_cols=y_left,
+                                      y_right_cols=y_right, legend_labels=header_data, tick_count=40)
             else:
                 chart = QChart()
         except Exception:
