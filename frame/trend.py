@@ -107,7 +107,9 @@ class ChartsFrameView(QScrollArea):
         row_index, col_index = 0, 0  # 记录布局的行数和列数
         for index, chart_item in enumerate(self.charts):
             chart_view = ChartView(chart_data=chart_item)
+            # print(chart_view.width())
             chart_view.setMinimumHeight(280)
+            # print(chart_view.frameGeometry().width(), chart_view.frameGeometry().height())
             chart_view.index_id = index
             chart_view.clicked.connect(self.chart_enlarge_clicked)
             self.container.layout().addWidget(chart_view, row_index, col_index)

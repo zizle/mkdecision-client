@@ -49,7 +49,6 @@ class WelcomePage(QSplashScreen):
             time.sleep(1.5)
         else:
             # 写入配置
-            print('utils.client.make_client_existed写入配置')
             settings.app_dawn.setValue('machine', response['data']['machine_code'])
 
     # 启动访问广告图片文件并保存至本地
@@ -87,7 +86,7 @@ class BaseWindow(QWidget):
         # self.mousePressed = False
         # 设置窗体的图标和名称
         self.setWindowIcon(QIcon("media/logo.png"))
-        self.setWindowTitle("瑞达期货研究院分析决策系统_管理端_0101911")
+        self.setWindowTitle("瑞达期货研究院分析决策系统管理端0102001")
         # 标题栏
         self.title_bar = TitleBar(parent=self)
         # 导航栏
@@ -223,7 +222,6 @@ class BaseWindow(QWidget):
         super(BaseWindow, self).mouseMoveEvent(event)
         pos = event.pos()
         pos_x, pos_y = pos.x(), pos.y()
-        print(pos_x, pos_y)
         wm, hm = self.width() - self.MARGIN, self.height() - self.MARGIN
         # print(wm, hm)
         # 窗口最大无需事件
@@ -233,21 +231,16 @@ class BaseWindow(QWidget):
             return
         if event.buttons() == Qt.LeftButton and self._pressed:
             self.resize_window(pos)
-            print('调整窗口大小')
-            # return
         if pos_x <= self.MARGIN and pos_y <= self.MARGIN:
             # 左上角
-            print('鼠标在左上角')
             self._direction = self.LeftTop
             self.setCursor(Qt.SizeFDiagCursor)
         elif wm <= pos_x <= self.width() and hm <= pos_y <= self.height():
             # 右下角
-            print('鼠标在右下角')
             self._direction = self.RightBottom
             self.setCursor(Qt.SizeFDiagCursor)
         elif wm <= pos_x and pos_y <= self.MARGIN:
             # 右上角
-            print('鼠标在右上角')
             self._direction = self.RightTop
             self.setCursor(Qt.SizeBDiagCursor)
         elif pos_x <= self.MARGIN and hm <= pos_y:
@@ -395,6 +388,7 @@ class BaseWindow(QWidget):
                     page.getCurrentNews()
                     page.getCurrentSliderAdvertisement()
                     page.getFoldedBoxContent()
+                    page.folded_box_clicked(category_id=1, head_text='常规报告') # 默认点击常规报告分类id=1
                 elif module_text == u'产品服务':
                     from frame.infoService import InfoServicePage
                     page = InfoServicePage(parent=self.page_container)

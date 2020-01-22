@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QC
 from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from widgets.CAvatar import CAvatar
+import settings
 
 
 __all__ = [
@@ -30,7 +31,7 @@ __all__ = [
 
 # 标题栏
 class TitleBar(QWidget):
-    HEIGHT = 35
+    HEIGHT = settings.TITLE_BAR_HEIGHT
 
     def __init__(self, *args, **kwargs):
         super(TitleBar, self).__init__(*args, **kwargs)
@@ -74,7 +75,7 @@ class TitleBar(QWidget):
         self.buttonMinimum.setFixedSize(self.HEIGHT - 5, self.HEIGHT - 5)
         self.buttonMaximum.setFixedSize(self.HEIGHT - 5, self.HEIGHT - 5)
         self.buttonClose.setFixedSize(self.HEIGHT - 5, self.HEIGHT - 5)
-        self.window_title.setText('瑞达期货研究院分析决策系统_管理端_0101911')
+        self.window_title.setText('瑞达期货研究院分析决策系统管理端0102001')
         self.setStyleSheet("""
         #titleBar{
             background-color: rgb(85,88,91);
@@ -120,9 +121,20 @@ class TitleBar(QWidget):
             # 最大化
             self.buttonMaximum.setText('2')
             self.parent().showMaximized()
+            # 修改配置中可用窗口显示区域的大小
+            self.resize_access_frame_size()
+
         else:  # 还原
             self.buttonMaximum.setText('1')
             self.parent().showNormal()
+            # 修改配置中可用窗口显示区域的大小
+            self.resize_access_frame_size()
+
+    # 调整可用显示区的大小
+    def resize_access_frame_size(self):
+        height = self.parent().height() - settings.TITLE_BAR_HEIGHT - settings.NAVIGATION_BAR_HEIGHT
+        settings.app_dawn.setValue('SCREEN_WIDTH', self.parent().width() - 6)
+        settings.app_dawn.setValue('SCREEN_HEIGHT', height)
 
     # 关闭
     def windowClosed(self):
@@ -395,11 +407,10 @@ class NavigationBar(QWidget):
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
         self.setObjectName('navigationBar')
         self.setMouseTracking(True)
+        self.setFixedHeight(settings.NAVIGATION_BAR_HEIGHT)
         self.setStyleSheet("""
         #navigationBar{
             background-color:rgb(100, 100, 100);
-            min-height: 24px;
-            max-height: 24px;
         }
         """)
 
@@ -416,20 +427,10 @@ class NavigationBar(QWidget):
 class LoadedPage(QStackedWidget):
     def __init__(self, *args, **kwargs):
         super(LoadedPage, self).__init__(*args, **kwargs)
-        # self.setDocumentMode(True)  # 去掉边框
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
-        # self.setTabBarAutoHide(True)
         self.setMouseTracking(True)
-        self.setObjectName('pageContainer')
+        # self.setObjectName('pageContainer')
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
-        # extra_style = "#pageContainer{background-color: rgb(230, 235, 230)}"
-        # # 设置滚动条样式(全局设置滚动条样式)
-        # with open("media/ScrollBar.qss", "rb") as fp:
-        #     content = fp.read()
-        #     encoding = chardet.detect(content) or {}
-        #     content = content.decode(encoding.get("encoding") or "utf-8")
-        # self.setStyleSheet(content + extra_style)
-
 
     # 鼠标移动事件
     def mouseMoveEvent(self, event, *args, **kwargs):
@@ -463,10 +464,14 @@ class FoldedBodyButton(QPushButton):
         self.setStyleSheet("""
         #button{
             border:none;
-            padding: 5px 2px
+            padding: 5px 2px;
+            margin-top:3px;
+            margin-bottom:3px;
         }
         #button:hover{
             color:rgb(200,120,200);
+            background-color:rgb(200,200,200);
+            border-radius:5px;
         }
         #button:pressed{
             background-color:rgb(150,150,180);
@@ -608,11 +613,11 @@ class ScrollFoldedBox(QScrollArea):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         extra_style = """
         #foldedHead{
-            background-color: rgb(190,200,220);
+            background-color: rgb(121,175,165);
             border-bottom: 1px solid rgb(200,200,200)
         }
         #foldedBody{
-            background-color: rgb(200,210,220)
+            background-color: rgb(255,245,247)
         }
         """
         # 设置滚动条样式(防止父控件设置无效)
@@ -664,22 +669,6 @@ class ScrollFoldedBox(QScrollArea):
             if isinstance(widget, FoldedHead) and widget == head:
                 self.container.layout().insertWidget(i + 1, body, alignment=Qt.AlignTop)
                 break
-
-
-    # # 获取折叠窗的数据
-    # def getFoldedBoxMenu(self):
-    #     head1 = self.addHead('第1个品种分组')
-    #     head2 = self.addHead('第2个品种分组')
-    #     head3 = self.addHead('第3个品种分组')
-    #     body2 = self.addBody(head=head2)
-    #     buttons = [QPushButton('品种' + str(i)) for i in range(40)]
-    #     body2.addButtons('二组', buttons, horizontal_count=2)
-    #
-    #     buttons = [QPushButton('品种' + str(i)) for i in range(55)]
-    #     body1 = self.addBody(head=head1)
-    #     body1.addButtons('一组', buttons, horizontal_count=2)
-    #     self.container.layout().addStretch()
-
 
 """ 表格控件 """
 
@@ -968,6 +957,3 @@ class Paginator(QWidget):
         self.current_page += 1
         self.setCurrentPageLable()
         self.clicked.emit(self.current_page)
-
-
-

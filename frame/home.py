@@ -112,8 +112,8 @@ class NewsBox(QWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
         self.setStyleSheet("""
         #newsBox{
-            min-width:330px;
-            max-width:420px;
+            /*min-width:420px;
+            max-width:420px;*/
         }
         #moreNews{
             border:none;
@@ -128,7 +128,8 @@ class NewsBox(QWidget):
         for item in item_list:
             item.item_clicked.connect(self.news_item_clicked)
             self.layout().addWidget(item, alignment=Qt.AlignTop)
-        self.layout().addStretch()
+        if len(item_list) < 12:
+            self.layout().addStretch()
 
     # 设置更多按钮
     def setMoreNewsButton(self):
@@ -194,7 +195,6 @@ class ImageSlider(QStackedWidget):
 
     # 改变图片显示
     def slider_image_label(self):
-
         current_index = self.currentIndex()
         if current_index + 1 >= self.count():
             self.setCurrentIndex(0)
@@ -267,17 +267,24 @@ class NormalReportPage(QWidget):
     def __init__(self, category_id, *args, **kwargs):
         super(NormalReportPage, self).__init__(*args, **kwargs)
         self.category_id = category_id
-        layout = QVBoxLayout(margin=0)
+        layout = QVBoxLayout(margin=0, spacing=1)
         # 相关品种选框
-        relate_variety_layout = QHBoxLayout()
+        variety_widget = QWidget(parent=self, objectName='varietyCombo')
+        relate_variety_layout = QHBoxLayout(margin=0, spacing=2)
         relate_variety_layout.addWidget(QLabel('相关品种:'))
         self.variety_combo = QComboBox(activated=self.getCurrentReports)
         relate_variety_layout.addWidget(self.variety_combo)
         relate_variety_layout.addStretch()
-        layout.addLayout(relate_variety_layout)
+        variety_widget.setLayout(relate_variety_layout)
+        layout.addWidget(variety_widget)
         self.report_table = NormalReportTable()
         layout.addWidget(self.report_table)
         self.setLayout(layout)
+        self.setStyleSheet("""
+        #varietyCombo{
+            background-color: rgb(178,200,187)
+        }
+        """)
 
     # 获取品种选框内容
     def getVarietyCombo(self):
@@ -467,14 +474,16 @@ class SpotCommodityPage(QWidget):
         super(SpotCommodityPage, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=2)
         # 日期选择
-        message_button_layout = QHBoxLayout()
+        date_widget = QWidget(parent=self, objectName='dateWidget')
+        message_button_layout = QHBoxLayout(margin=0, spacing=0)
         self.date_edit = QDateEdit(QDate.currentDate().addDays(-1), dateChanged=self.getCurrentSpotCommodity)
         self.date_edit.setDisplayFormat('yyyy-MM-dd')
         self.date_edit.setCalendarPopup(True)
         message_button_layout.addWidget(QLabel('日期:'))
         message_button_layout.addWidget(self.date_edit)
         message_button_layout.addStretch()  # 伸缩
-        layout.addLayout(message_button_layout)
+        date_widget.setLayout(message_button_layout)
+        layout.addWidget(date_widget, alignment=Qt.AlignTop)
         # 当前数据显示表格
         self.spot_table = SpotCommodityTable()
         layout.addWidget(self.spot_table)
@@ -484,6 +493,11 @@ class SpotCommodityPage(QWidget):
         layout.addWidget(self.no_data_label)
 
         self.setLayout(layout)
+        self.setStyleSheet("""
+        #dateWidget{
+            background-color: rgb(178,200,187)
+        }
+        """)
 
     def getCurrentSpotCommodity(self):
         current_date = self.date_edit.text()
@@ -552,14 +566,16 @@ class FinanceCalendarPage(QWidget):
         super(FinanceCalendarPage, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=2)
         # 日期选择
-        message_button_layout = QHBoxLayout()
+        date_widget = QWidget(parent=self, objectName='dateWidget')
+        message_button_layout = QHBoxLayout(margin=0, spacing=0)
         self.date_edit = QDateEdit(QDate.currentDate(), dateChanged=self.getCurrentFinanceCalendar)
         self.date_edit.setDisplayFormat('yyyy-MM-dd')
         self.date_edit.setCalendarPopup(True)
         message_button_layout.addWidget(QLabel('日期:'))
         message_button_layout.addWidget(self.date_edit)
         message_button_layout.addStretch()  # 伸缩
-        layout.addLayout(message_button_layout)
+        date_widget.setLayout(message_button_layout)
+        layout.addWidget(date_widget, alignment=Qt.AlignTop)
         # 当前数据显示表格
         self.finance_table = FinanceCalendarTable()
         layout.addWidget(self.finance_table)
@@ -568,6 +584,11 @@ class FinanceCalendarPage(QWidget):
         self.no_data_label.hide()
         layout.addWidget(self.no_data_label)
         self.setLayout(layout)
+        self.setStyleSheet("""
+        #dateWidget{
+            background-color: rgb(178,200,187)
+        }
+        """)
 
     # 获取当前日期财经日历
     def getCurrentFinanceCalendar(self):
@@ -634,6 +655,11 @@ class HomePage(QScrollArea):
             encoding = chardet.detect(content) or {}
             content = content.decode(encoding.get("encoding") or "utf-8")
         self.setStyleSheet(content)
+
+    def resizeEvent(self, event):
+        super(HomePage, self).resizeEvent(event)
+        # 控制新闻控件的大小
+        self.news_box.setFixedSize(self.parent().width() * 0.382, self.news_box.width()/4 * 3)
 
     # 阅读更多新闻
     def read_more_news(self):
@@ -733,6 +759,7 @@ class HomePage(QScrollArea):
                     data_category[group] = list()
                 data_category[group].append({'id': category_item['id'], 'name': category_item['name']})
             for key, values in data_category.items():
+                data_category[key].append({'id': -1, 'name': '其他'})  # 加入其他选项
                 head = self.folded_box.addHead(key)  # 一个group就得一个Head
                 body = self.folded_box.addBody(head=head)
                 body.addButtons(values)
@@ -749,7 +776,7 @@ class HomePage(QScrollArea):
 
     # 折叠盒子被点击
     def folded_box_clicked(self, category_id, head_text):
-        print('点击折叠盒子', category_id, head_text)
+        # print('点击折叠盒子', category_id, head_text)
         # 根据头部text显示窗口
         if head_text == u'常规报告':
             page = NormalReportPage(category_id=category_id, parent=self.frame_window)

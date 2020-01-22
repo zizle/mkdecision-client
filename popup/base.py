@@ -25,7 +25,7 @@ class LoginPopup(QDialog):
         phone_label.setPixmap(QPixmap('media/passport_icon/phone.png'))
         phone_layout.addWidget(phone_label)
         # 填写手机
-        self.phone_edit = QLineEdit()
+        self.phone_edit = QLineEdit(textEdited=self.phone_editing)
         phone_layout.addWidget(self.phone_edit)
         layout.addLayout(phone_layout)
         # 手机号错误提示框
@@ -45,6 +45,7 @@ class LoginPopup(QDialog):
         layout.addWidget(QLabel(parent=self, objectName='psdError'))
         # 记住密码
         remember_layout = QHBoxLayout(spacing=2)
+        # 点击事件由代码不触发
         self.remember_psd = QCheckBox('记住密码', objectName='rememberCheck', clicked=self.clicked_remember_psd)
         remember_layout.addWidget(self.remember_psd)
         # 记住登录
@@ -87,6 +88,12 @@ class LoginPopup(QDialog):
         # 布局
         self.setLayout(layout)
         self._init_account()
+
+    # 正在输入账号
+    def phone_editing(self):
+        self.password_edit.setText('')
+        self.remember_psd.setChecked(False)
+        self.remember_login.setChecked(False)
 
     # 选择记住密码
     def clicked_remember_psd(self):
@@ -376,6 +383,9 @@ class RegisterPopup(QDialog):
                 self.findChild(QLabel, 'usernameError').setText('用户名需由中文、数字、字母及下划线组成,2-20个字符')
                 return
             username = username.group()
+        else:
+            self.findChild(QLabel, 'usernameError').setText('请输入用户名.')
+            return
         # 获取密码
         password = self.password_edit.text()
         password = re.sub(r'\s+', '', password)
