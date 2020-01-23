@@ -11,7 +11,7 @@ from PyQt5.QtChart import QChart
 from widgets.chart import ChartView, DetailChartView
 from widgets.base import ScrollFoldedBox, LoadedPage
 import settings
-from utils.charts import draw_lines_stacked, draw_bars_stacked
+from utils.charts import lines_stacked, bars_stacked
 
 
 # 展示图表的线程
@@ -107,7 +107,9 @@ class ChartsFrameView(QScrollArea):
         row_index, col_index = 0, 0  # 记录布局的行数和列数
         for index, chart_item in enumerate(self.charts):
             chart_view = ChartView(chart_data=chart_item)
+            # print(chart_view.width())
             chart_view.setMinimumHeight(280)
+            # print(chart_view.frameGeometry().width(), chart_view.frameGeometry().height())
             chart_view.index_id = index
             chart_view.clicked.connect(self.chart_enlarge_clicked)
             self.container.layout().addWidget(chart_view, row_index, col_index)
@@ -150,7 +152,7 @@ class ChartsFrameView(QScrollArea):
         chart, table_df = self.data_to_chart(chart_data, tick_count=40)
         table_df[0] = pd.to_datetime(table_df[0])  # 第一列转为时间类型
         self.chart_detail.chart_view.setChart(chart)
-        self.chart_detail.chart_view.setDateCategoryXaxis(chart.date_xaxis_category)  # 根据x轴是否是时间轴设置鼠标动作
+        # self.chart_detail.chart_view.setDateCategoryXaxis(chart.date_xaxis_category)  # 根据x轴是否是时间轴设置鼠标动作
         if chart_data['category'] == 'line':
             self.chart_detail.chart_view.linesInstallHoverEvent()
         elif chart_data['category'] == 'bar':
@@ -174,6 +176,7 @@ class ChartsFrameView(QScrollArea):
                 self.chart_detail.table_view.setItem(row, col, item)
                 self.chart_detail.table_view.setRowHeight(row, 23)  # 行高
         self.chart_detail.show()
+
 
     # 删除掉详情页
     def delete_chart_detail(self):
@@ -212,13 +215,14 @@ class ChartsFrameView(QScrollArea):
             pass
         x_bottom = (json.loads(chart_data['x_bottom']))
         y_left = json.loads(chart_data['y_left'])
+        y_right = json.loads(chart_data['y_right'])
         # 根据图表类型画图
         if chart_data['category'] == 'line':
-            chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
-                                       y_left=y_left, legends=header_data, tick_count=tick_count)
+            chart = lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom_cols=x_bottom, y_left_cols=y_left,
+                                  y_right_cols=y_right, legend_labels=header_data, tick_count=tick_count)
         elif chart_data['category'] == 'bar':
-            chart = draw_bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
-                                      y_left=y_left, legends=header_data, tick_count=tick_count)
+            chart = bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom_cols=x_bottom, y_left_cols=y_left,
+                                 y_right_cols=y_right, legend_labels=header_data, tick_count=tick_count)
         else:
             chart = QChart()
         return chart, table_df

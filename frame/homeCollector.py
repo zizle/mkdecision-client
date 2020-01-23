@@ -996,13 +996,18 @@ class HomePageCollector(QWidget):
         super(HomePageCollector, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0)
         # 左侧菜单列表
-        self.left_list = QListWidget(parent=self, clicked=self.left_menu_clicked)
+        self.left_list = QListWidget(parent=self, clicked=self.left_menu_clicked, objectName='leftList')
         layout.addWidget(self.left_list, alignment=Qt.AlignLeft)
         # 右侧显示具体操作窗体
         self.operate_frame = LoadedPage()
         layout.addWidget(self.operate_frame)
         self.setLayout(layout)
         self._addListMenu()
+        self.setStyleSheet("""
+        #leftList::item{
+            height:22px;
+        }
+        """)
 
     # 添加菜单按钮
     def _addListMenu(self):

@@ -1038,7 +1038,7 @@ class InfoServicePageCollector(QWidget):
         super(InfoServicePageCollector, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0)
         # 左侧管理菜单
-        self.left_tree = QTreeWidget(clicked=self.left_tree_clicked)
+        self.left_tree = QTreeWidget(clicked=self.left_tree_clicked, objectName='leftTree')
         self.left_tree.header().hide()
         layout.addWidget(self.left_tree, alignment=Qt.AlignLeft)
         # 右侧显示窗口
@@ -1046,6 +1046,11 @@ class InfoServicePageCollector(QWidget):
         layout.addWidget(self.right_frame)
         self.setLayout(layout)
         self._addLeftTreeContentes()
+        self.setStyleSheet("""
+        #leftTree::item{
+            height:22px;
+        }
+        """)
 
     # 添加管理菜单
     def _addLeftTreeContentes(self):
@@ -1111,7 +1116,7 @@ class InfoServicePageCollector(QWidget):
             return
         service_id = item.sid
         text = item.text(0)
-        print(service_id)
+        # print(service_id)
         if service_id == 1:  # 短信通
             page = MessageServiceMaintain()
             page.getCurrentSMS()

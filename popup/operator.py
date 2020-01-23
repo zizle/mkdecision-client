@@ -4,10 +4,13 @@ import re
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QDialog, QGridLayout, QHBoxLayout, QVBoxLayout, QLineEdit, QPushButton, QLabel,\
-    QComboBox, QTabWidget, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QTreeWidget, QTreeWidgetItem
+    QComboBox, QTabWidget, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QTreeWidget, QTreeWidgetItem, QMenu,\
+    QAction
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
+from PyQt5.QtGui import QCursor
 import settings
 from widgets.operator import TableCheckBox
+from popup.tips import InformationPopup, WarningPopup
 
 __all__ = [
     'EditUserInformationPopup',
@@ -901,6 +904,52 @@ class CreateNewVarietyGroup(QDialog):
             self.findChild(QLabel, 'groupNameError').setText(response['message'])
 
 
+# 品种的分组树
+class VarietyGroupTree(QTreeWidget):
+    # 仅触发右击事件，左键事件依然保持原来的
+    def contextMenuEvent(self, event, *args, **kwargs):
+        point = event.pos()
+        current_item = self.itemAt(point)
+        # 没有父级的item
+        if not current_item.parent():
+            popup_menu = QMenu(self)
+            popup_menu.clear()
+            popup_menu.addAction(QAction('删除', self, triggered=self.delete_variety_group))
+            popup_menu.exec_(QCursor.pos())
+        event.accept()
+
+    # 删除品种组
+    def delete_variety_group(self, checked):
+        def confirm_delete():
+            current_item = self.currentItem()
+            machine_code = settings.app_dawn.value('machine')
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'group-varieties/' + str(current_item.gid) + '/?mc=' + machine_code,
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                popup = InformationPopup(message=str(e), parent=warning)
+                if not popup.exec_():
+                    popup.deleteLater()
+                    del popup
+            else:
+                popup = InformationPopup(message='删除成功!', parent=warning)
+                if not popup.exec_():
+                    popup.deleteLater()
+                    del popup
+                self.takeTopLevelItem(self.currentIndex().row())
+            warning.close()
+        warning = WarningPopup(message='确定删除此组及其下品种？\n此组下所有品种相关的所有数据将被清除且不可恢复!', parent=self)
+        warning.confirm_button.connect(confirm_delete)
+        if not warning.exec_():
+            warning.deleteLater()
+            del warning
+
+
 # 弹窗新增品种主页
 class CreateNewVarietyPopup(QDialog):
     def __init__(self, *args, **kwargs):
@@ -909,7 +958,8 @@ class CreateNewVarietyPopup(QDialog):
         # 左侧上下布局
         llayout = QVBoxLayout()
         # 左侧分组树
-        self.group_tree = QTreeWidget(clicked=self.group_tree_clicked)
+        self.group_tree = VarietyGroupTree(clicked=self.group_tree_clicked, objectName='groupTree')
+
         self.group_tree.header().hide()
         self.group_tree.setFixedWidth(200)
         llayout.addWidget(self.group_tree)
@@ -949,6 +999,11 @@ class CreateNewVarietyPopup(QDialog):
         self.setLayout(layout)
         self.setWindowTitle('新增品种')
         self.setFixedSize(600, 405)
+        self.setStyleSheet("""
+        #groupTree::item{
+            height:20px;
+        }
+        """)
 
     # 获取分组和每个分组下的品种
     def getGroupWithVarieties(self):
@@ -974,7 +1029,7 @@ class CreateNewVarietyPopup(QDialog):
         self.group_tree.expandAll()  # 展开所有
 
     # 分组树点击
-    def group_tree_clicked(self):
+    def group_tree_clicked(self, event):
         item = self.group_tree.currentItem()
         if item.childCount():  # has children open the root
             if item.isExpanded():

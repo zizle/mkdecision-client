@@ -49,7 +49,6 @@ class WelcomePage(QSplashScreen):
             time.sleep(1.5)
         else:
             # 写入配置
-            print('utils.client.make_client_existed写入配置')
             settings.app_dawn.setValue('machine', response['data']['machine_code'])
 
     # 启动访问广告图片文件并保存至本地
@@ -87,7 +86,7 @@ class BaseWindow(QWidget):
         # self.mousePressed = False
         # 设置窗体的图标和名称
         self.setWindowIcon(QIcon("media/logo.png"))
-        self.setWindowTitle("瑞达期货研究院分析决策系统_管理端_0101911")
+        self.setWindowTitle("瑞达期货研究院分析决策系统管理端0102001")
         # 标题栏
         self.title_bar = TitleBar(parent=self)
         # 导航栏
@@ -223,7 +222,6 @@ class BaseWindow(QWidget):
         super(BaseWindow, self).mouseMoveEvent(event)
         pos = event.pos()
         pos_x, pos_y = pos.x(), pos.y()
-        print(pos_x, pos_y)
         wm, hm = self.width() - self.MARGIN, self.height() - self.MARGIN
         # print(wm, hm)
         # 窗口最大无需事件
@@ -233,21 +231,16 @@ class BaseWindow(QWidget):
             return
         if event.buttons() == Qt.LeftButton and self._pressed:
             self.resize_window(pos)
-            print('调整窗口大小')
-            # return
         if pos_x <= self.MARGIN and pos_y <= self.MARGIN:
             # 左上角
-            print('鼠标在左上角')
             self._direction = self.LeftTop
             self.setCursor(Qt.SizeFDiagCursor)
         elif wm <= pos_x <= self.width() and hm <= pos_y <= self.height():
             # 右下角
-            print('鼠标在右下角')
             self._direction = self.RightBottom
             self.setCursor(Qt.SizeFDiagCursor)
         elif wm <= pos_x and pos_y <= self.MARGIN:
             # 右上角
-            print('鼠标在右上角')
             self._direction = self.RightTop
             self.setCursor(Qt.SizeBDiagCursor)
         elif pos_x <= self.MARGIN and hm <= pos_y:
@@ -388,55 +381,53 @@ class BaseWindow(QWidget):
                 del info_popup
             return
         else:  # 模块权限验证通过
-            try:
-                if module_text == u'首页':
-                    from frame.home import HomePage
-                    page = HomePage(parent=self.page_container)
-                    page.getCurrentNews()
-                    page.getCurrentSliderAdvertisement()
-                    page.getFoldedBoxContent()
-                elif module_text == u'产品服务':
-                    from frame.infoService import InfoServicePage
-                    page = InfoServicePage(parent=self.page_container)
+            if module_text == u'首页':
+                from frame.home import HomePage
+                page = HomePage(parent=self.page_container)
+                page.getCurrentNews()
+                page.getCurrentSliderAdvertisement()
+                page.getFoldedBoxContent()
+                page.folded_box_clicked(category_id=1, head_text='常规报告') # 默认点击常规报告分类id=1
+            elif module_text == u'产品服务':
+                from frame.infoService import InfoServicePage
+                page = InfoServicePage(parent=self.page_container)
 
-                elif module_text == '数据分析':
-                    from frame.trend import TrendPage
-                    page = TrendPage(parent=self.page_container)
-                    page.getGroupVarieties()
-                    page.getTrendPageCharts()
-                elif module_text == '数据管理':
-                    from frame.collector import CollectorMaintain
-                    page = CollectorMaintain(parent=self.page_container)
+            elif module_text == '数据分析':
+                from frame.trend import TrendPage
+                page = TrendPage(parent=self.page_container)
+                page.getGroupVarieties()
+                page.getTrendPageCharts()
+            elif module_text == '数据管理':
+                from frame.collector import CollectorMaintain
+                page = CollectorMaintain(parent=self.page_container)
 
-                elif module_text == u'运营管理':
-                    from frame.operator import OperatorMaintain
-                    page = OperatorMaintain(parent=self.page_container)
-                    page.addListItem()  # 加入管理项目
-                elif module_text == u'权限管理':
-                    from frame.authority import AuthorityMaintain
-                    page = AuthorityMaintain(parent=self.page_container)
-                    page.getCurrentUsers()
-                # elif module_text == u'数据管理':
-                #     from windows.maintenance import MaintenanceHome
-                #     tab = MaintenanceHome(parent=self.tab_loaded)
-                # elif module_text == u'权限管理':
-                #     from windows.maintenance import AuthorityHome
-                #     tab = AuthorityHome(parent=self.tab_loaded)
-                #     tab.addComboItem()  # 添加选择当前角色，并由此出发请求相应用户列表
-                else:
-                    page = QLabel(parent=self.page_container,
-                                  styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
-                                  alignment=Qt.AlignCenter)
-                    page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
+            elif module_text == u'运营管理':
+                from frame.operator import OperatorMaintain
+                page = OperatorMaintain(parent=self.page_container)
+                page.addListItem()  # 加入管理项目
+            elif module_text == u'权限管理':
+                from frame.authority import AuthorityMaintain
+                page = AuthorityMaintain(parent=self.page_container)
+                page.getCurrentUsers()
+            # elif module_text == u'数据管理':
+            #     from windows.maintenance import MaintenanceHome
+            #     tab = MaintenanceHome(parent=self.tab_loaded)
+            # elif module_text == u'权限管理':
+            #     from windows.maintenance import AuthorityHome
+            #     tab = AuthorityHome(parent=self.tab_loaded)
+            #     tab.addComboItem()  # 添加选择当前角色，并由此出发请求相应用户列表
+            else:
+                page = QLabel(parent=self.page_container,
+                              styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
+                              alignment=Qt.AlignCenter)
+                page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
 
-                self.page_container.clear()
-                # print('当前窗体个数：', self.page_container.count())
-                self.page_container.addWidget(page)
-                # self.page_container.removeWidget(self.page_container.widget(0))
-                # print('当前窗体个数：', self.page_container.count())
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
+            self.page_container.clear()
+            # print('当前窗体个数：', self.page_container.count())
+            self.page_container.addWidget(page)
+            # self.page_container.removeWidget(self.page_container.widget(0))
+            # print('当前窗体个数：', self.page_container.count())
+
 
             # self.tab_loaded.clear()
 

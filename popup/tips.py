@@ -38,7 +38,7 @@ class InformationPopup(QDialog):
 class WarningPopup(QDialog):
     confirm_button = pyqtSignal(bool)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, message='删除将不可恢复!', *args, **kwargs):
         super(WarningPopup, self).__init__(*args, **kwargs)
         layout = QGridLayout()
         self.setWindowTitle('注意')
@@ -47,7 +47,7 @@ class WarningPopup(QDialog):
         ico_label.setPixmap(pix)
         ico_label.setScaledContents(True)
         layout.addWidget(ico_label, 0, 0)
-        layout.addWidget(QLabel('删除将不可恢复!', styleSheet='color:rgb(255,10,10);font-weight:bold'), 0, 1, 1, 2)
+        layout.addWidget(QLabel(message, styleSheet='color:rgb(255,10,10);font-weight:bold'), 0, 1, 1, 2)
         layout.addWidget(QPushButton('确定', clicked=self.confirm), 1, 1)
         layout.addWidget(QPushButton('取消', clicked=self.cancel), 1, 2)
         self.setLayout(layout)

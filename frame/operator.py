@@ -4,10 +4,10 @@ import json
 import requests
 import pandas as pd
 from PyQt5.QtWidgets import QWidget, QListWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QLabel, QComboBox, \
-    QHeaderView, QPushButton, QTableWidgetItem
+    QHeaderView, QPushButton, QTableWidgetItem, QLineEdit, QListView
 from PyQt5.QtCore import Qt, QMargins, QDateTime
 from PyQt5.QtGui import QFont, QPainter
-from PyQt5.QtChart import QChartView, QChart, QLineSeries, QBarSeries, QBarSet, QDateTimeAxis, QValueAxis
+from PyQt5.QtChart import QChartView, QChart, QLineSeries, QDateTimeAxis, QValueAxis
 from popup.operator import EditUserInformationPopup, EditClientInformationPopup, CreateNewModulePopup,\
     EditModuleInformationPopup, CreateNewVarietyPopup, EditVarietyInformationPopup
 import settings
@@ -432,23 +432,27 @@ class VarietyManagePage(QWidget):
 class ClientRecordTable(ManageTable):
     KEY_LABELS = [
         ('day', '日期'),
-        ('client', '客户端'),
+        ('client_name', '客户端'),
         ('category', '类型'),
         ('day_count', '开启次数'),
     ]
 
     # 设置表格数据
     def setRowContents(self, row_list):
+        client_combo = dict()
         self.resetTableMode(len(row_list))
-        for row, user_item in enumerate(row_list):
+        for row, client_item in enumerate(row_list):
             for col, header in enumerate(self.KEY_LABELS):
-                table_item = QTableWidgetItem(str(user_item[header[0]]))
+                table_item = QTableWidgetItem(str(client_item[header[0]]))
                 if col in self.CHECK_COLUMNS:
-                    check_box = TableCheckBox(checked=user_item[header[0]])
+                    check_box = TableCheckBox(checked=client_item[header[0]])
                     check_box.check_activated.connect(self.check_box_changed)
                     self.setCellWidget(row, col, check_box)
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
+            if client_item['client'] not in client_combo.keys():
+                client_combo[client_item['client']] = client_item['client_name']
+        return client_combo
 
     # 填充数据前初始化表格
     def resetTableMode(self, row_count):
@@ -456,20 +460,24 @@ class ClientRecordTable(ManageTable):
         self.setRowCount(row_count)
         self.setColumnCount(len(self.KEY_LABELS))
         self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
 
 
 # 模块记录表格显示
 class ModuleRecordTable(ManageTable):
     KEY_LABELS = [
         ('day', '日期'),
-        ('user', '用户'),
+        ('user_note', '用户'),
         ('module', '模块'),
         ('day_count', '访问次数'),
     ]
 
     # 设置表格数据
     def setRowContents(self, row_list):
+        # 保存用户的选项
+        user_combo = dict()
         self.resetTableMode(len(row_list))
         for row, user_item in enumerate(row_list):
             for col, header in enumerate(self.KEY_LABELS):
@@ -480,6 +488,10 @@ class ModuleRecordTable(ManageTable):
                     self.setCellWidget(row, col, check_box)
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
+            # 加入用户选择的资料
+            if user_item['user'] not in user_combo.keys():
+                user_combo[user_item['user']] = user_item['user_note']
+        return user_combo
 
     # 填充数据前初始化表格
     def resetTableMode(self, row_count):
@@ -487,7 +499,9 @@ class ModuleRecordTable(ManageTable):
         self.setRowCount(row_count)
         self.setColumnCount(len(self.KEY_LABELS))
         self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
 
 
 # 数据查看主页
@@ -502,6 +516,18 @@ class OperateManagePage(QWidget):
                                             objectName='moduleBtn',
                                             cursor=Qt.PointingHandCursor, clicked=self.getModuleRecord))
         option_layout.addStretch()
+        line_edit = QLineEdit(readOnly=True)
+        line_edit.setAlignment(Qt.AlignCenter)
+        # 客户端记录
+        self.client_combo = QComboBox(objectName='clientCombo', activated=self.getClientRecord)
+        self.client_combo.setLineEdit(line_edit)
+        option_layout.addWidget(self.client_combo)
+        # 模块记录
+        line_edit = QLineEdit(readOnly=True)  # 新实例化，不能共用
+        line_edit.setAlignment(Qt.AlignCenter)
+        self.user_combo = QComboBox(objectName='userCombo', activated=self.getModuleRecord)
+        self.user_combo.setLineEdit(line_edit)
+        option_layout.addWidget(self.user_combo)
         layout.addLayout(option_layout)
         self.record_chart_view = QChartView()  # 图表
         self.record_chart_view.setRenderHint(QPainter.Antialiasing)  # 抗锯齿
@@ -519,13 +545,32 @@ class OperateManagePage(QWidget):
             padding: 1px;
             margin: 5px
         }
+        #userCombo QAbstractItemView::item{
+            height:22px;
+            font-size:13px;
+            color: rgb(22,212,126)
+        }
+        #clientCombo QAbstractItemView::item{
+            height:22px;
+            font-size:13px;
+            color: rgb(22,212,126)
+        }
         """)
+        self.user_combo.setView(QListView())
+        self.client_combo.setView(QListView())
+        self.client_combo.hide()
+        self.user_combo.hide()
 
     # 获取客户端数据记录
     def getClientRecord(self):
+        print('请求客户端记录')
+        current_client = self.client_combo.currentData()
+        url = settings.SERVER_ADDR + 'client_record/?mc=' + settings.app_dawn.value('machine')
+        if current_client:
+            url += '&client=' + str(current_client)
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'client_record/?mc=' + settings.app_dawn.value('machine'),
+                url=url,
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -534,15 +579,34 @@ class OperateManagePage(QWidget):
             pass
         else:
             self.module_table_view.hide()
+            self.user_combo.hide()
             self.client_table_view.show()
-            self.client_table_view.setRowContents(response['data'])
+            self.client_combo.show()
+            response_data = response['data']
+            # print(response_data)
+            client_combo_list = self.client_table_view.setRowContents(response_data)
             # self.draw_chart()
+            # print(client_combo_list)
+            # 在没有带客户端请求的时候才执行这些
+            if not current_client:
+                self.client_combo.clear()
+                self.client_combo.addItem('全部', None)  # 加入全部的选项
+                for client_id, client_name in client_combo_list.items():
+                    self.client_combo.addItem(client_name, client_id)
+                for i in range(self.client_combo.count()):
+                    self.client_combo.view().model().item(i).setTextAlignment(Qt.AlignCenter)
+                # 设置下拉框的大小
+                self.client_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
 
     # 获取模块数据记录
     def getModuleRecord(self):
+        current_user = self.user_combo.currentData()
+        url = settings.SERVER_ADDR + 'module_record/?mc=' + settings.app_dawn.value('machine')
+        if current_user:
+            url += '&user=' + str(current_user)
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'module_record/?mc=' + settings.app_dawn.value('machine'),
+                url=url,
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -551,84 +615,22 @@ class OperateManagePage(QWidget):
             pass
         else:
             self.client_table_view.hide()
+            self.client_combo.hide()
             self.module_table_view.show()
-            self.module_table_view.setRowContents(response['data'])
+            self.user_combo.show()
+            response_data = response['data']
+            user_combo_list = self.module_table_view.setRowContents(response_data)
             # self.draw_chart()
-
-    # 画图展示
-    def draw_chart(self):
-        # 获取图表数据(客户端记录使用折线图， 模块记录采用柱形图，每个客户端一个DataFrame)
-        # 画图
-        chart = QChart()
-        chart.layout().setContentsMargins(0, 0, 0, 0)  # chart的外边距
-        chart.setMargins(QMargins(15, 5, 15, 0))
-        if self.client_table_view.isHidden():  # 模块记录显示
-            chart.setTitle('模块被访问次数统计图')
-            self.record_chart_view.hide()
-
-        elif self.module_table_view.isHidden():  # 客户端记录显示
-            self.record_chart_view.show()
-            # 获取数据
-            rows = self.client_table_view.rowCount()
-            cols = self.client_table_view.columnCount()
-            data_dict = dict()
-            for row in range(rows):
-                row_content = list()
-                row_key = ''
-                for col in range(cols):
-                    text = self.client_table_view.item(row, col).text()
-                    if col == 1:
-                        row_key = text
-                        if text not in data_dict.keys():
-                            data_dict[text] = list()
-                    row_content.append(text)
-                data_dict[row_key].append(row_content)
-            chart.setTitle('客户端打开次数折线图')
-            try:
-                for key, value in data_dict.items():
-                    chart_df = pd.DataFrame(value)
-                    chart_df[0] = pd.to_datetime(chart_df[0])
-                    chart_df.sort_values(by=0, inplace=True)  # 时间排序
-                    chart_df[3] = chart_df[3].apply(lambda x: float(x))
-                    # 计算处理x轴数据
-                    x_axis_data = chart_df.iloc[:, [0]]  # 取得第一列数据
-                    min_x, max_x = x_axis_data.min(0).tolist()[0], x_axis_data.max(0).tolist()[0]  # 第一列时间数据(x轴)的最大值和最小值
-                    line_data = chart_df.iloc[:, [0, 3]]
-                    series = QLineSeries()
-                    series.setName(key)
-                    for point_item in line_data.values.tolist():
-                        series.append(QDateTime(point_item[0]).toMSecsSinceEpoch(), point_item[1])  # 取出源数据后一条线就2列数据
-                    chart.addSeries(series)
-                # chart.createDefaultAxes()
-                # 设置X轴文字格式
-                axis_X = QDateTimeAxis()
-                # axis_X = chart.axisX()
-                # axis_X.setRange(min_x, max_x)
-                axis_X.setFormat('yyyy-MM-dd')
-                axis_X.setLabelsAngle(-90)
-                font = QFont()
-                font.setPointSize(7)
-                axis_X.setLabelsFont(font)
-                axis_X.setGridLineVisible(False)
-                # 设置Y轴
-                axix_Y = QValueAxis()
-                axix_Y.setLabelsFont(font)
-                axix_Y.setLabelFormat('%i')
-                series = chart.series()[0]
-                for series in chart.series():
-                    chart.setAxisX(axis_X, series)
-                    chart.setAxisY(axix_Y, series)
-                # min_y, max_y = 0, int(chart.axisY().max())
-                # # 根据位数取整数
-                # axix_Y.setRange(min_y, max_y)
-                # axix_Y.setLabelFormat('%i')
-                # chart.setAxisY(axix_Y, series)
-            except Exception:
-                pass
-        else:
-            pass
-        self.record_chart_view.setChart(chart)
-
+            # 在没有带用户请求的时候才执行这些
+            if not current_user:
+                self.user_combo.clear()
+                self.user_combo.addItem('全部', None)  # 加入全部的选项
+                for user_id, user_note in user_combo_list.items():
+                    self.user_combo.addItem(user_note, user_id)
+                for i in range(self.user_combo.count()):
+                    self.user_combo.view().model().item(i).setTextAlignment(Qt.AlignCenter)
+                # 设置下拉框的大小
+                self.user_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
 
 
 """ 运营管理主页 """

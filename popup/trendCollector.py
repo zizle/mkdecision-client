@@ -6,18 +6,17 @@ import xlrd
 import datetime
 import requests
 import pandas as pd
-from pandas.api.types import is_datetime64_any_dtype
 from xlrd import xldate_as_tuple
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QDialog, QTreeWidget, QWidget, QGridLayout, QLabel, QLineEdit,\
     QPushButton, QComboBox, QTableWidget, QTreeWidgetItem, QFileDialog, QHeaderView, QTableWidgetItem, QAbstractItemView, \
     QListWidget, QDateEdit, QCheckBox
-from PyQt5.QtChart import QChartView, QChart, QLineSeries, QCategoryAxis, QDateTimeAxis, QValueAxis
-from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDateTime, QDate
-from PyQt5.QtGui import QPainter, QFont, QIntValidator
+from PyQt5.QtChart import QChartView, QChart
+from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
+from PyQt5.QtGui import QPainter
 import settings
 from widgets.base import TableRowDeleteButton, TableRowReadButton
 from popup.tips import WarningPopup, InformationPopup
-from utils.charts import draw_lines_stacked, draw_bars_stacked
+from utils.charts import lines_stacked, bars_stacked
 
 
 # 新建数据表
@@ -27,7 +26,7 @@ class CreateNewTrendTablePopup(QDialog):
         # 绑定当前显示的页面(0, 上传数据表)、(1, 新增数据组别)
         self.current_option = 0
         # 左侧类别树
-        self.variety_tree = QTreeWidget(clicked=self.variety_tree_clicked)
+        self.variety_tree = QTreeWidget(clicked=self.variety_tree_clicked, objectName='varietyTree')
         # 上传表格数据控件
         self.udwidget = QWidget()  # upload data widget
         # 右侧上传数据控件布局
@@ -83,6 +82,9 @@ class CreateNewTrendTablePopup(QDialog):
         self.variety_tree.header().hide()
         self.setObjectName('myself')
         self.setStyleSheet("""
+        #varietyTree::item{
+            height:22px;
+        }
         #AttachVariety, #AttachGroup, #tgpopAttachTo{
             color:rgb(180,20,30)
         }
@@ -143,7 +145,7 @@ class CreateNewTrendTablePopup(QDialog):
         except Exception:
             return
         for index, variety_item in enumerate(response['data']):
-            print(index, variety_item)
+            # print(index, variety_item)
             variety = QTreeWidgetItem(self.variety_tree)
             variety.setText(0, variety_item['name'])
             variety.vid = variety_item['id']
@@ -562,35 +564,32 @@ class EditTableDetailPopup(QDialog):
 
     # 删除一行数据
     def delete_button_clicked(self, delete_button):
-        try:
-            current_row, _ = self.get_widget_index(delete_button)
-            row_id = self.table.item(current_row, 0).col_id
-            def delete_row_content():
-                try:
-                    r = requests.delete(
-                        url=settings.SERVER_ADDR + 'trend/table/' + str(
-                            self.table_id) + '/?mc=' + settings.app_dawn.value('machine'),
-                        headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
-                        data=json.dumps({'row_id': row_id})
-                    )
-                    response = json.loads(r.content.decode('utf-8'))
-                    if r.status_code != 200:
-                        raise ValueError(response['message'])
-                except Exception as e:
-                    self.network_result_label.setText(str(e))
-                else:
-                    # 表格移除当前行
-                    self.table.removeRow(current_row)
-                    popup.close()
-                    self.network_result_label.setText(response['message'])
-            # 警示框
-            popup = WarningPopup(parent=self)
-            popup.confirm_button.connect(delete_row_content)
-            if not popup.exec_():
-                popup.deleteLater()
-                del popup
-        except Exception as e:
-            print(e)
+        current_row, _ = self.get_widget_index(delete_button)
+        row_id = self.table.item(current_row, 0).col_id
+        def delete_row_content():
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'trend/table/' + str(
+                        self.table_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({'row_id': row_id})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result_label.setText(str(e))
+            else:
+                # 表格移除当前行
+                self.table.removeRow(current_row)
+                popup.close()
+                self.network_result_label.setText(response['message'])
+        # 警示框
+        popup = WarningPopup(parent=self)
+        popup.confirm_button.connect(delete_row_content)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
 
     # 删除整张表
     def delete_this_table(self):
@@ -842,11 +841,10 @@ class SetChartDetailPopup(QDialog):
             end_date = pd.to_datetime(end_date)
             df = self.table_data_frame.copy()
             final_df = df.loc[(df[0] >= start_date) & (df[0] <= end_date)].copy()  # 根据时间范围取数
-
             # 根据类型进行画图
             if chart_category == u'折线图':  # 折线图
-                chart = draw_lines_stacked(name=chart_name, table_df=final_df, x_bottom_cols=x_axis_col, y_left_cols=left_y_cols,
-                                           y_right_cols=right_y_cols, legend_labels=header_data, tick_count=12)
+                chart = lines_stacked(name=chart_name, table_df=final_df, x_bottom_cols=x_axis_col, y_left_cols=left_y_cols,
+                                      y_right_cols=right_y_cols, legend_labels=header_data, tick_count=12)
                 # 设置图例
                 # chart.legend().hide()
                 # markers = chart.legend().markers()
@@ -866,8 +864,8 @@ class SetChartDetailPopup(QDialog):
                 #         col_index = 0
 
             elif chart_category == u'柱形图':
-                chart = draw_bars_stacked(name=chart_name, table_df=final_df, x_bottom=x_axis_col, y_left=left_y_cols,
-                                          legends=header_data, tick_count=12)
+                chart = bars_stacked(name=chart_name, table_df=final_df, x_bottom_cols=x_axis_col,
+                                      y_left_cols=left_y_cols, y_right_cols=right_y_cols, legend_labels=header_data, tick_count=12)
             else:
                 popup = InformationPopup(message='当前设置不适合作图或系统暂不支持作图。', parent=self)
                 if not popup.exec_():
@@ -877,8 +875,6 @@ class SetChartDetailPopup(QDialog):
             self.review_chart.setChart(chart)
             self.has_review_chart = True
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             popup = InformationPopup(message=str(e), parent=self)
             if not popup.exec_():
                 popup.deleteLater()
@@ -1091,7 +1087,8 @@ class VarietyTrendTablesShow(QTableWidget):
                 popup.deleteLater()
                 del popup
         except Exception as e:
-            print(e)
+            # print(e)
+            pass
 
     # 获取控件所在行和列
     def get_widget_index(self, widget):
@@ -1184,15 +1181,17 @@ class ShowChartPopup(QDialog):
                 table_df = table_df[(table_df[0] <= end_date)]
             else:
                 pass
+            # print(chart_data)
             x_bottom = (json.loads(chart_data['x_bottom']))
             y_left = json.loads(chart_data['y_left'])
+            y_right = json.loads(chart_data['y_right'])
             # 根据图表类型画图
             if chart_data['category'] == 'line':
-                chart = draw_lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
-                                           y_left=y_left, legends=header_data, tick_count=40)
+                chart = lines_stacked(name=chart_data['name'], table_df=table_df, x_bottom_cols=x_bottom, y_left_cols=y_left,
+                                      y_right_cols=y_right, legend_labels=header_data, tick_count=40)
             elif chart_data['category'] == 'bar':
-                chart = draw_bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom=x_bottom,
-                                          y_left=y_left, legends=header_data, tick_count=40)
+                chart = bars_stacked(name=chart_data['name'], table_df=table_df, x_bottom_cols=x_bottom, y_left_cols=y_left,
+                                      y_right_cols=y_right, legend_labels=header_data, tick_count=40)
             else:
                 chart = QChart()
         except Exception:
