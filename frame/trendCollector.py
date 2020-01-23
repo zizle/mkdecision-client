@@ -207,16 +207,17 @@ class TrendTableManagePage(QWidget):
             self.table_group_combo.clear()
             self.table_group_combo.addItem('全部', 0)  # 填充第一个为【全部】
             # 记录最长的的下拉选择
-            max_length_text = 2
+            # max_length_text = 2
             # 整理所有的表数据填充显示表格(减少初始化一次网络请求)
             all_tables = list()
             for group_item in response['data']:
                 self.table_group_combo.addItem(group_item['name'], group_item['id'])
                 # 调整宽度
-                if len(group_item['name']) > max_length_text:
-                    max_length_text = len(group_item['name'])
+                # if len(group_item['name']) > max_length_text:
+                #     max_length_text = len(group_item['name'])
                 all_tables += group_item['tables']
-            self.table_group_combo.view().setFixedWidth(max_length_text*12)
+            # self.table_group_combo.view().setFixedWidth(max_length_text*12)
+            self.table_group_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
             # 放到表格展示
             self.trend_data_table.showRowContents(all_tables)
             self.network_message_label.setText(response['message'])
@@ -438,6 +439,8 @@ class VarietyChartsManagePage(QWidget):
     # 获取当前品种的所有图表
     def getCurrentVarietyCharts(self):
         current_vid = self.variety_combo.currentData()
+        if not current_vid:
+            return
         try:
             r = requests.get(
                 url=settings.SERVER_ADDR + 'trend/' + str(
@@ -470,13 +473,18 @@ class TrendPageCollector(QWidget):
         super(TrendPageCollector, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0)
         # 左侧管理菜单列表
-        self.left_list = QListWidget(clicked=self.left_list_clicked)
+        self.left_list = QListWidget(clicked=self.left_list_clicked, objectName='leftList')
         layout.addWidget(self.left_list, alignment=Qt.AlignLeft)
         # 右侧显示的frame
         self.frame_loaded = LoadedPage(parent=self)
         layout.addWidget(self.frame_loaded)
         self.setLayout(layout)
         self._addLeftListMenu()
+        self.setStyleSheet("""
+        #leftList::item{
+            height:22px
+        }
+        """)
 
     # 添加左侧管理菜单
     def _addLeftListMenu(self):

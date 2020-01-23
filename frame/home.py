@@ -272,7 +272,7 @@ class NormalReportPage(QWidget):
         variety_widget = QWidget(parent=self, objectName='varietyCombo')
         relate_variety_layout = QHBoxLayout(margin=0, spacing=2)
         relate_variety_layout.addWidget(QLabel('相关品种:'))
-        self.variety_combo = QComboBox(activated=self.getCurrentReports)
+        self.variety_combo = QComboBox(activated=self.getCurrentReports, objectName='combo')
         relate_variety_layout.addWidget(self.variety_combo)
         relate_variety_layout.addStretch()
         variety_widget.setLayout(relate_variety_layout)
@@ -283,6 +283,9 @@ class NormalReportPage(QWidget):
         self.setStyleSheet("""
         #varietyCombo{
             background-color: rgb(178,200,187)
+        }
+        #varietyCombo #combo{
+            background-color: rgb(178,200,187);
         }
         """)
 
@@ -476,7 +479,7 @@ class SpotCommodityPage(QWidget):
         # 日期选择
         date_widget = QWidget(parent=self, objectName='dateWidget')
         message_button_layout = QHBoxLayout(margin=0, spacing=0)
-        self.date_edit = QDateEdit(QDate.currentDate().addDays(-1), dateChanged=self.getCurrentSpotCommodity)
+        self.date_edit = QDateEdit(QDate.currentDate().addDays(-1), dateChanged=self.getCurrentSpotCommodity, objectName='dateEdit')
         self.date_edit.setDisplayFormat('yyyy-MM-dd')
         self.date_edit.setCalendarPopup(True)
         message_button_layout.addWidget(QLabel('日期:'))
@@ -497,6 +500,15 @@ class SpotCommodityPage(QWidget):
         #dateWidget{
             background-color: rgb(178,200,187)
         }
+        #dateWidget #dateEdit{
+            background-color: rgb(178,200,187);
+            margin:0;
+            padding:0;
+        }
+        /*#dateWidget #dateEdit::drop-down{
+            background-color: rgb(178,200,187);
+            
+        }*/
         """)
 
     def getCurrentSpotCommodity(self):
@@ -568,7 +580,7 @@ class FinanceCalendarPage(QWidget):
         # 日期选择
         date_widget = QWidget(parent=self, objectName='dateWidget')
         message_button_layout = QHBoxLayout(margin=0, spacing=0)
-        self.date_edit = QDateEdit(QDate.currentDate(), dateChanged=self.getCurrentFinanceCalendar)
+        self.date_edit = QDateEdit(QDate.currentDate(), dateChanged=self.getCurrentFinanceCalendar, objectName='dateEdit')
         self.date_edit.setDisplayFormat('yyyy-MM-dd')
         self.date_edit.setCalendarPopup(True)
         message_button_layout.addWidget(QLabel('日期:'))
@@ -587,6 +599,11 @@ class FinanceCalendarPage(QWidget):
         self.setStyleSheet("""
         #dateWidget{
             background-color: rgb(178,200,187)
+        }
+        #dateWidget #dateEdit{
+            background-color: rgb(178,200,187);
+            margin:0;
+            padding:0;
         }
         """)
 

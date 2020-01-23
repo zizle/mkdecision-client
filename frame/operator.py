@@ -583,10 +583,10 @@ class OperateManagePage(QWidget):
             self.client_table_view.show()
             self.client_combo.show()
             response_data = response['data']
-            print(response_data)
+            # print(response_data)
             client_combo_list = self.client_table_view.setRowContents(response_data)
             # self.draw_chart()
-            print(client_combo_list)
+            # print(client_combo_list)
             # 在没有带客户端请求的时候才执行这些
             if not current_client:
                 self.client_combo.clear()

@@ -42,7 +42,7 @@ class TitleBar(QWidget):
         self.window_icon.setScaledContents(True)
         self.window_icon.setPixmap(pixmap)
         # 标题
-        self.window_title = QLabel(parent=self)
+        self.window_title = QLabel(parent=self, objectName='titleName')
         layout.addWidget(self.window_icon, Qt.AlignLeft)
         layout.addWidget(self.window_title, Qt.AlignLeft)
         # 中间伸缩
@@ -78,17 +78,22 @@ class TitleBar(QWidget):
         self.window_title.setText('瑞达期货研究院分析决策系统管理端0102001')
         self.setStyleSheet("""
         #titleBar{
-            background-color: rgb(85,88,91);
+            background-color: rgb(34,102,175);
+        }
+        #titleName{
+            color: rgb(210,210,210);
+            font-size:14px;
+            font-weight: bold;
         }
         /*最小化最大化关闭按钮通用默认背景*/
         #buttonMinimum,#buttonMaximum,#buttonClose {
             border: none;
-            background-color: rgb(85,88,91);
+            background-color: rgb(34,102,175);
         }
 
         /*悬停*/
         #buttonMinimum:hover,#buttonMaximum:hover {
-            background-color: rgb(72,75,78);
+            background-color: rgb(33,165,229);
         }
         #buttonClose:hover {
             color: white;
@@ -111,12 +116,12 @@ class TitleBar(QWidget):
 
     # 最小化
     def windowMinimumed(self):
-        print('最小化窗口')
+        # print('最小化窗口')
         self.parent().showMinimized()
 
     # 最大化
     def windowMaximized(self):
-        print('最大化窗口')
+        # print('最大化窗口')
         if self.buttonMaximum.text() == '1':
             # 最大化
             self.buttonMaximum.setText('2')
@@ -138,7 +143,7 @@ class TitleBar(QWidget):
 
     # 关闭
     def windowClosed(self):
-        print('关闭窗口')
+        # print('关闭窗口')
         self.parent().close()
 
     # 鼠标双击
@@ -184,7 +189,7 @@ class ManagerMenu(QMenu):
         super(ManagerMenu, self).__init__(*args, **kwargs)
         self.setStyleSheet("""
         QMenu{
-            background-color:rgb(85,88,91); /* sets background of the menu 设置整个菜单区域的背景色 */
+            background-color:rgb(34,102,175); /* sets background of the menu 设置整个菜单区域的背景色 */
             border: 1px solid rgb(250,255,250);/*整个菜单区域的边框粗细、样式、颜色*/
          }
         QMenu::item {
@@ -218,15 +223,15 @@ class ModuleBar(QWidget):
         self.setObjectName('moduleBar')
         self.setStyleSheet("""
         #moduleBar{
-            min-height:20px;
-            max-height:20px;
+            min-height:24px;
+            max-height:24px;
         }
         QPushButton{
-            background-color:rgb(85,88,91);
-            color: rgb(255,20,150);
-            border: 1px solid rgb(180,255,250);
+            background-color:rgb(34,102,175);
+            color: rgb(235,20,150);
+            border: 1px solid rgb(34,142,155);
             margin-left:3px;
-            padding: 0px 6px;  /*上下，左右*/
+            padding: 1px 6px;  /*上下，左右*/
             min-height:16px;
             max-height:16px;
             color: #FFFFFF
@@ -244,17 +249,17 @@ class ModuleBar(QWidget):
 
     # 设置菜单按钮
     def setMenus(self, menu_data):
-        print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
+        # print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
         self.clearActionMenu()
         for menu_item in menu_data:
             menu = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
             menu.clicked_module.connect(self.module_menu_clicked)
             self.layout().addWidget(menu)
-        print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
+        # print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
 
     # 设置管理菜单
     def setMenuActions(self, actions):
-        print('设置管理菜单')
+        # print('设置管理菜单')
         if not actions:
             return
         self.actions_menu.clear()
@@ -366,7 +371,7 @@ class PermitBar(QWidget):
         self.login_button.show()
         self.register_button.show()
         if hasattr(self, 'timer'):
-            print('注销销毁定时器piece.base.PermitBar.user_logout()')
+            # print('注销销毁定时器piece.base.PermitBar.user_logout()')
             self.timer.stop()
             self.timer.deleteLater()
             del self.timer
@@ -410,7 +415,7 @@ class NavigationBar(QWidget):
         self.setFixedHeight(settings.NAVIGATION_BAR_HEIGHT)
         self.setStyleSheet("""
         #navigationBar{
-            background-color:rgb(100, 100, 100);
+            background-color:rgb(34,102,185);
         }
         """)
 
@@ -532,7 +537,7 @@ class FoldedHead(QWidget):
 
     # 窗体折叠展开动画
     def body_toggle(self):
-        print('头以下的身体折叠展开')
+        # print('头以下的身体折叠展开')
         body = self.get_body()
         if not body:
             return

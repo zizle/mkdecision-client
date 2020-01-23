@@ -26,7 +26,7 @@ class CreateNewTrendTablePopup(QDialog):
         # 绑定当前显示的页面(0, 上传数据表)、(1, 新增数据组别)
         self.current_option = 0
         # 左侧类别树
-        self.variety_tree = QTreeWidget(clicked=self.variety_tree_clicked)
+        self.variety_tree = QTreeWidget(clicked=self.variety_tree_clicked, objectName='varietyTree')
         # 上传表格数据控件
         self.udwidget = QWidget()  # upload data widget
         # 右侧上传数据控件布局
@@ -82,6 +82,9 @@ class CreateNewTrendTablePopup(QDialog):
         self.variety_tree.header().hide()
         self.setObjectName('myself')
         self.setStyleSheet("""
+        #varietyTree::item{
+            height:22px;
+        }
         #AttachVariety, #AttachGroup, #tgpopAttachTo{
             color:rgb(180,20,30)
         }
@@ -142,7 +145,7 @@ class CreateNewTrendTablePopup(QDialog):
         except Exception:
             return
         for index, variety_item in enumerate(response['data']):
-            print(index, variety_item)
+            # print(index, variety_item)
             variety = QTreeWidgetItem(self.variety_tree)
             variety.setText(0, variety_item['name'])
             variety.vid = variety_item['id']
@@ -561,35 +564,32 @@ class EditTableDetailPopup(QDialog):
 
     # 删除一行数据
     def delete_button_clicked(self, delete_button):
-        try:
-            current_row, _ = self.get_widget_index(delete_button)
-            row_id = self.table.item(current_row, 0).col_id
-            def delete_row_content():
-                try:
-                    r = requests.delete(
-                        url=settings.SERVER_ADDR + 'trend/table/' + str(
-                            self.table_id) + '/?mc=' + settings.app_dawn.value('machine'),
-                        headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
-                        data=json.dumps({'row_id': row_id})
-                    )
-                    response = json.loads(r.content.decode('utf-8'))
-                    if r.status_code != 200:
-                        raise ValueError(response['message'])
-                except Exception as e:
-                    self.network_result_label.setText(str(e))
-                else:
-                    # 表格移除当前行
-                    self.table.removeRow(current_row)
-                    popup.close()
-                    self.network_result_label.setText(response['message'])
-            # 警示框
-            popup = WarningPopup(parent=self)
-            popup.confirm_button.connect(delete_row_content)
-            if not popup.exec_():
-                popup.deleteLater()
-                del popup
-        except Exception as e:
-            print(e)
+        current_row, _ = self.get_widget_index(delete_button)
+        row_id = self.table.item(current_row, 0).col_id
+        def delete_row_content():
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'trend/table/' + str(
+                        self.table_id) + '/?mc=' + settings.app_dawn.value('machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({'row_id': row_id})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result_label.setText(str(e))
+            else:
+                # 表格移除当前行
+                self.table.removeRow(current_row)
+                popup.close()
+                self.network_result_label.setText(response['message'])
+        # 警示框
+        popup = WarningPopup(parent=self)
+        popup.confirm_button.connect(delete_row_content)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
 
     # 删除整张表
     def delete_this_table(self):
@@ -875,8 +875,6 @@ class SetChartDetailPopup(QDialog):
             self.review_chart.setChart(chart)
             self.has_review_chart = True
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             popup = InformationPopup(message=str(e), parent=self)
             if not popup.exec_():
                 popup.deleteLater()
@@ -1089,7 +1087,8 @@ class VarietyTrendTablesShow(QTableWidget):
                 popup.deleteLater()
                 del popup
         except Exception as e:
-            print(e)
+            # print(e)
+            pass
 
     # 获取控件所在行和列
     def get_widget_index(self, widget):
@@ -1182,7 +1181,7 @@ class ShowChartPopup(QDialog):
                 table_df = table_df[(table_df[0] <= end_date)]
             else:
                 pass
-            print(chart_data)
+            # print(chart_data)
             x_bottom = (json.loads(chart_data['x_bottom']))
             y_left = json.loads(chart_data['y_left'])
             y_right = json.loads(chart_data['y_right'])
