@@ -701,6 +701,8 @@ class InfoServicePage(QWidget):
         elif sid == 11:  # 策略服务-套保方案
             page = HedgePlanPage(parent=self.frame)
             page.getCurrentPlanContents()
+        elif sid == 12:  # 培训服务-品种介绍
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/varietyIntro/培训服务_品种介绍.pdf', parent=self.frame)
         else:
             page = QLabel('当前模块正在加紧开放...',
                           styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)
