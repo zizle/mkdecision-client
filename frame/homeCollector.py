@@ -539,7 +539,7 @@ class NormalReportPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.report_table.showRowContents(response['data'])
+            self.report_table.showRowContents(response['data']['contacts'])
             self.network_message_label.setText(response['message'])
 
     # 新增报告
@@ -708,7 +708,7 @@ class TransactionNoticePage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.notice_table.showRowContents(response['data'])
+            self.notice_table.showRowContents(response['data']['contacts'])
             self.network_message_label.setText(response['message'])
 
     # 新建交易通知

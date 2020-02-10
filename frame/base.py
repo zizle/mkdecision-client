@@ -102,7 +102,7 @@ class BaseWindow(QWidget):
         user_desktop = QDesktopWidget().availableGeometry()  # 用户的桌面信息,来改变自身窗体大小
         max_width = user_desktop.width()
         max_height = user_desktop.height()
-        self.resize(max_width * 0.8, max_height * 0.8)
+        self.resize(max_width * 0.8, max_width * 0.8 * 0.618)
         self.setMaximumSize(max_width, max_height)  # 最大为用户桌面大小
         self.setMinimumSize(max_width * 0.5, max_height * 0.5)  # 最小为用户桌面大小的一半
         my_frame = self.frameGeometry()  # 1 (三步法放置桌面中心)自身窗体信息(虚拟框架)

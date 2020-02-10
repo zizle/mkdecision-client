@@ -9,6 +9,74 @@ from PyQt5.QtWidgets import QDialog, QDateEdit, QTimeEdit, QVBoxLayout, QTextEdi
 from PyQt5.QtCore import Qt, QDate, QTime
 import settings
 
+
+""" 培训服务-品种介绍 """
+
+# 修改部门组建文件
+class ModifyVarietyIntroPopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(ModifyVarietyIntroPopup, self).__init__(*args, **kwargs)
+        layout = QGridLayout()
+        layout.addWidget(QLabel('文件:'), 0, 0)
+        self.file_edit = QLineEdit()
+        self.file_edit.setEnabled(False)
+        layout.addWidget(self.file_edit, 0, 1)
+        layout.addWidget(QPushButton('浏览', clicked=self.select_file), 0, 2)
+        layout.addWidget(QLabel(objectName='fileError'), 1, 0, 1, 3)
+        layout.addWidget(QPushButton('确定', clicked=self.commit_upload), 2, 1, 1, 2)
+        self.setMinimumWidth(400)
+        self.setWindowTitle('修改文件')
+        self.setLayout(layout)
+
+    # 选择文件
+    def select_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files(*.pdf)")
+        if file_path:
+            # file_name = file_path.rsplit('/', 1)[1]
+            # file_name = file_name.rsplit('.', 1)[0]
+            # self.name_edit.setText(file_name)
+            self.file_edit.setText(file_path)
+
+    # 修改人才培养显示文件内容
+    def commit_upload(self):
+        # name = re.sub(r'\s+', '', self.name_edit.text())
+        # if not name:
+        #     self.findChild(QLabel, 'nameError').setText('请输入名称!')
+        #     return
+        file_path = self.file_edit.text()
+        file_name = file_path.rsplit('/', 1)[1]
+        data_file = dict()
+        # # 增加其他字段
+        # data_file['name'] = name
+        # 读取文件
+        file = open(file_path, "rb")
+        file_content = file.read()
+        file.close()
+        # 文件内容字段
+        data_file["file"] = (file_name, file_content)
+        encode_data = encode_multipart_formdata(data_file)
+        data_file = encode_data[0]
+        # 发起上传请求
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'info/variety-intro/?mc=' + settings.app_dawn.value('machine'),
+                headers={
+                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
+                    'Content-Type': encode_data[1]
+                },
+                data=data_file
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+
+        except Exception as e:
+            self.findChild(QLabel, 'fileError').setText(str(e))
+        else:
+            self.findChild(QLabel, 'fileError').setText(response['message'])
+
+
+
 """ 策略服务-套保方案 """
 
 

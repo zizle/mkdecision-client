@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedW
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint, QDate
 from PyQt5.QtGui import QPixmap, QBrush, QColor
 import settings
-from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, LoadedPage, TableRowReadButton
+from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, LoadedPage, TableRowReadButton, Paginator
 
 """ 【更多新闻】页面"""
 
@@ -244,6 +244,9 @@ class NormalReportTable(QTableWidget):
                     read_button = TableRowReadButton('阅读')
                     read_button.button_clicked.connect(self.read_button_clicked)
                     self.setCellWidget(row, col + 1, read_button)
+        # 设置表格高度
+        self.setMinimumHeight(self.rowCount() * 30 + 45)
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
     # 阅读一个报告
     def read_button_clicked(self, read_button):
@@ -272,9 +275,13 @@ class NormalReportPage(QWidget):
         variety_widget = QWidget(parent=self, objectName='varietyCombo')
         relate_variety_layout = QHBoxLayout(margin=0, spacing=2)
         relate_variety_layout.addWidget(QLabel('相关品种:'))
-        self.variety_combo = QComboBox(activated=self.getCurrentReports, objectName='combo')
+        self.variety_combo = QComboBox(activated=self.varietyChanged, objectName='combo')
         relate_variety_layout.addWidget(self.variety_combo)
         relate_variety_layout.addStretch()
+        # 页码控制
+        self.paginator = Paginator(parent=self)
+        self.paginator.clicked.connect(self.getCurrentReports)
+        relate_variety_layout.addWidget(self.paginator)
         variety_widget.setLayout(relate_variety_layout)
         layout.addWidget(variety_widget)
         self.report_table = NormalReportTable()
@@ -310,13 +317,19 @@ class NormalReportPage(QWidget):
                     self.variety_combo.addItem(variety_item['name'], variety_item['id'])
             self.getCurrentReports()  # 获取当前报告
 
+    # 选择了品种
+    def varietyChanged(self):
+        self.paginator.clearPages()
+        self.getCurrentReports()
+
     # 获取当前显示的报告
     def getCurrentReports(self):
+        current_page = self.paginator.current_page
         current_variety_id = self.variety_combo.currentData()
         try:
             # 发起上传请求
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/normal-report/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'home/normal-report/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine'),
                 data=json.dumps({'category': self.category_id, 'variety': current_variety_id})
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -325,7 +338,8 @@ class NormalReportPage(QWidget):
         except Exception:
             pass
         else:
-            self.report_table.showRowContents(response['data'])
+            self.report_table.showRowContents(response['data']['contacts'])
+            self.paginator.setTotalPages(response['data']['total_page'])
 
 
 """ 交易通知显示相关 """
@@ -392,17 +406,32 @@ class TransactionNoticePage(QWidget):
     def __init__(self, category_id, *args, **kwargs):
         super(TransactionNoticePage, self).__init__(*args, **kwargs)
         self.category_id = category_id
-        layout = QVBoxLayout(margin=0)
+        layout = QVBoxLayout(margin=0, spacing=1)
+        # 页码器
+        contro_widget = QWidget(parent=self, objectName='controlWidget')
+        controller_layout = QHBoxLayout(margin=0)
+        self.paginator = Paginator(parent=contro_widget)
+        self.paginator.clicked.connect(self.getCurrentNotices)
+        controller_layout.addWidget(self.paginator, alignment=Qt.AlignRight)
+        contro_widget.setLayout(controller_layout)
+        layout.addWidget(contro_widget)
         self.notice_table = TransactionNoticeTable()
         layout.addWidget(self.notice_table)
         self.setLayout(layout)
+        self.setStyleSheet("""
+        #controlWidget{
+            background-color: rgb(178,200,187);
+            min-height: 20px;
+        }
+        """)
 
     # 获取当前通知
     def getCurrentNotices(self):
+        current_page = self.paginator.current_page
         try:
             # 发起请求当前数据
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/transaction_notice/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'home/transaction_notice/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine'),
                 data=json.dumps({'category_id': self.category_id})
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -411,8 +440,8 @@ class TransactionNoticePage(QWidget):
         except Exception:
             pass
         else:
-            self.notice_table.showRowContents(response['data'])
-
+            self.notice_table.showRowContents(response['data']['contacts'])
+            self.paginator.setTotalPages(response['data']['total_page'])
 
 """ 现货报表相关 """
 
@@ -676,7 +705,8 @@ class HomePage(QScrollArea):
     def resizeEvent(self, event):
         super(HomePage, self).resizeEvent(event)
         # 控制新闻控件的大小
-        self.news_box.setFixedSize(self.parent().width() * 0.382, self.news_box.width()/4 * 3)
+        box_width = self.parent().width() * 0.382
+        self.news_box.setFixedSize(box_width, box_width/4 * 3)
 
     # 阅读更多新闻
     def read_more_news(self):

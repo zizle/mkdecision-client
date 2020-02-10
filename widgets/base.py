@@ -921,6 +921,11 @@ class Paginator(QWidget):
     def setMargins(self, a, b, c, d):
         self.layout().setContentsMargins(a, b, c, d)
 
+    # 清空页码
+    def clearPages(self):
+        self.current_page = self.total_pages = 1
+        self.current_label.setText('1/1')
+
     # 设置总页数
     def setTotalPages(self, total_pages):
         self.total_pages = total_pages
@@ -960,5 +965,6 @@ class Paginator(QWidget):
         if self.current_page == self.total_pages:
             return
         self.current_page += 1
+        print('下一页里',self.current_page)
         self.setCurrentPageLable()
         self.clicked.emit(self.current_page)

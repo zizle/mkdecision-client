@@ -10,7 +10,30 @@ import settings
 from widgets.base import TableRowReadButton, TableRowDeleteButton, PDFContentPopup, Paginator, PDFContentShower
 from popup.infoServiceCollector import CreateNewSMSLink, EditSMSLink, CreateNewMarketAnalysisPopup, \
     CreateNewSearchReportPopup, CreateNewTopicSearchPopup, ModifyPersonnelTrainPopup, ModifyDeptBuildPopup, \
-    ModifyInstExaminePopup, CreateNewTradePolicyPopup, EditTradePolicy, CreateNewInvestPlanPopup, CreateNewHedgePlanPopup
+    ModifyInstExaminePopup, CreateNewTradePolicyPopup, EditTradePolicy, CreateNewInvestPlanPopup, CreateNewHedgePlanPopup, \
+    ModifyVarietyIntroPopup
+
+
+""" 培训服务-品种介绍 """
+
+
+# 品种介绍
+class VarietyIntroMaintain(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(VarietyIntroMaintain, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0)
+        layout.addWidget(QPushButton('修改', clicked=self.modify_file), alignment=Qt.AlignRight)
+        # 显示服务端pdf文件
+        content_show = PDFContentShower(file=settings.STATIC_PREFIX + 'info/varietyIntro/培训服务_品种介绍.pdf', parent=self)
+        layout.addWidget(content_show)
+        self.setLayout(layout)
+
+    # 修改部门组建显示的文件
+    def modify_file(self):
+        popup = ModifyVarietyIntroPopup(parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
 
 
 """ 策略服务-套保方案 """
@@ -1143,6 +1166,8 @@ class InfoServicePageCollector(QWidget):
         elif service_id == 11:  # 套保方案
             page = HedgePlanMaintain()
             page.getFileContents()
+        elif service_id == 12:  # 培训服务-品种介绍
+            page = VarietyIntroMaintain()
         else:
             page = QLabel('【' + text + '】还不能进行数据管理...',
                           styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)
