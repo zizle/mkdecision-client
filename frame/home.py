@@ -4,23 +4,13 @@ import os
 import json
 import requests
 import chardet
+import sip
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
     QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QDateEdit
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint, QDate
 from PyQt5.QtGui import QPixmap, QBrush, QColor
 import settings
 from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, LoadedPage, TableRowReadButton, Paginator
-
-""" 【更多新闻】页面"""
-
-
-class MoreNewsPage(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(MoreNewsPage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel('暂无更多新闻，关注其他资讯...', styleSheet='font-size:18px;color:rgb(200,120,130)')
-                         , alignment=Qt.AlignCenter)
-        self.setLayout(layout)
 
 
 """ 新闻公告栏相关 """
@@ -96,7 +86,7 @@ class NewsItem(QWidget):
         self.item_clicked.emit(self.item_id)
 
 
-# 新闻公告板块
+# 首页中新闻公告板块
 class NewsBox(QWidget):
     news_item_clicked = pyqtSignal(int)
 
@@ -138,8 +128,90 @@ class NewsBox(QWidget):
         return self.more_button
 
 
-""" 图片广告轮播相关 """
+# 更多新闻页面
+class MoreNewsPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(MoreNewsPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        self.news_scroll = QScrollArea(parent=self, objectName='newsScroll')
+        self.news_scroll.setWidgetResizable(True)
+        layout.addWidget(self.news_scroll)
+        self.paginator = Paginator(parent=self)
+        self.paginator.clicked.connect(self.getCurrentNews)
+        layout.addWidget(self.paginator, alignment=Qt.AlignBottom | Qt.AlignCenter)
+        # layout.addWidget(QLabel('暂无更多新闻，关注其他资讯...', styleSheet='font-size:18px;color:rgb(200,120,130)')
+        #                  , alignment=Qt.AlignCenter)
+        self.setLayout(layout)
+        self.setStyleSheet("""
+        #newsScroll{
+            border:none;
+        }
+        """)
 
+    # 获取新闻公告内容
+    def getCurrentNews(self):
+        current_page = self.paginator.current_page
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/news-more/?page=' + str(
+                    current_page) + '&mc=' + settings.app_dawn.value('machine')
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception:
+            pass
+        else:
+            self.resetNewsBox()
+            news_data = response['data']['contacts']
+            for news_obj in news_data:
+                news_item = NewsItem(
+                    title=news_obj['title'],
+                    create_time=news_obj['create_time'],
+                    item_id=news_obj['id'],
+                    parent=self.news_box
+                )
+                news_item.item_clicked.connect(self.read_detail_news)
+                self.news_box.layout().addWidget(news_item)
+            self.news_box.layout().addStretch()
+            self.paginator.setTotalPages(response['data']['total_page'])
+
+    # 清除控件内的条目
+    def resetNewsBox(self):
+        if hasattr(self, 'news_box'):
+            self.news_box.deleteLater()
+        self.news_box = QWidget(parent=self.news_scroll)
+        news_layout = QVBoxLayout(margin=0)
+        self.news_box.setLayout(news_layout)
+        self.news_scroll.setWidget(self.news_box)
+
+    # 阅读新闻
+    def read_detail_news(self, news_id):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/news/' + str(news_id) + '/',
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            # 根据具体情况显示内容
+            news_data = response['data']
+            if news_data['file']:
+                # 显示文件
+                file = settings.STATIC_PREFIX + news_data['file']
+                popup = PDFContentPopup(title=news_data['title'], file=file, parent=self)
+            else:
+                popup = TextContentPopup(title=news_data['title'], content=news_data['content'], parent=self)  # 显示内容
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
+
+
+
+""" 图片广告轮播相关 """
 
 # 轮播图的label
 class SliderLabel(QLabel):
@@ -713,6 +785,7 @@ class HomePage(QScrollArea):
         page = MoreNewsPage()
         self.parent().clear()
         self.parent().addWidget(page)
+        page.getCurrentNews()  # 请求数据
 
     # 阅读一条新闻
     def read_news_item(self, news_id):
