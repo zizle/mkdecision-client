@@ -12,6 +12,7 @@ import settings
 from widgets.base import TitleBar, NavigationBar, LoadedPage
 from utils.machine import get_machine_code
 from popup.tips import InformationPopup
+from frame.usercenter import UserCenter
 
 """ 欢迎页 """
 
@@ -86,7 +87,7 @@ class BaseWindow(QWidget):
         # self.mousePressed = False
         # 设置窗体的图标和名称
         self.setWindowIcon(QIcon("media/logo.png"))
-        self.setWindowTitle("瑞达期货研究院分析决策系统管理端0102001")
+        self.setWindowTitle("瑞达期货研究院分析决策系统")
         # 标题栏
         self.title_bar = TitleBar(parent=self)
         # 导航栏
@@ -96,6 +97,7 @@ class BaseWindow(QWidget):
         self.navigation_bar.clicked_register_button.connect(self.user_to_register)
         self.navigation_bar.clicked_logout_button.connect(self.user_to_logout)
         self.navigation_bar.module_bar.menu_clicked.connect(self.module_clicked)  # 选择了某个模块的
+        self.navigation_bar.permit_bar.to_usercenter.connect(self.skip_to_usercenter)  # 跳转至用户中心
         # 窗口承载体
         self.page_container = LoadedPage(parent=self)
         # 属性、样式
@@ -172,6 +174,8 @@ class BaseWindow(QWidget):
             dynamic_username = phone[0:3] + '****' + phone[7:11]
         # 改变显示用户名
         self.navigation_bar.permit_bar.show_username(dynamic_username)
+        # 设置用户id
+        self.navigation_bar.permit_bar.set_user_id(response_data['id'])
         # 设置管理角色的菜单
         self.navigation_bar.module_bar.setMenuActions(response_data['actions'])
 
@@ -359,6 +363,13 @@ class BaseWindow(QWidget):
         # 设置模块菜单
         self.navigation_bar.module_bar.setMenus(modules)
 
+    # 跳转个人中心
+    def skip_to_usercenter(self, user_id):
+        print('跳转个人中心', user_id)
+        self.page_container.clear()
+        page = UserCenter(user_id, parent=self.page_container)
+        self.page_container.addWidget(page)
+
     # 点击模块菜单事件(接受到模块的id和模块名称)
     def module_clicked(self, module_id, module_text):
         # print(module_id, module_text)
@@ -391,7 +402,6 @@ class BaseWindow(QWidget):
             elif module_text == u'产品服务':
                 from frame.infoService import InfoServicePage
                 page = InfoServicePage(parent=self.page_container)
-
             elif module_text == '数据分析':
                 from frame.trend import TrendPage
                 page = TrendPage(parent=self.page_container)
@@ -400,7 +410,6 @@ class BaseWindow(QWidget):
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)
-
             elif module_text == u'运营管理':
                 from frame.operator import OperatorMaintain
                 page = OperatorMaintain(parent=self.page_container)
@@ -409,29 +418,10 @@ class BaseWindow(QWidget):
                 from frame.authority import AuthorityMaintain
                 page = AuthorityMaintain(parent=self.page_container)
                 page.getCurrentUsers()
-            # elif module_text == u'数据管理':
-            #     from windows.maintenance import MaintenanceHome
-            #     tab = MaintenanceHome(parent=self.tab_loaded)
-            # elif module_text == u'权限管理':
-            #     from windows.maintenance import AuthorityHome
-            #     tab = AuthorityHome(parent=self.tab_loaded)
-            #     tab.addComboItem()  # 添加选择当前角色，并由此出发请求相应用户列表
             else:
                 page = QLabel(parent=self.page_container,
                               styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
                               alignment=Qt.AlignCenter)
                 page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
-
             self.page_container.clear()
-            # print('当前窗体个数：', self.page_container.count())
             self.page_container.addWidget(page)
-            # self.page_container.removeWidget(self.page_container.widget(0))
-            # print('当前窗体个数：', self.page_container.count())
-
-
-            # self.tab_loaded.clear()
-
-
-
-
-

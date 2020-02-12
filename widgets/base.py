@@ -283,15 +283,19 @@ class ModuleBar(QWidget):
 
 # 登录信息栏
 class PermitBar(QWidget):
+    to_usercenter = pyqtSignal(int)
+
     def __init__(self, *args, **kwargs):
         super(PermitBar, self).__init__(*args, **kwargs)
+        self.user_id = None
         layout = QHBoxLayout(margin=0, spacing=0)
         # 用户头像
         self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.jpg', size=QSize(22, 22),
                               objectName='userAvatar')
+        self.avatar.clicked.connect(self.to_user_center)
         layout.addWidget(self.avatar, alignment=Qt.AlignRight)
         # 用户名
-        self.username_shown = QLabel('用户名用户名', parent=self, objectName='usernameShown')
+        self.username_shown = QPushButton('用户名用户名', parent=self, objectName='usernameShown', clicked=self.to_user_center)
         layout.addWidget(self.username_shown, alignment=Qt.AlignRight)
         # 按钮
         self.login_button = QPushButton('登录', parent=self, objectName='loginBtn')
@@ -329,6 +333,8 @@ class PermitBar(QWidget):
         }
         #usernameShown{
             margin-left: 3px;
+            border:none;
+            padding: 0 2px;
         }
         /*
         #userAvatar{
@@ -344,6 +350,16 @@ class PermitBar(QWidget):
         self.avatar.hide()
         self.username_shown.hide()
         self.logout_button.hide()
+
+    # 设置用户id
+    def set_user_id(self, uid):
+        self.user_id = uid
+
+    # 前往用户中心
+    def to_user_center(self):
+        if not self.user_id:
+            return
+        self.to_usercenter.emit(self.user_id)
 
     # 显示用户名
     def show_username(self, username):
