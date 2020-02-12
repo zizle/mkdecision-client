@@ -46,9 +46,9 @@ def get_machine_code():
         md.update(main_board.encode('utf-8'))
         md.update(disk.encode('utf-8'))
         machine_code = md.hexdigest()
-        # machine_code = machine_code[:-1] + '4'  # 15759566200  运营员
+        machine_code = machine_code[:-1] + '4'  # 15759566200  运营员
         # machine_code = machine_code[:-1] + '5'  # 15759566202 研究员（甲醇、尿素、纯碱、橡胶20200211）
-        machine_code = machine_code[:-1] + '6'  # 18800000006 普通用户（006）开放产品服务至20200213
+        # machine_code = machine_code[:-1] + '6'  # 18800000006 普通用户（006）开放产品服务至20200213
     except Exception:
         machine_code = ''
     return machine_code

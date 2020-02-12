@@ -17,6 +17,7 @@ from PyQt5.QtGui import QPixmap, QColor, QPainter, QPainterPath, QMovie
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkDiskCache,\
     QNetworkRequest
 from PyQt5.QtWidgets import QWidget, qApp
+from PyQt5.QtCore import pyqtSignal
 
 
 __Author__ = 'Irony'
@@ -25,7 +26,6 @@ __Version__ = 1.0
 
 
 class CAvatar(QWidget):
-
     Circle = 0              # 圆圈
     Rectangle = 1           # 圆角矩形
     SizeLarge = QSize(128, 128)
@@ -33,6 +33,7 @@ class CAvatar(QWidget):
     SizeSmall = QSize(32, 32)
     StartAngle = 0          # 起始旋转角度
     EndAngle = 360          # 结束旋转角度
+    clicked = pyqtSignal(bool)
 
     def __init__(self, *args, shape=0, url='', cacheDir=False, size=QSize(64, 64), animation=False, **kwargs):
         super(CAvatar, self).__init__(*args, **kwargs)
@@ -116,6 +117,10 @@ class CAvatar(QWidget):
         self.rotateAnimation.setStartValue(cv)
         self.rotateAnimation.setEndValue(self.StartAngle)
         self.rotateAnimation.start()
+
+    def mousePressEvent(self, event):
+        if event.buttons() == Qt.LeftButton:
+            self.clicked.emit(True)
 
     def onLoading(self):
         """更新进度动画
