@@ -377,6 +377,10 @@ class PermitBar(QWidget):
         self.timer.start(500)
         self.timer.timeout.connect(self._dynamic_username)
 
+    # 设置头像
+    def setAvatar(self, avatar_url):
+        self.avatar.setUrl(avatar_url)
+
     # 用户注销
     def user_logout(self):
         self.username_shown.setText('')

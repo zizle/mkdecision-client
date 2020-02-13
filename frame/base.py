@@ -172,6 +172,9 @@ class BaseWindow(QWidget):
         if not response_data['username']:
             phone = response_data['phone']
             dynamic_username = phone[0:3] + '****' + phone[7:11]
+        # 设置头像
+        avatar_url = settings.SERVER_ADDR[:-1] + response_data['avatar']
+        self.navigation_bar.permit_bar.setAvatar(avatar_url)
         # 改变显示用户名
         self.navigation_bar.permit_bar.show_username(dynamic_username)
         # 设置用户id
@@ -368,6 +371,8 @@ class BaseWindow(QWidget):
         print('跳转个人中心', user_id)
         self.page_container.clear()
         page = UserCenter(user_id, parent=self.page_container)
+        page.avatar_changed.connect(self.navigation_bar.permit_bar.setAvatar)
+        page.psd_changed.connect(self.navigation_bar.permit_bar.user_logout)
         self.page_container.addWidget(page)
 
     # 点击模块菜单事件(接受到模块的id和模块名称)
