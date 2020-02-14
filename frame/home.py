@@ -318,6 +318,7 @@ class NormalReportTable(QTableWidget):
                     self.setCellWidget(row, col + 1, read_button)
         # 设置表格高度
         self.setMinimumHeight(self.rowCount() * 30 + 45)
+        # 竖向自动拉伸
         self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
     # 阅读一个报告
@@ -455,6 +456,10 @@ class TransactionNoticeTable(QTableWidget):
                     read_button = TableRowReadButton('阅读')
                     read_button.button_clicked.connect(self.read_button_clicked)
                     self.setCellWidget(row, col + 1, read_button)
+        # 设置表格高度
+        self.setMinimumHeight(self.rowCount() * 30 + 45)
+        # 竖向自动拉伸
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
     # 阅读一个通知
     def read_button_clicked(self, read_button):
@@ -557,10 +562,10 @@ class SpotCommodityTable(QTableWidget):
                         num = int(content_item[header[0]])
                         text = str(num)
                         if num > 0:
-                            print('数大于0')
+                            # print('数大于0')
                             color.setColor(QColor(220, 100, 100))
                         elif num < 0:
-                            print('数《0')
+                            # print('数《0')
                             color.setColor(QColor(100, 220, 100))
                         else:
                             pass
@@ -570,6 +575,10 @@ class SpotCommodityTable(QTableWidget):
                     table_item.setForeground(color)
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
+        # 设置表格高度
+        self.setMinimumHeight(self.rowCount() * 30 + 45)
+        # 竖向自动拉伸
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
 
 # 现货报表显示主页
@@ -671,6 +680,10 @@ class FinanceCalendarTable(QTableWidget):
                     table_item = QTableWidgetItem(str(content_item[header[0]]))
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
+        # 设置表格高度
+        self.setMinimumHeight(self.rowCount() * 30 + 45)
+        # 竖向自动拉伸
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
 
 # 财经日历显示主页

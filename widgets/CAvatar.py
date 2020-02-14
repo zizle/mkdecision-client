@@ -17,7 +17,7 @@ from PyQt5.QtGui import QPixmap, QColor, QPainter, QPainterPath, QMovie
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkDiskCache,\
     QNetworkRequest
 from PyQt5.QtWidgets import QWidget, qApp
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QThread
 
 
 __Author__ = 'Irony'
@@ -139,7 +139,6 @@ class CAvatar(QWidget):
         self.loadingTimer.stop()
         self.pradius = 0
         reply = self.sender()
-
         if self.isGif:
             self._movie = QMovie(reply, b'gif', self)
             if self._movie.isValid():
@@ -184,6 +183,7 @@ class CAvatar(QWidget):
         :param url:
         """
         self.url = url
+        # print('设置头像', url)
         self._get(url)
 
     def setCacheDir(self, cacheDir=''):
@@ -250,8 +250,8 @@ class CAvatar(QWidget):
         if url.startswith('http') and not self.loadingTimer.isActive():
             url = QUrl(url)
             request = QNetworkRequest(url)
-            request.setHeader(QNetworkRequest.UserAgentHeader, b'CAvatar')
-            request.setRawHeader(b'Author', b'Irony')
+            # request.setHeader(QNetworkRequest.UserAgentHeader, b'CAvatar')
+            # request.setRawHeader(b'Author', b'Irony')
             request.setAttribute(
                 QNetworkRequest.FollowRedirectsAttribute, True)
             if qApp._network.cache():

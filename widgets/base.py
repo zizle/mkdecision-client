@@ -290,7 +290,7 @@ class PermitBar(QWidget):
         self.user_id = None
         layout = QHBoxLayout(margin=0, spacing=0)
         # 用户头像
-        self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.jpg', size=QSize(22, 22),
+        self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.png', size=QSize(22, 22),
                               objectName='userAvatar')
         self.avatar.clicked.connect(self.to_user_center)
         layout.addWidget(self.avatar, alignment=Qt.AlignRight)
@@ -376,6 +376,10 @@ class PermitBar(QWidget):
         self.timer = QTimer()
         self.timer.start(500)
         self.timer.timeout.connect(self._dynamic_username)
+
+    # 设置头像
+    def setAvatar(self, avatar_url):
+        self.avatar.setUrl(avatar_url)
 
     # 用户注销
     def user_logout(self):
