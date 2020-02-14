@@ -243,7 +243,7 @@ class UserCenter(QWidget):
             self.avatar.setUrl(url)
             self.avatar_changed.emit(url)
         else:
-            self.avatar.setUrl('media/avatar.jpg')
+            self.avatar.setUrl('media/avatar.png')
 
     def password_changed(self):
         print('密码修改了')

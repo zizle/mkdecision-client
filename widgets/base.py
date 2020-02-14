@@ -290,7 +290,7 @@ class PermitBar(QWidget):
         self.user_id = None
         layout = QHBoxLayout(margin=0, spacing=0)
         # 用户头像
-        self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.jpg', size=QSize(22, 22),
+        self.avatar = CAvatar(self, shape=CAvatar.Circle, url='media/avatar.png', size=QSize(22, 22),
                               objectName='userAvatar')
         self.avatar.clicked.connect(self.to_user_center)
         layout.addWidget(self.avatar, alignment=Qt.AlignRight)
