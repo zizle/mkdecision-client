@@ -6,7 +6,7 @@ import time
 import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QSize
 
 import settings
 from widgets.base import TitleBar, NavigationBar, LoadedPage
@@ -21,12 +21,15 @@ from frame.usercenter import UserCenter
 class WelcomePage(QSplashScreen):
     def __init__(self, *args, **kwargs):
         super(WelcomePage, self).__init__(*args, *kwargs)
-        self.setPixmap(QPixmap('media/start.png'))
+        pixmap = QPixmap('media/start.png')
+        scaled_map = pixmap.scaled(QSize(660, 400), Qt.KeepAspectRatio)
+        self.setPixmap(scaled_map)
         font = QFont()
         font.setPointSize(16)
         font.setBold(True)
         font.setWeight(75)
         self.setFont(font)
+
         self.showMessage("欢迎使用分析决策系统\n程序正在启动中...", Qt.AlignCenter, Qt.blue)
 
     # 启动使客户端存在
