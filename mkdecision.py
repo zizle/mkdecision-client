@@ -18,3 +18,4 @@ base_window.running_auto_login()  # 自动登录
 base_window.module_clicked(module_id=1, module_text=u'首页')  # 启动后显示首页
 splash.finish(base_window)  # close welcome when main page loaded  # 执行到这句话才会消失欢迎页
 sys.exit(app.exec_())
+# 'pkg_resources.py2_warn'
