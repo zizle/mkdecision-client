@@ -10,7 +10,7 @@ from requests import get as request_get
 from subprocess import Popen
 from PyQt5.QtWidgets import QApplication, QLabel
 from PyQt5.QtGui import QPixmap, QFont, QPalette, QIcon
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer
 
 # HTTP_SERVER = "http://192.168.191.2:8000/"
 HTTP_SERVER = "http://210.13.218.130:9004/"
@@ -24,6 +24,7 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 # 线程检测是否更新版本
 class CheckUpdatingVersion(QThread):
     check_successful = pyqtSignal(dict)
+    check_fail = pyqtSignal(bool)
 
     def run(self):
         version = APP_DAWN.value('VERSION')
@@ -37,7 +38,7 @@ class CheckUpdatingVersion(QThread):
                 raise ValueError('检测版本失败。')
             response = json.loads(r.content.decode('utf-8'))
         except Exception as e:
-            pass
+            self.check_fail.emit(True)
         else:
             self.check_successful.emit(response['data'])
 
@@ -53,6 +54,7 @@ class DownloadNewVersion(QThread):
         self.file_count = len(file_list)
         self.update_file_list = dict()
         self.new_version = new_version
+        self.download_process_error = False
 
     def run(self):
         # 获取本地文件
@@ -75,33 +77,35 @@ class DownloadNewVersion(QThread):
             #     # 文件不存在，需要下载文件
             #     print('文件不存在,需要下载')
             self.file_downloading.emit(index, self.file_count, str(file))
-            self.download_file(file)
+            try:
+                self.download_file(file)
+            except Exception as e:
+                self.download_process_error = True
+                self.download_fail.emit(str(e))
+                break
             time.sleep(0.000002)
             self.file_downloading.emit(index + 1, self.file_count, str(file))
         # 下载完成，写入新版本号
-        APP_DAWN.setValue('VERSION', str(self.new_version))
-        self.download_finished.emit(True)
+        if not self.download_process_error:
+            APP_DAWN.setValue('VERSION', str(self.new_version))
+            self.download_finished.emit(True)
 
     # 请求下载文件
     def download_file(self, file_name):
         file_path = os.path.join(BASE_DIR, file_name)
-        try:
-            r = request_get(
-                url=HTTP_SERVER + 'updating/download/',
-                data=json.dumps({'filename': file_name, 'identify': ADMINISTRATOR})
-            )
-            if r.status_code != 200:
-                response = r.content.decode('utf-8')
-                print(response)
-                raise ValueError(response['data'])
-            file_dir = os.path.split(file_path)[0]
-            if not os.path.exists(file_dir):
-                os.makedirs(file_dir)
-            file_name = open(file_path, 'wb')
-            file_name.write(r.content)
-            file_name.close()
-        except Exception as e:
-            self.download_fail.emit(str(e))
+        r = request_get(
+            url=HTTP_SERVER + 'updating/download/',
+            data=json.dumps({'filename': file_name, 'identify': ADMINISTRATOR})
+        )
+        if r.status_code != 200:
+            response = r.content.decode('utf-8')
+            raise ValueError(response['data'])
+        file_dir = os.path.split(file_path)[0]
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        file_name = open(file_path, 'wb')
+        file_name.write(r.content)
+        file_name.close()
 
     # 计算文件的MD5
     def get_file_md5(self, filename):
@@ -159,6 +163,9 @@ class StartPage(QLabel):
         self.show_text.setFixedSize(self.width(), self.height())
         self.show_text.setAlignment(Qt.AlignCenter)
         self.show_text.setPalette(self.red)
+        self.count_down = QTimer()
+        self.count_down.timeout.connect(self.count_down_timeout)
+        self.count_down_count = 6
         # layout.addLayout(self.show_text)
         # self.showMessage("欢迎使用分析决策系统\n正在检查新版本...", Qt.AlignCenter, Qt.blue)
 
@@ -183,10 +190,11 @@ class StartPage(QLabel):
         self.checking_thread = CheckUpdatingVersion()
         self.checking_thread.finished.connect(self.checking_thread.deleteLater)
         self.checking_thread.check_successful.connect(self.version_checked)
+        self.checking_thread.check_fail.connect(self.version_check_error)
         self.checking_thread.start()
 
     def version_checked(self, result):
-        # print('版本检测成功', result)
+        print('版本检测成功', result)
         if result['update']:
             self.show_text.setText("欢迎使用分析决策系统,正在准备更新\n检测到新版本{}".format(result['version']))
             # 线程下载文件到目录中
@@ -201,6 +209,19 @@ class StartPage(QLabel):
             self.show_text.setPalette(self.blue)
             self.update_finished()
 
+    def version_check_error(self):
+        # 版本检测失败
+        self.show_text.setText("网络错误！请检查网络设置...\n系统将在{}秒后退出!".format(self.count_down_count))
+        self.count_down.start(1000)
+
+    def count_down_timeout(self):
+        self.count_down_count -= 1
+        if self.count_down_count <= 0:
+            self.count_down_count = 6
+            self.count_down.stop()
+            sys.exit()
+        self.show_text.setText("网络错误！请检查网络设置...\n系统将在{}秒后退出!".format(self.count_down_count))
+
     def setProcessing(self, current_index, total_count, file_name):
         rate = (current_index / total_count) * 100
         file_name = os.path.split(file_name)[1]
@@ -208,9 +229,10 @@ class StartPage(QLabel):
         self.show_text.setPalette(self.blue)
 
     def update_fail(self, error):
-        self.show_text.setText("欢迎使用分析决策系统\n系统更新失败...\n{}".format(error))
+        self.show_text.setText("系统更新失败...\n{}\n稍后将自动退出!".format(error))
         self.show_text.setPalette(self.red)
-        time.sleep(2)
+        QApplication.processEvents()
+        time.sleep(8)
         self.close()
         sys.exit()
 

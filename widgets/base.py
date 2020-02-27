@@ -3,6 +3,7 @@
 import fitz
 import chardet
 import requests
+from math import floor
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QCheckBox, QGridLayout, QScrollArea,\
     QVBoxLayout, QStackedWidget, QDialog, QTextBrowser
 from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage
@@ -75,7 +76,7 @@ class TitleBar(QWidget):
         self.buttonMinimum.setFixedSize(self.HEIGHT - 5, self.HEIGHT - 5)
         self.buttonMaximum.setFixedSize(self.HEIGHT - 5, self.HEIGHT - 5)
         self.buttonClose.setFixedSize(self.HEIGHT - 5, self.HEIGHT - 5)
-        self.window_title.setText('瑞达期货研究院分析决策系统管理端0102001')
+        self.window_title.setText('瑞达期货研究院分析决策系统管理端')
         self.setStyleSheet("""
         #titleBar{
             background-color: rgb(34,102,175);
@@ -489,9 +490,12 @@ class FoldedBodyButton(QPushButton):
         self.setStyleSheet("""
         #button{
             border:none;
-            padding: 5px 2px;
+            padding: 5px 0;
             margin-top:3px;
             margin-bottom:3px;
+            font-size: 14px;
+            min-width: 60px;
+            max-width: 60px;
         }
         #button:hover{
             color:rgb(200,120,200);
@@ -506,6 +510,7 @@ class FoldedBodyButton(QPushButton):
         """)
 
     def left_mouse_clicked(self):
+        print(self.bid)
         self.mouse_clicked.emit(self.bid)
 
 
@@ -518,8 +523,7 @@ class FoldedHead(QWidget):
         layout = QHBoxLayout(margin=0)
         self.head_label = QLabel(text, parent=self, objectName='headLabel')
         self.head_button = QPushButton('', parent=self, clicked=self.body_toggle, objectName='headButton', cursor=Qt.PointingHandCursor)
-        self.head_button.setMaximumSize(30,30)
-        self.head_button.setMinimumSize(25,25)
+        self.head_button.setFixedSize(20,20)
         layout.addWidget(self.head_label, alignment=Qt.AlignLeft)
         layout.addWidget(self.head_button, alignment=Qt.AlignRight)
         self.setLayout(layout)
@@ -529,13 +533,13 @@ class FoldedHead(QWidget):
         # 样式
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
-        self.setStyleSheet("""
-        #headLabel{
-            padding:8px 5px;
-            font-weight: bold;
-            font-size:12px;
-        }
-        """)
+        # self.setStyleSheet("""
+        # #headLabel{
+        #     padding:8px 5px;
+        #     font-weight: bold;
+        #     font-size:12px;
+        # }
+        # """)
         self.moreButtonStyle()
 
     # 折叠的button样式
@@ -554,6 +558,7 @@ class FoldedHead(QWidget):
     def get_body(self):
         if hasattr(self, 'bodyChild'):
             return self.bodyChild
+        return None
 
     # 窗体折叠展开动画
     def body_toggle(self):
@@ -580,6 +585,7 @@ class FoldedBody(QWidget):
     def __init__(self, *args, **kwargs):
         super(FoldedBody, self).__init__(*args, **kwargs)
         layout = QGridLayout(margin=0)
+        self.button_list = list()
         self.setLayout(layout)
         # 样式
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
@@ -587,27 +593,20 @@ class FoldedBody(QWidget):
 
     # 添加按钮
     def addButtons(self, button_list, horizontal_count=3):
-        if horizontal_count != 3:
-            horizontal_count = 3
-        row_index = 0
-        col_index = 0
-        for index, button_item in enumerate(button_list):
+        self.button_list.clear()
+        for button_item in button_list:
             button = FoldedBodyButton(
                 text=button_item['name'],
                 bid=button_item['id'],
                 parent=self
             )
             button.mouse_clicked.connect(self.body_button_clicked)
-            self.layout().addWidget(button, row_index, col_index)
-            col_index += 1
-            if col_index == horizontal_count:  # 因为col_index先+1,此处应相等
-                row_index += 1
-                col_index = 0
+            self.button_list.append(button)
 
     # 按钮被点击
     def body_button_clicked(self, bid):
         # 获取body的parent
-        head = self.get_body()
+        head = self.get_head()
         self.mouse_clicked.emit(bid, head.head_text)
 
     # 设置身体控件(由于设置parent后用findChild没找到，用此法)
@@ -615,9 +614,23 @@ class FoldedBody(QWidget):
         if not hasattr(self, 'myHead'):
             self.myHead = head
 
-    def get_body(self):
+    def get_head(self):
         if hasattr(self, 'myHead'):
             return self.myHead
+        return None
+
+    def resetHorizationItemCount(self, body_width):
+        # 得到控件的大小，计算一列能容下的数量，向下取整
+        horizontal_count = floor(body_width / 65)  # 每个button的宽度是60 + 间距5
+        # 设置填入buttons
+        row_index = 0
+        col_index = 0
+        for index, button in enumerate(self.button_list):
+            self.layout().addWidget(button, row_index, col_index)
+            col_index += 1
+            if col_index == horizontal_count:  # 因为col_index先+1,此处应相等
+                row_index += 1
+                col_index = 0
 
 
 # 滚动折叠盒子
@@ -635,22 +648,10 @@ class ScrollFoldedBox(QScrollArea):
         self.setObjectName('foldedBox')
         # 设置样式
         self.setMinimumWidth(240)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        extra_style = """
-        #foldedHead{
-            background-color: rgb(121,175,165);
-            border-bottom: 1px solid rgb(200,200,200)
-        }
-        #foldedBody{
-            background-color: rgb(255,245,247)
-        }
-        """
-        # 设置滚动条样式(防止父控件设置无效)
-        with open("media/ScrollBar.qss", "rb") as fp:
-            content = fp.read()
-            encoding = chardet.detect(content) or {}
-            content = content.decode(encoding.get("encoding") or "utf-8")
-        self.setStyleSheet(content + extra_style)
+        self.head_list = list()
+
+    def setFoldedStyleSheet(self, stylesheet):
+        self.setStyleSheet(stylesheet)
 
     # 鼠标进入显示竖直滚动条
     def enterEvent(self, *args, **kwargs):
@@ -668,6 +669,7 @@ class ScrollFoldedBox(QScrollArea):
     def addHead(self, text):
         head = FoldedHead(text, parent=self.container, objectName='foldedHead')
         self.container.layout().addWidget(head, alignment=Qt.AlignTop)
+        self.head_list.append(head)
         return head
 
     # 添加头部的身体
@@ -684,16 +686,13 @@ class ScrollFoldedBox(QScrollArea):
         body.mouse_clicked.connect(self.left_mouse_clicked.emit)
         body.setHead(head)
         return body
+    
+    def setBodyHorizationItemCount(self):
+        for head in self.head_list:
+            body = head.get_body()
+            if body:
+                body.resetHorizationItemCount(self.width())
 
-    # 添加其他任意body控件
-    def addOtherBody(self, head, body):
-        head.setBody(body)
-        # 找出head所在的位置
-        for i in range(self.container.layout().count()):
-            widget = self.container.layout().itemAt(i).widget()
-            if isinstance(widget, FoldedHead) and widget == head:
-                self.container.layout().insertWidget(i + 1, body, alignment=Qt.AlignTop)
-                break
 
 """ 表格控件 """
 

@@ -4,7 +4,7 @@ import os
 import json
 import requests
 import chardet
-import sip
+from math import floor
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
     QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QDateEdit
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint, QDate
@@ -46,9 +46,12 @@ class NewsItem(QWidget):
         }
         #title{
             border:none;
+            font-size:14px;
+            padding-left:2px;
         }
         #createTime{
             padding:0 5px;
+            color:rgb(128,128,128)
         }
         """)
 
@@ -63,9 +66,12 @@ class NewsItem(QWidget):
         }
         #title{
             border:none;
+            font-size:14px;
+            padding-left:2px;
         }
         #createTime{
             padding:0 5px;
+            color:rgb(128,128,128)
         }
         """)
 
@@ -118,8 +124,17 @@ class NewsBox(QWidget):
         for item in item_list:
             item.item_clicked.connect(self.news_item_clicked)
             self.layout().addWidget(item, alignment=Qt.AlignTop)
-        if len(item_list) < 12:
-            self.layout().addStretch()
+
+    # 设置当前显示的条目数
+    def setItemCount(self, count):
+        total_count = self.layout().count()
+        if total_count >= count:
+            for item_index in range(0, total_count - 1):
+                widget = self.layout().itemAt(item_index).widget()
+                if item_index < count:
+                    widget.show()
+                else:
+                    widget.hide()
 
     # 设置更多按钮
     def setMoreNewsButton(self):
@@ -292,16 +307,21 @@ class NormalReportTable(QTableWidget):
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setStyleSheet("font-size: 14px")
+        self.cellClicked.connect(self.read_report)
+
 
     # 显示报告内容
     def showRowContents(self, report_list):
         self.clear()
         self.setRowCount(len(report_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setColumnCount(len(self.KEY_LABELS))
         self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        # self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        self.setColumnWidth(1, 400)
         for row, content_item in enumerate(report_list):
             for col, header in enumerate(self.KEY_LABELS):
                 if col == 0:
@@ -312,14 +332,27 @@ class NormalReportTable(QTableWidget):
                     table_item = QTableWidgetItem(str(content_item[header[0]]))
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
-                if col == len(self.KEY_LABELS) - 1:
-                    read_button = TableRowReadButton('阅读')
-                    read_button.button_clicked.connect(self.read_button_clicked)
-                    self.setCellWidget(row, col + 1, read_button)
+                # if col == len(self.KEY_LABELS) - 1:
+                #     read_button = TableRowReadButton('阅读')
+                #     read_button.button_clicked.connect(self.read_button_clicked)
+                #     self.setCellWidget(row, col + 1, read_button)
         # 设置表格高度
         self.setMinimumHeight(self.rowCount() * 30 + 45)
         # 竖向自动拉伸
         self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+    def read_report(self, row, col):
+        print('dianji')
+        print(row, col)
+        if col == 1:
+            report_file = self.item(row, 0).file
+            # 显示文件
+            file = settings.STATIC_PREFIX + report_file
+            popup = PDFContentPopup(title='阅读报告', file=file, parent=self)
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
+
 
     # 阅读一个报告
     def read_button_clicked(self, read_button):
@@ -765,7 +798,7 @@ class HomePage(QScrollArea):
         layout.addLayout(news_slider_layout)
         # 左下角菜单折叠窗
         # 菜单-显示窗布局
-        box_frame_layout = QHBoxLayout()
+        box_frame_layout = QHBoxLayout(spacing=1)
         # 菜单滚动折叠窗
         self.folded_box = ScrollFoldedBox(parent=self)
         # self.folded_box.getFoldedBoxMenu()  # 初始化获取它的内容再加入布局
@@ -780,6 +813,22 @@ class HomePage(QScrollArea):
         self.setWidgetResizable(True)  # 内部控件可随窗口调整大小
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # 设置折叠窗的样式
+        self.folded_box.setFoldedStyleSheet("""
+        #foldedHead{
+            background-color: rgb(101,155,135);
+            border-bottom: 1px solid rgb(200,200,200);
+            max-height: 30px;
+        }
+        #headLabel{
+            padding:8px 5px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        #foldedBody{
+            background-color: rgb(240, 240, 240);
+        }
+        """)
         # 设置滚动条样式
         with open("media/ScrollBar.qss", "rb") as fp:
             content = fp.read()
@@ -790,9 +839,17 @@ class HomePage(QScrollArea):
     def resizeEvent(self, event):
         super(HomePage, self).resizeEvent(event)
         # 控制新闻控件的大小
-        box_width = self.parent().width() * 0.382
-        self.news_box.setFixedSize(box_width, box_width/4 * 3)
-
+        box_width = self.parent().width() * 0.3
+        box_height = box_width / 8 * 3
+        self.news_box.setFixedSize(box_width, box_height)
+        # 计算当前控件能容纳的条目数
+        self.news_box.setItemCount(floor(box_height / 25))
+        # 控制广告图形的高度
+        self.image_slider.setFixedHeight(box_height)
+        # 控制左下角折叠窗的宽度
+        self.folded_box.setMinimumWidth(box_width)
+        # 重新设置body的排序数量
+        self.folded_box.setBodyHorizationItemCount()
     # 阅读更多新闻
     def read_more_news(self):
         page = MoreNewsPage()
