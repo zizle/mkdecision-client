@@ -185,9 +185,9 @@ class ModuleButton(QPushButton):
 
 
 # 管理菜单按钮
-class ManagerMenu(QMenu):
+class DropdownMenu(QMenu):
     def __init__(self, *args, **kwargs):
-        super(ManagerMenu, self).__init__(*args, **kwargs)
+        super(DropdownMenu, self).__init__(*args, **kwargs)
         self.setStyleSheet("""
         QMenu{
             background-color:rgb(34,102,175); /* sets background of the menu 设置整个菜单区域的背景色 */
@@ -217,7 +217,7 @@ class ModuleBar(QWidget):
         super(ModuleBar, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0, spacing=0)
         self.system_manager_button = QPushButton('系统管理')
-        self.actions_menu = ManagerMenu()
+        self.actions_menu = DropdownMenu()
         self.actions_menu.triggered.connect(self.module_action_selected)
         self.setLayout(layout)
         # 样式设计
@@ -249,12 +249,24 @@ class ModuleBar(QWidget):
         self.system_manager_button.setText('系统管理')
 
     # 设置菜单按钮
-    def setMenus(self, menu_data):
+    def setMenus(self, menu_obj_list):
         # print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
         self.clearActionMenu()
-        for menu_item in menu_data:
-            menu = ModuleButton(mid=menu_item['id'], text=menu_item['name'])
-            menu.clicked_module.connect(self.module_menu_clicked)
+        for menu_dict_item in menu_obj_list:
+            menu = ModuleButton(mid=menu_dict_item['id'], text=menu_dict_item['name'])
+            sub_module_items = menu_dict_item['subs']
+            if sub_module_items:  # 有子菜单
+                drop_down_menu = DropdownMenu()  # 创建下拉菜单
+                drop_down_menu.triggered.connect(self.module_action_selected)  # 下拉菜单信号
+                # 先加入原来的模块
+                drop_action = drop_down_menu.addAction(menu_dict_item['name'])
+                drop_action.aid = menu_dict_item['id']
+                for sub_module in sub_module_items:
+                    drop_action = drop_down_menu.addAction(sub_module['name'])
+                    drop_action.aid = sub_module['id']
+                menu.setMenu(drop_down_menu)
+            else:  # 没有子菜单关联原菜单的点击事件
+                menu.clicked_module.connect(self.module_menu_clicked)
             self.layout().addWidget(menu)
         # print('添加后模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
 
@@ -278,7 +290,7 @@ class ModuleBar(QWidget):
 
     # 管理菜单选择了
     def module_action_selected(self, action):
-        self.system_manager_button.setText(action.text())
+        # self.system_manager_button.setText(action.text())
         self.menu_clicked.emit(action.aid, action.text())
 
 
@@ -823,7 +835,7 @@ class PDFContentPopup(QDialog):
         self.file_name = title
         # auth doc type
         self.setWindowTitle(title)
-        self.setMinimumSize(1000, 600)
+        self.setMinimumSize(1010, 600)
         self.download = QPushButton("下载PDF")
         self.download.setIcon(QIcon('media/download-file.png'))
         self.setWindowIcon(QIcon("media/reader.png"))
@@ -866,7 +878,7 @@ class PDFContentPopup(QDialog):
         for page_index in range(doc.pageCount):
             page = doc.loadPage(page_index)
             page_label = QLabel()
-            page_label.setMinimumSize(self.width() - 20, self.height())  # 设置label大小
+            page_label.setMinimumSize(self.width() - 25, self.height())  # 设置label大小
             # show PDF content
             zoom_matrix = fitz.Matrix(1.58, 1.5)  # 图像缩放比例
             pagePixmap = page.getPixmap(

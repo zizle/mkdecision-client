@@ -364,11 +364,11 @@ class BaseWindow(QWidget):
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception:
-            modules = {}
+            modules = []
         else:
             modules = response['data']
-        # 设置模块菜单
-        self.navigation_bar.module_bar.setMenus(modules)
+            # 设置模块菜单
+            self.navigation_bar.module_bar.setMenus(modules)
 
     # 跳转个人中心
     def skip_to_usercenter(self, user_id):

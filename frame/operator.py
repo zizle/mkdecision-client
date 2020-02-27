@@ -2,16 +2,15 @@
 # __Author__： zizle
 import json
 import requests
-import pandas as pd
 from PyQt5.QtWidgets import QWidget, QListWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QLabel, QComboBox, \
-    QHeaderView, QPushButton, QTableWidgetItem, QLineEdit, QListView
-from PyQt5.QtCore import Qt, QMargins, QDateTime
+    QHeaderView, QPushButton, QTableWidgetItem, QLineEdit, QListView, QAbstractItemView, QTableWidget
+from PyQt5.QtCore import Qt, QMargins, QDateTime, pyqtSignal, QPoint
 from PyQt5.QtGui import QFont, QPainter
 from PyQt5.QtChart import QChartView, QChart, QLineSeries, QDateTimeAxis, QValueAxis
 from popup.operator import EditUserInformationPopup, EditClientInformationPopup, CreateNewModulePopup,\
-    EditModuleInformationPopup, CreateNewVarietyPopup, EditVarietyInformationPopup
+     ModuleSubsInformationPopup,CreateNewVarietyPopup, EditVarietyInformationPopup
 import settings
-from widgets.operator import ManageTable
+from widgets.operator import ManageTable, EditButton
 from widgets.base import TableCheckBox
 
 """ 用户管理相关 """
@@ -246,7 +245,8 @@ class ClientManagePage(QWidget):
 
 
 # 模块显示管理表格
-class ModulesTable(ManageTable):
+class ModulesTable(QTableWidget):
+    network_result = pyqtSignal(str)
     KEY_LABELS = [
         ('id', '序号'),
         ('name', '名称'),
@@ -254,9 +254,40 @@ class ModulesTable(ManageTable):
     ]
     CHECK_COLUMNS = [2]
 
-    def resetTableMode(self, row_count):
-        super(ModulesTable, self).resetTableMode(row_count)
+    def __init__(self, *args, **kwargs):
+        super(ModulesTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.module_data = None
+
+    # 设置表格数据
+    def setRowContents(self, row_list):
+        self.module_data = row_list
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 1)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, user_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = user_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(user_item[header[0]]))
+                if col in self.CHECK_COLUMNS:
+                    check_box = TableCheckBox(checked=user_item[header[0]])
+                    check_box.check_activated.connect(self.check_box_changed)
+                    self.setCellWidget(row, col, check_box)
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # 增加【查看子块】按钮
+                if col == len(self.KEY_LABELS) - 1:
+                    show_subs_button = EditButton('子模块')
+                    show_subs_button.button_clicked.connect(self.show_subs_button_clicked)
+                    self.setCellWidget(row, col + 1, show_subs_button)
 
     # 编辑模块的有效
     def check_box_changed(self, check_box):
@@ -277,15 +308,35 @@ class ModulesTable(ManageTable):
         else:
             self.network_result.emit(response['message'])
 
-    def edit_button_clicked(self, edit_button):
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+    # 查看当前模块的子块
+    def show_subs_button_clicked(self, edit_button):
         current_row, current_col = self.get_widget_index(edit_button)
         module_id = self.item(current_row, 0).id
-        # 弹窗编辑信息
-        edit_popup = EditModuleInformationPopup(module_id=module_id, parent=self)
-        edit_popup.getCurrentModule()
-        if not edit_popup.exec_():
-            edit_popup.deleteLater()
-            del edit_popup
+        # 获取子模块
+        subs_popup = None
+        for module_dict_items in self.module_data:
+            if module_dict_items['id'] == module_id:
+                # 弹窗显示子模块信息
+                subs_popup = ModuleSubsInformationPopup(
+                    parent_id=module_id,
+                    parent_name=module_dict_items['name'],
+                    module_subs=module_dict_items['subs']
+                )
+                break
+        if subs_popup:
+            if not subs_popup.exec_():
+                subs_popup.deleteLater()
+                del subs_popup
+
+        # edit_popup.getCurrentModule()
+        # if not edit_popup.exec_():
+        #     edit_popup.deleteLater()
+        #     del edit_popup
 
 
 # 模块管理页面
@@ -320,12 +371,12 @@ class ModuleManagePage(QWidget):
         except Exception as e:
             self.network_message.setText(str(e))
         else:
-            self.module_table.setRowContents(response['data'])
             self.network_message.setText(response['message'])
+            self.module_table.setRowContents(response['data'])
 
     # 新增系统模块
     def create_new_module(self):
-        popup = CreateNewModulePopup(parent=self)
+        popup = CreateNewModulePopup(parent=self, module_combo=self.module_table.module_data)
         if not popup.exec_():
             popup.deleteLater()
             del popup

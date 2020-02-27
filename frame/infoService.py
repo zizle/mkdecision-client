@@ -618,7 +618,6 @@ class InfoServicePage(QWidget):
         layout = QHBoxLayout(margin=2)
         self.variety_folded = ScrollFoldedBox()
         self.variety_folded.left_mouse_clicked.connect(self.enter_service)
-        self.variety_folded.setMaximumWidth(250)
         layout.addWidget(self.variety_folded)
         self.frame = LoadedPage()
         layout.addWidget(self.frame)
@@ -671,6 +670,10 @@ class InfoServicePage(QWidget):
             body = self.variety_folded.addBody(head=head)
             body.addButtons(group_item['subs'])
         self.variety_folded.container.layout().addStretch()
+
+    def resizeEvent(self, event):
+        print('页面大小钙奶')
+        self.variety_folded.setBodyHorizationItemCount()
 
     # 点击服务，显示页面
     def enter_service(self, sid, text):
