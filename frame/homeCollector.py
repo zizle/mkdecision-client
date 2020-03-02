@@ -3,7 +3,7 @@
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout,QGridLayout, QListWidget, QLabel, QDialog, QComboBox, \
-    QPushButton, QHeaderView, QTableWidget, QAbstractItemView, QTableWidgetItem, QDateEdit
+    QPushButton, QHeaderView, QTableWidget, QAbstractItemView, QTableWidgetItem, QDateEdit, QListWidgetItem
 from PyQt5.Qt import Qt, pyqtSignal, QPoint, QDate
 from PyQt5.QtGui import QPixmap, QImage
 from widgets.base import LoadedPage, PDFContentPopup, TextContentPopup
@@ -11,7 +11,7 @@ from popup.homeCollector import CreateNewsPopup, CreateAdvertisementPopup, Creat
     CreateNewSpotTablePopup, CreateNewFinanceCalendarPopup
 import settings
 from widgets.base import TableRowDeleteButton, TableRowReadButton
-from popup.tips import WarningPopup
+from popup.tips import WarningPopup, InformationPopup
 
 """ 【首页】数据管理相关 """
 
@@ -975,14 +975,12 @@ class FinanceCalendarPage(QWidget):
             self.finance_table.showRowContents(response['data'])
             self.network_message_label.setText(response['message'])
 
-
     # 新增财经日历数据
     def create_finance_calendar(self):
         popup = CreateNewFinanceCalendarPopup(parent=self)
         if not popup.exec_():
             popup.deleteLater()
             del popup
-
 
 
 """ 首页管理主页 """
@@ -1011,7 +1009,15 @@ class HomePageCollector(QWidget):
 
     # 添加菜单按钮
     def _addListMenu(self):
-        for item in [u'新闻公告', u'广告设置', u'常规报告', u'交易通知', u'现货报表', u'财经日历']:
+        # 获取身份证明
+        s_key = settings.app_dawn.value('SKEY', 0)
+        if s_key >= 7:  # 信息管理以上
+            actions = [u'新闻公告', u'广告设置', u'常规报告', u'交易通知', u'现货报表', u'财经日历']
+        elif s_key <= 5:
+            actions = []
+        else:
+            actions = [u'常规报告']
+        for item in actions:
             self.left_list.addItem(item)
 
     # 点击左侧按钮

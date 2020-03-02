@@ -314,7 +314,7 @@ class NormalReportTable(QTableWidget):
         self.horizontalHeader().setStyleSheet("""
         QHeaderView::section,
         QTableCornerButton::section {
-            min-height: 30px;
+            min-height: 25px;
             padding: 1px;border: none;
             border-right: 1px solid rgb(211,212,212);
             border-bottom: 1px solid rgb(211,212,212);
@@ -387,6 +387,7 @@ class NormalReportPage(QWidget):
         relate_variety_layout.addWidget(QLabel('相关品种:'))
         self.variety_combo = QComboBox(activated=self.varietyChanged, objectName='combo')
         self.variety_combo.setCursor(Qt.PointingHandCursor)
+        self.variety_combo.setMinimumWidth(60)
         relate_variety_layout.addWidget(self.variety_combo)
         relate_variety_layout.addStretch()
         # 页码控制
@@ -492,7 +493,7 @@ class TransactionNoticeTable(QTableWidget):
         self.horizontalHeader().setStyleSheet("""
         QHeaderView::section,
         QTableCornerButton::section {
-            min-height: 30px;
+            min-height: 25px;
             padding: 1px;border: none;
             border-right: 1px solid rgb(211,212,212);
             border-bottom: 1px solid rgb(211,212,212);
@@ -628,6 +629,25 @@ class SpotCommodityTable(QTableWidget):
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.horizontalHeader().setStyleSheet("""
+        QHeaderView::section,
+        QTableCornerButton::section {
+            min-height: 25px;
+            padding: 1px;border: none;
+            border-right: 1px solid rgb(211,212,212);
+            border-bottom: 1px solid rgb(211,212,212);
+            background-color:rgb(243,245,248);
+            font-weight: bold;
+            font-size: 14px;
+        }""")
+        self.setStyleSheet("""
+        font-size: 14px;
+        selection-color: red;
+        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        """)
 
     def showRowContents(self, row_list):
         self.clear()
@@ -637,6 +657,7 @@ class SpotCommodityTable(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         for row, content_item in enumerate(row_list):
+            self.setRowHeight(row, 32)
             for col, header in enumerate(self.KEY_LABELS):
                 color = QBrush(QColor(0,0,0))
                 if col == 0:
@@ -663,21 +684,24 @@ class SpotCommodityTable(QTableWidget):
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
         # 设置表格高度
-        self.setMinimumHeight(self.rowCount() * 30 + 45)
+        self.setMinimumHeight(self.rowCount() * 33 + 30)
         # 竖向自动拉伸
-        self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        if self.rowCount() >= 45:
+            self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        else:
+            self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)  # 固定行高，设置的大小
 
 
 # 现货报表显示主页
 class SpotCommodityPage(QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, delta_days, *args, **kwargs):
         super(SpotCommodityPage, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=2)
         # 日期选择
         date_widget = QWidget(parent=self, objectName='dateWidget')
         date_widget.setFixedHeight(22)
         message_button_layout = QHBoxLayout(margin=0, spacing=0)
-        self.date_edit = QDateEdit(QDate.currentDate().addDays(-1), parent=date_widget, dateChanged=self.getCurrentSpotCommodity, objectName='dateEdit')
+        self.date_edit = QDateEdit(QDate.currentDate().addDays(delta_days), parent=date_widget, dateChanged=self.getCurrentSpotCommodity, objectName='dateEdit')
         self.date_edit.setDisplayFormat('yyyy-MM-dd')
         self.date_edit.setCalendarPopup(True)
         message_button_layout.addWidget(QLabel('日期:'))
@@ -689,10 +713,9 @@ class SpotCommodityPage(QWidget):
         self.spot_table = SpotCommodityTable()
         layout.addWidget(self.spot_table)
         # 无数据的显示
-        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignTop | Qt.AlignHCenter)
         self.no_data_label.hide()
         layout.addWidget(self.no_data_label)
-
         self.setLayout(layout)
         self.setStyleSheet("""
         #dateWidget{
@@ -756,6 +779,25 @@ class FinanceCalendarTable(QTableWidget):
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.horizontalHeader().setStyleSheet("""
+        QHeaderView::section,
+        QTableCornerButton::section {
+            min-height: 25px;
+            padding: 1px;border: none;
+            border-right: 1px solid rgb(211,212,212);
+            border-bottom: 1px solid rgb(211,212,212);
+            background-color:rgb(243,245,248);
+            font-weight: bold;
+            font-size: 14px;
+        }""")
+        self.setStyleSheet("""
+        font-size: 14px;
+        selection-color: red;
+        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        """)
 
     def showRowContents(self, row_list):
         self.clear()
@@ -764,7 +806,10 @@ class FinanceCalendarTable(QTableWidget):
         self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        self.setColumnWidth(4, 350)
         for row, content_item in enumerate(row_list):
+            self.setRowHeight(row, 32)
             for col, header in enumerate(self.KEY_LABELS):
                 if col == 0:
                     table_item = QTableWidgetItem(str(row + 1))
@@ -774,21 +819,23 @@ class FinanceCalendarTable(QTableWidget):
                 table_item.setTextAlignment(Qt.AlignCenter)
                 self.setItem(row, col, table_item)
         # 设置表格高度
-        self.setMinimumHeight(self.rowCount() * 30 + 45)
+        self.setMinimumHeight(self.rowCount() * 33 + 30)
         # 竖向自动拉伸
-        self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
+        if self.rowCount() >= 45:
+            self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        else:
+            self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)  # 固定行高，设置的大小
 
 # 财经日历显示主页
 class FinanceCalendarPage(QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, delta_days, *args, **kwargs):
         super(FinanceCalendarPage, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=2)
         # 日期选择
         date_widget = QWidget(parent=self, objectName='dateWidget')
         date_widget.setFixedHeight(22)
         message_button_layout = QHBoxLayout(margin=0, spacing=0)
-        self.date_edit = QDateEdit(QDate.currentDate(), parent=date_widget, dateChanged=self.getCurrentFinanceCalendar, objectName='dateEdit')
+        self.date_edit = QDateEdit(QDate.currentDate().addDays(delta_days), parent=date_widget, dateChanged=self.getCurrentFinanceCalendar, objectName='dateEdit')
         self.date_edit.setDisplayFormat('yyyy-MM-dd')
         self.date_edit.setCalendarPopup(True)
         message_button_layout.addWidget(QLabel('日期:'))
@@ -800,7 +847,7 @@ class FinanceCalendarPage(QWidget):
         self.finance_table = FinanceCalendarTable()
         layout.addWidget(self.finance_table)
         # 无数据的显示
-        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignHCenter | Qt.AlignTop)
         self.no_data_label.hide()
         layout.addWidget(self.no_data_label)
         self.setLayout(layout)
@@ -1030,10 +1077,10 @@ class HomePage(QScrollArea):
             spot_head = self.folded_box.addHead('现货报表')
             finance_head = self.folded_box.addHead('财经日历')
             spot_body = self.folded_box.addBody(head=spot_head)
-            spot_body.addButtons([{'id': -1, 'name': '昨日数据'}])
+            spot_body.addButtons([{'id': -1, 'name': '昨日数据'}, {'id': 0, 'name': '今日数据'}])
             # spot_body.setHead(spot_head)
             finance_body = self.folded_box.addBody(head=finance_head)
-            finance_body.addButtons([{'id': 0, 'name': '今日数据'}])
+            finance_body.addButtons([{'id': -1, 'name': '昨日数据'}, {'id': 0, 'name': '今日数据'}])
             self.folded_box.container.layout().addStretch()
 
     # 折叠盒子被点击
@@ -1047,10 +1094,10 @@ class HomePage(QScrollArea):
             page = TransactionNoticePage(category_id=category_id, parent=self.frame_window)
             page.getCurrentNotices()
         elif head_text == u'现货报表':
-            page = SpotCommodityPage(parent=self)
+            page = SpotCommodityPage(delta_days=category_id, parent=self.frame_window)
             page.getCurrentSpotCommodity()
         elif head_text == u'财经日历':
-            page = FinanceCalendarPage(parent=self)
+            page = FinanceCalendarPage(delta_days=category_id, parent=self.frame_window)
             page.getCurrentFinanceCalendar()
         else:
             page = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)

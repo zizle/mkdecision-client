@@ -522,7 +522,7 @@ class FoldedBodyButton(QPushButton):
         """)
 
     def left_mouse_clicked(self):
-        print(self.bid)
+        # print(self.bid)
         self.mouse_clicked.emit(self.bid)
 
 

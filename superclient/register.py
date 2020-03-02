@@ -8,8 +8,8 @@ from wmi import WMI
 from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel, QLineEdit, QPushButton
 
 # SERVER = 'http://127.0.0.1:8000/'
-SERVER = "http://210.13.218.130:9004/"
-# SERVER = "http://192.168.0.103:8000/"
+# SERVER = "http://210.13.218.130:9004/"
+SERVER = "http://192.168.0.102:8000/"
 
 
 # 获取本机机器码

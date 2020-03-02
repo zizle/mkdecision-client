@@ -5,7 +5,7 @@ import json
 import time
 import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
-from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont
+from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
 from PyQt5.QtCore import Qt, QSize
 
 import settings
@@ -21,7 +21,17 @@ from frame.usercenter import UserCenter
 class WelcomePage(QSplashScreen):
     def __init__(self, *args, **kwargs):
         super(WelcomePage, self).__init__(*args, *kwargs)
-        pixmap = QPixmap('media/start.png')
+        # 请求启动页
+        try:
+            r = requests.get(url=settings.STATIC_PREFIX + 'startpng/start.png')
+            response_img = r.content
+            if r.status_code != 200:
+                raise ValueError('get starting image error')
+        except Exception:
+            pixmap = QPixmap('media/start.png')
+        else:
+            start_image = QImage.fromData(response_img)
+            pixmap = QPixmap.fromImage(start_image)
         scaled_map = pixmap.scaled(QSize(660, 400), Qt.KeepAspectRatio)
         self.setPixmap(scaled_map)
         font = QFont()
@@ -29,7 +39,6 @@ class WelcomePage(QSplashScreen):
         font.setBold(True)
         font.setWeight(75)
         self.setFont(font)
-
         self.showMessage("欢迎使用分析决策系统\n程序正在启动中...", Qt.AlignCenter, Qt.blue)
 
     # 启动使客户端存在
@@ -77,6 +86,10 @@ class WelcomePage(QSplashScreen):
                 r = requests.get(url=settings.STATIC_PREFIX + ad_item['image'])
                 with open('media/slider/' + image_name, 'wb') as img:
                     img.write(r.content)
+
+    # 导入模块到运行环境
+    def import_packages(self):
+        import pandas as pd
 
 
 # 主窗口(无边框)
@@ -169,6 +182,18 @@ class BaseWindow(QWidget):
     def user_login_successfully(self, response_data):
         # 保存token
         token = response_data['Authorization']
+        # 保存用户的身份证明
+        if response_data['role'] == "超级管理员":
+            s_key = 9
+        elif response_data['role'] == "运营管理员":
+            s_key = 8
+        elif response_data['role'] == "信息管理员":
+            s_key = 7
+        elif response_data['role'] == "研究员":
+            s_key = 6
+        else:
+            s_key = 5
+        settings.app_dawn.setValue('SKEY', s_key)
         settings.app_dawn.setValue('AUTHORIZATION', token)
         # 组织滚动显示用户名
         dynamic_username = response_data['username']
@@ -410,11 +435,20 @@ class BaseWindow(QWidget):
             elif module_text == u'产品服务':
                 from frame.infoService import InfoServicePage
                 page = InfoServicePage(parent=self.page_container)
-            elif module_text == '数据分析':
+            elif module_text == '基本分析':
                 from frame.trend import TrendPage
                 page = TrendPage(parent=self.page_container)
                 page.getGroupVarieties()
                 page.getTrendPageCharts()
+            elif module_text == '交割服务':
+                try:
+                    from delivery.windows.base import Base
+                    page = Base()
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    print(e)
+
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)

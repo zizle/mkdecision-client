@@ -786,6 +786,7 @@ class ModuleSubsInformationPopup(QDialog):
         self.module_table.verticalHeader().hide()
         self.module_table.setFocusPolicy(Qt.NoFocus)
         self.module_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.module_table.cellClicked.connect(self.cell_clicked)
         layout.addWidget(self.module_table)
         self.setLayout(layout)
 
@@ -804,8 +805,8 @@ class ModuleSubsInformationPopup(QDialog):
     def show_module_subs(self):
         self.module_table.clear()
         self.module_table.setRowCount(len(self.module_subs))
-        self.module_table.setColumnCount(3)
-        self.module_table.setHorizontalHeaderLabels(['序号', '名称', '有效'])
+        self.module_table.setColumnCount(4)
+        self.module_table.setHorizontalHeaderLabels(['序号', '名称', '有效', '排序'])
         self.module_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.module_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         for row, sub_module_item in enumerate(self.module_subs):
@@ -819,6 +820,9 @@ class ModuleSubsInformationPopup(QDialog):
             item3 = TableCheckBox(checked=sub_module_item['is_active'])
             item3.check_activated.connect(self.check_box_changed)
             self.module_table.setCellWidget(row, 2, item3)
+            item4 = QTableWidgetItem("上移")
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.module_table.setItem(row, 3, item4)
 
     # 有效信息发生变化
     def check_box_changed(self, check_box):
@@ -844,6 +848,50 @@ class ModuleSubsInformationPopup(QDialog):
     def get_widget_index(self, widget):
         index = self.module_table.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
         return index.row(), index.column()
+
+    # 点击排序
+    def cell_clicked(self, row, col):
+        if col == 3:
+            if row == 0:
+                return
+            current_item_id = self.module_table.item(row, 0).module_id
+            up_item_id = self.module_table.item(row -1, 0).module_id
+            # 发起请求
+            try:  # 发起请求
+                r = requests.patch(
+                    url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
+                    headers={"AUTHORIZATION": settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({"current_id": current_item_id, "replace_id": up_item_id})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                pass
+            else:
+                new_module_data = response['data']
+                # 加入两行
+                self.module_table.insertRow(row)
+                self.module_table.insertRow(row)
+                # 原两行删除
+                self.module_table.removeRow(row + 2)
+                self.module_table.removeRow(row - 1)
+                # 新数据填入行 row-1, row
+                for index, module_item in enumerate(new_module_data):
+                    index = row - 1 if not index else row
+                    item1 = QTableWidgetItem(str(index + 1))
+                    item1.setTextAlignment(Qt.AlignCenter)
+                    item1.module_id = module_item['id']
+                    self.module_table.setItem(index, 0, item1)
+                    item2 = QTableWidgetItem(str(module_item['name']))
+                    item2.setTextAlignment(Qt.AlignCenter)
+                    self.module_table.setItem(index, 1, item2)
+                    item3 = TableCheckBox(checked=module_item['is_active'])
+                    item3.check_activated.connect(self.check_box_changed)
+                    self.module_table.setCellWidget(index, 2, item3)
+                    item4 = QTableWidgetItem("上移")
+                    item4.setTextAlignment(Qt.AlignCenter)
+                    self.module_table.setItem(index, 3, item4)
 
 
 """ 运营管理-【新增模块】"""
