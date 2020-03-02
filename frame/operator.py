@@ -2,16 +2,15 @@
 # __Author__： zizle
 import json
 import requests
-import pandas as pd
 from PyQt5.QtWidgets import QWidget, QListWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QLabel, QComboBox, \
-    QHeaderView, QPushButton, QTableWidgetItem, QLineEdit, QListView
-from PyQt5.QtCore import Qt, QMargins, QDateTime
-from PyQt5.QtGui import QFont, QPainter
-from PyQt5.QtChart import QChartView, QChart, QLineSeries, QDateTimeAxis, QValueAxis
+    QHeaderView, QPushButton, QTableWidgetItem, QLineEdit, QListView, QAbstractItemView, QTableWidget
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint
+from PyQt5.QtGui import QPainter, QBrush, QColor
+from PyQt5.QtChart import QChartView
 from popup.operator import EditUserInformationPopup, EditClientInformationPopup, CreateNewModulePopup,\
-    EditModuleInformationPopup, CreateNewVarietyPopup, EditVarietyInformationPopup
+     ModuleSubsInformationPopup,CreateNewVarietyPopup, EditVarietyInformationPopup
 import settings
-from widgets.operator import ManageTable
+from widgets.operator import ManageTable, EditButton
 from widgets.base import TableCheckBox
 
 """ 用户管理相关 """
@@ -246,7 +245,9 @@ class ClientManagePage(QWidget):
 
 
 # 模块显示管理表格
-class ModulesTable(ManageTable):
+class ModulesTable(QTableWidget):
+    network_result = pyqtSignal(str)
+    reload_module_data = pyqtSignal(bool)
     KEY_LABELS = [
         ('id', '序号'),
         ('name', '名称'),
@@ -254,9 +255,47 @@ class ModulesTable(ManageTable):
     ]
     CHECK_COLUMNS = [2]
 
-    def resetTableMode(self, row_count):
-        super(ModulesTable, self).resetTableMode(row_count)
+    def __init__(self, *args, **kwargs):
+        super(ModulesTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.module_data = None
+        self.cellClicked.connect(self.cell_item_clicked)
+
+    # 设置表格数据
+    def setRowContents(self, row_list):
+        self.module_data = row_list
+        self.clear()
+        self.setRowCount(len(row_list))
+        self.setColumnCount(len(self.KEY_LABELS) + 2)
+        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['排序', ''])
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, user_item in enumerate(row_list):
+            for col, header in enumerate(self.KEY_LABELS):
+                if col == 0:
+                    table_item = QTableWidgetItem(str(row + 1))
+                    table_item.id = user_item[header[0]]
+                else:
+                    table_item = QTableWidgetItem(str(user_item[header[0]]))
+                if col in self.CHECK_COLUMNS:
+                    check_box = TableCheckBox(checked=user_item[header[0]])
+                    check_box.check_activated.connect(self.check_box_changed)
+                    self.setCellWidget(row, col, check_box)
+                table_item.setTextAlignment(Qt.AlignCenter)
+                self.setItem(row, col, table_item)
+                # 增加排序控制按钮
+                if col == len(self.KEY_LABELS) - 1:
+                    order_item = QTableWidgetItem('上移')
+                    order_item.setTextAlignment(Qt.AlignCenter)
+                    order_item.setForeground(QBrush(QColor(40, 100, 201)))
+                    self.setItem(row, col + 1, order_item)
+                # 增加【查看子块】按钮
+                if col == len(self.KEY_LABELS) - 1:
+                    show_subs_button = EditButton('子模块')
+                    show_subs_button.button_clicked.connect(self.show_subs_button_clicked)
+                    self.setCellWidget(row, col + 2, show_subs_button)
 
     # 编辑模块的有效
     def check_box_changed(self, check_box):
@@ -277,16 +316,107 @@ class ModulesTable(ManageTable):
         else:
             self.network_result.emit(response['message'])
 
-    def edit_button_clicked(self, edit_button):
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+    # 查看当前模块的子块
+    def show_subs_button_clicked(self, edit_button):
         current_row, current_col = self.get_widget_index(edit_button)
         module_id = self.item(current_row, 0).id
-        # 弹窗编辑信息
-        edit_popup = EditModuleInformationPopup(module_id=module_id, parent=self)
-        edit_popup.getCurrentModule()
-        if not edit_popup.exec_():
-            edit_popup.deleteLater()
-            del edit_popup
+        # 获取子模块
+        subs_popup = None
+        for module_dict_items in self.module_data:
+            if module_dict_items['id'] == module_id:
+                # 弹窗显示子模块信息
+                subs_popup = ModuleSubsInformationPopup(
+                    parent_id=module_id,
+                    parent_name=module_dict_items['name'],
+                    module_subs=module_dict_items['subs']
+                )
+                break
+        if subs_popup:
+            if not subs_popup.exec_():
+                self.reload_module_data.emit(True)
+                subs_popup.deleteLater()
+                del subs_popup
 
+    # 移动排序
+    def cell_item_clicked(self, row, col):
+        if col == 3:
+            if row == 0:
+                self.network_result.emit('已经到顶了.')
+                return
+            # 获取当前行的id
+            current_item_id = self.item(row, 0).id
+            # 上一行的item
+            up_item_id = self.item(row - 1, 0).id
+            try:  # 发起请求
+                r = requests.patch(
+                    url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
+                    headers={"AUTHORIZATION": settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({"current_id": current_item_id, "replace_id": up_item_id})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result.emit(str(e))
+            else:
+                new_module_data = response['data']
+                # 加入两行
+                self.insertRow(row)
+                self.insertRow(row)
+                # 原两行删除
+                self.removeRow(row + 2)
+                self.removeRow(row - 1)
+                # 新数据填入行 row-1, row
+                for index, module_item in enumerate(new_module_data):
+                    index = row - 1 if not index else row
+                    for col, header in enumerate(self.KEY_LABELS):
+                        if col == 0:
+                            table_item = QTableWidgetItem(str(index + 1))
+                            table_item.id = module_item[header[0]]
+                        else:
+                            table_item = QTableWidgetItem(str(module_item[header[0]]))
+                        if col in self.CHECK_COLUMNS:
+                            check_box = TableCheckBox(checked=module_item[header[0]])
+                            check_box.check_activated.connect(self.check_box_changed)
+                            self.setCellWidget(index, col, check_box)
+                        table_item.setTextAlignment(Qt.AlignCenter)
+                        self.setItem(index, col, table_item)
+                        # 增加排序控制按钮
+                        if col == len(self.KEY_LABELS) - 1:
+                            order_item = QTableWidgetItem('上移')
+                            order_item.setTextAlignment(Qt.AlignCenter)
+                            order_item.setForeground(QBrush(QColor(40, 100, 201)))
+                            self.setItem(index, col + 1, order_item)
+                        # 增加【查看子块】按钮
+                        if col == len(self.KEY_LABELS) - 1:
+                            show_subs_button = EditButton('子模块')
+                            show_subs_button.button_clicked.connect(self.show_subs_button_clicked)
+                            self.setCellWidget(index, col + 2, show_subs_button)
+
+    # 移动一行
+    def move_row(self, from_row):
+        if from_row <= 0:
+            return
+        row_count = self.rowCount()
+        if from_row >= row_count - 1:
+            return
+        # 获取旧行的item
+        item_list = list()
+        for col_index in range(self.columnCount()):
+            if col_index == len(self.columnCount() - 1):  # widget行
+                item = self.cellWidget(from_row, col_index)
+            else:
+                item = self.item(from_row, col_index)
+            item_list.append(item)
+        print(item_list)
+        # 加入新行
+        self.insertRow(from_row - 1)
+        # 新行加入item
 
 # 模块管理页面
 class ModuleManagePage(QWidget):
@@ -303,6 +433,7 @@ class ModuleManagePage(QWidget):
         # 模块编辑显示表格
         self.module_table = ModulesTable(parent=self)
         self.module_table.network_result.connect(self.network_message.setText)
+        self.module_table.reload_module_data.connect(self.getCurrentModules)
         layout.addLayout(message_button_layout)
         layout.addWidget(self.module_table)
         self.setLayout(layout)
@@ -320,12 +451,12 @@ class ModuleManagePage(QWidget):
         except Exception as e:
             self.network_message.setText(str(e))
         else:
-            self.module_table.setRowContents(response['data'])
             self.network_message.setText(response['message'])
+            self.module_table.setRowContents(response['data'])
 
     # 新增系统模块
     def create_new_module(self):
-        popup = CreateNewModulePopup(parent=self)
+        popup = CreateNewModulePopup(parent=self, module_combo=self.module_table.module_data)
         if not popup.exec_():
             popup.deleteLater()
             del popup

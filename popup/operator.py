@@ -5,7 +5,7 @@ import json
 import requests
 from PyQt5.QtWidgets import QWidget, QDialog, QGridLayout, QHBoxLayout, QVBoxLayout, QLineEdit, QPushButton, QLabel,\
     QComboBox, QTabWidget, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QTreeWidget, QTreeWidgetItem, QMenu,\
-    QAction
+    QAction, QAbstractItemView
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
 from PyQt5.QtGui import QCursor
 import settings
@@ -15,7 +15,7 @@ from popup.tips import InformationPopup, WarningPopup
 __all__ = [
     'EditUserInformationPopup',
     'EditClientInformationPopup',
-    'EditModuleInformationPopup',
+    'ModuleSubsInformationPopup',
     'EditVarietyInformationPopup',
     'CreateNewModulePopup',
     'CreateNewVarietyPopup'
@@ -771,61 +771,127 @@ class EditClientInformationPopup(QDialog):
             self.findChild(QLabel, 'machineError').setText(response['message'])
 
 
-""" 运营管理-【编辑】模块信息 """
+""" 运营管理-【查看】子模块信息 """
 
 
-# 编辑模块信息
-class EditModuleInformationPopup(QDialog):
-    def __init__(self, module_id, *args, **kwargs):
-        super(EditModuleInformationPopup, self).__init__(*args, **kwargs)
-        self.setWindowTitle('编辑模块')
-        self.module_id = module_id
-        layout = QGridLayout()
-        layout.addWidget(QLabel('名称:'), 0, 0)
-        self.name_edit = QLineEdit()
-        layout.addWidget(self.name_edit, 0, 1)
-        layout.addWidget(QLabel(parent=self, objectName='nameError'), 1, 0, 1, 2)
-        self.commit_button = QPushButton('确认提交', clicked=self.edit_module_info)
-        layout.addWidget(self.commit_button, 2, 1)
+# 子模块信息
+class ModuleSubsInformationPopup(QDialog):
+    def __init__(self, parent_id, parent_name, module_subs, *args, **kwargs):
+        super(ModuleSubsInformationPopup, self).__init__(*args, **kwargs)
+        self.setWindowTitle(parent_name + '-子模块')
+        self.parent_id = parent_id
+        self.module_subs = module_subs
+        layout = QVBoxLayout()
+        self.module_table = QTableWidget()
+        self.module_table.verticalHeader().hide()
+        self.module_table.setFocusPolicy(Qt.NoFocus)
+        self.module_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.module_table.cellClicked.connect(self.cell_clicked)
+        layout.addWidget(self.module_table)
         self.setLayout(layout)
 
-    # 获取当前模块信息
-    def getCurrentModule(self):
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'module/' + str(self.module_id) + '/?mc=' + settings.app_dawn.value(
-                    'machine'),
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            el = self.findChild(QLabel, 'nameError')
-            el.setText(str(e))
-        else:
-            module_data = response['data']
-            self.name_edit.setText(module_data['name'])
+        # layout = QGridLayout()
+        # layout.addWidget(QLabel('名称:'), 0, 0)
+        # self.name_edit = QLineEdit()
+        # layout.addWidget(self.name_edit, 0, 1)
+        # layout.addWidget(QLabel(parent=self, objectName='nameError'), 1, 0, 1, 2)
+        # self.commit_button = QPushButton('确认提交', clicked=self.edit_module_info)
+        # layout.addWidget(self.commit_button, 2, 1)
+        # self.setLayout(layout)
+        self.setFixedSize(500, 400)
+        self.show_module_subs()
 
-    # 修改模块信息
-    def edit_module_info(self):
-        name = re.sub(r'\s+', '', self.name_edit.text())
-        if not name:
-            self.findChild(QLabel, 'nameError').setText('请输入模块名称!')
-            return
+    # 显示子模块
+    def show_module_subs(self):
+        self.module_table.clear()
+        self.module_table.setRowCount(len(self.module_subs))
+        self.module_table.setColumnCount(4)
+        self.module_table.setHorizontalHeaderLabels(['序号', '名称', '有效', '排序'])
+        self.module_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.module_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, sub_module_item in enumerate(self.module_subs):
+            item1 = QTableWidgetItem(str(row + 1))
+            item1.setTextAlignment(Qt.AlignCenter)
+            item1.module_id = sub_module_item['id']
+            self.module_table.setItem(row, 0, item1)
+            item2 = QTableWidgetItem(str(sub_module_item['name']))
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.module_table.setItem(row, 1, item2)
+            item3 = TableCheckBox(checked=sub_module_item['is_active'])
+            item3.check_activated.connect(self.check_box_changed)
+            self.module_table.setCellWidget(row, 2, item3)
+            item4 = QTableWidgetItem("上移")
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.module_table.setItem(row, 3, item4)
+
+    # 有效信息发生变化
+    def check_box_changed(self, check_box):
+        current_row, current_col = self.get_widget_index(check_box)
+        module_id = self.module_table.item(current_row, 0).module_id
+        for sub_module in self.module_subs:
+            if sub_module['id'] == module_id:
+                sub_module['is_active'] = 1 if check_box.check_box.isChecked() else 0
         try:
             r = requests.patch(
-                url=settings.SERVER_ADDR + 'module/' + str(self.module_id) + '/?mc=' + settings.app_dawn.value(
+                url=settings.SERVER_ADDR + 'module/' + str(module_id) + '/?mc=' + settings.app_dawn.value(
                     'machine'),
                 headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
-                data=json.dumps({'name': name})
+                data=json.dumps({'is_active': check_box.check_box.isChecked()})
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.findChild(QLabel, 'nameError').setText(str(e))
-        else:
-            self.findChild(QLabel, 'nameError').setText(response['message'])
+            pass
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.module_table.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+    # 点击排序
+    def cell_clicked(self, row, col):
+        if col == 3:
+            if row == 0:
+                return
+            current_item_id = self.module_table.item(row, 0).module_id
+            up_item_id = self.module_table.item(row -1, 0).module_id
+            # 发起请求
+            try:  # 发起请求
+                r = requests.patch(
+                    url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
+                    headers={"AUTHORIZATION": settings.app_dawn.value('AUTHORIZATION')},
+                    data=json.dumps({"current_id": current_item_id, "replace_id": up_item_id})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                pass
+            else:
+                new_module_data = response['data']
+                # 加入两行
+                self.module_table.insertRow(row)
+                self.module_table.insertRow(row)
+                # 原两行删除
+                self.module_table.removeRow(row + 2)
+                self.module_table.removeRow(row - 1)
+                # 新数据填入行 row-1, row
+                for index, module_item in enumerate(new_module_data):
+                    index = row - 1 if not index else row
+                    item1 = QTableWidgetItem(str(index + 1))
+                    item1.setTextAlignment(Qt.AlignCenter)
+                    item1.module_id = module_item['id']
+                    self.module_table.setItem(index, 0, item1)
+                    item2 = QTableWidgetItem(str(module_item['name']))
+                    item2.setTextAlignment(Qt.AlignCenter)
+                    self.module_table.setItem(index, 1, item2)
+                    item3 = TableCheckBox(checked=module_item['is_active'])
+                    item3.check_activated.connect(self.check_box_changed)
+                    self.module_table.setCellWidget(index, 2, item3)
+                    item4 = QTableWidgetItem("上移")
+                    item4.setTextAlignment(Qt.AlignCenter)
+                    self.module_table.setItem(index, 3, item4)
 
 
 """ 运营管理-【新增模块】"""
@@ -833,16 +899,25 @@ class EditModuleInformationPopup(QDialog):
 
 # 新增模块
 class CreateNewModulePopup(QDialog):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, module_combo, *args, **kwargs):
         super(CreateNewModulePopup, self).__init__(*args, **kwargs)
         self.setWindowTitle('新增模块')
         layout = QGridLayout()
         layout.addWidget(QLabel('名称:'), 0, 0)
         self.name_edit = QLineEdit()
         layout.addWidget(self.name_edit, 0, 1)
-        layout.addWidget(QLabel(parent=self, objectName='nameError'), 1, 0, 1, 2)
+        layout.addWidget(QLabel(''), 1, 0)  # 占位
+        # 附属
+        layout.addWidget(QLabel('附属:'), 2, 0)
+        self.attach_combo = QComboBox()
+        # 添加选项
+        self.attach_combo.addItem('无', None)
+        for module_item in module_combo:
+            self.attach_combo.addItem(module_item['name'], module_item['id'])
+        layout.addWidget(self.attach_combo, 2, 1)
+        layout.addWidget(QLabel(parent=self, objectName='nameError'), 3, 0, 1, 2)
         self.commit_button = QPushButton('确认提交', clicked=self.commit_new_module)
-        layout.addWidget(self.commit_button, 2, 1)
+        layout.addWidget(self.commit_button, 4, 1)
         self.setLayout(layout)
 
     # 提交新增模块
@@ -851,11 +926,13 @@ class CreateNewModulePopup(QDialog):
         if not name:
             self.findChild(QLabel, 'nameError').setText('请输入模块名称!')
             return
+        parent = self.attach_combo.currentData()
+        print(parent)
         try:
             r = requests.post(
                 url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
                 headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
-                data=json.dumps({'name': name})
+                data=json.dumps({'name': name, 'parent': parent})
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:

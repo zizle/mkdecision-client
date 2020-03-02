@@ -1,5 +1,6 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
+import os
 import re
 import json
 import hashlib
@@ -809,7 +810,8 @@ class CreateNewSpotTablePopup(QDialog):
         select_message_layout.addWidget(QPushButton('选择报表', clicked=self.select_spot_table))
         select_message_layout.addWidget(QLabel(parent=self, objectName='errorMessage'))
         select_message_layout.addStretch()
-        select_message_layout.addWidget(QPushButton('模板下载', objectName='downloadModel'))
+        select_message_layout.addWidget(QPushButton('模板下载', objectName='downloadModel',
+                                                    clicked=self.download_model_file, cursor=Qt.PointingHandCursor))
         layout.addLayout(select_message_layout)
         # 预览表格
         self.review_table = QTableWidget()
@@ -824,7 +826,25 @@ class CreateNewSpotTablePopup(QDialog):
             border: none;
             color:rgb(20,150,200)
         }
+        #downloadModel:pressed{
+            color: red;
+        }
+        #downloadModel:hover{
+            color: rgb(20, 180, 200)
+        }
         """)
+
+    # 下载数据模板
+    def download_model_file(self):
+        directory = QFileDialog.getExistingDirectory(None, '保存到', os.getcwd())
+        # 请求模板文件信息，保存
+        try:
+            r = requests.get(url=settings.STATIC_PREFIX + 'model_files/home/spot_commodity_model.xlsx')
+            save_path = os.path.join(directory, '现货报表模板.xlsx')
+            with open(save_path, 'wb') as f:
+                f.write(r.content)
+        except Exception:
+            pass
 
     # 选择文件
     def select_spot_table(self):
@@ -895,7 +915,8 @@ class CreateNewFinanceCalendarPopup(QDialog):
         select_message_layout.addWidget(QPushButton('选择数据', clicked=self.select_finance_table))
         select_message_layout.addWidget(QLabel(parent=self, objectName='errorMessage'))
         select_message_layout.addStretch()
-        select_message_layout.addWidget(QPushButton('模板下载', objectName='downloadModel'))
+        select_message_layout.addWidget(QPushButton('模板下载', objectName='downloadModel',
+                                                    clicked=self.download_model_file, cursor=Qt.PointingHandCursor))
         layout.addLayout(select_message_layout)
         # 预览表格
         self.review_table = QTableWidget()
@@ -910,7 +931,25 @@ class CreateNewFinanceCalendarPopup(QDialog):
             border: none;
             color:rgb(20,150,200)
         }
+        #downloadModel:pressed{
+            color: red;
+        }
+        #downloadModel:hover{
+            color: rgb(20, 180, 200)
+        }
         """)
+
+    # 下载数据模板
+    def download_model_file(self):
+        directory = QFileDialog.getExistingDirectory(None, '保存到', os.getcwd())
+        # 请求模板文件信息，保存
+        try:
+            r = requests.get(url=settings.STATIC_PREFIX + 'model_files/home/finance_calendar_model.xlsx')
+            save_path = os.path.join(directory, '财经日历模板.xlsx')
+            with open(save_path, 'wb') as f:
+                f.write(r.content)
+        except Exception:
+            pass
 
     # 选择文件
     def select_finance_table(self):

@@ -3,12 +3,14 @@
 
 import sys
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from frame.base import WelcomePage, BaseWindow
 
 app = QApplication(sys.argv)
 splash = WelcomePage()  # welcome
 splash.show()
 app.processEvents()  # non-blocking
+splash.import_packages()  # 事先导入一些会卡顿的包，后面模块用到就不会卡顿
 splash.make_client_existed()  # 启动使当前客户端存在（发送请求,不存在就注册）
 splash.getCurrentAdvertisements()
 base_window = BaseWindow()  # main window

@@ -618,11 +618,26 @@ class InfoServicePage(QWidget):
         layout = QHBoxLayout(margin=2)
         self.variety_folded = ScrollFoldedBox()
         self.variety_folded.left_mouse_clicked.connect(self.enter_service)
-        self.variety_folded.setMaximumWidth(250)
         layout.addWidget(self.variety_folded)
         self.frame = LoadedPage()
         layout.addWidget(self.frame)
         self.setLayout(layout)
+        # 设置折叠窗的样式
+        self.variety_folded.setFoldedStyleSheet("""
+            #foldedHead{
+                background-color: rgb(145,202,182);
+                border-bottom: 1px solid rgb(200,200,200);
+                max-height: 30px;
+            }
+            #headLabel{
+                padding:8px 5px;
+                font-weight: bold;
+                font-size: 15px;
+            }
+            #foldedBody{
+                background-color: rgb(240, 240, 240);
+            }
+            """)
         self._addServiceContents()
 
     # 获取所有品种组和品种
@@ -671,6 +686,12 @@ class InfoServicePage(QWidget):
             body = self.variety_folded.addBody(head=head)
             body.addButtons(group_item['subs'])
         self.variety_folded.container.layout().addStretch()
+
+    def resizeEvent(self, event):
+        # 设置折叠菜单的大小
+        folded_width = self.parent().width() * 0.23
+        self.variety_folded.setFixedWidth(folded_width)
+        self.variety_folded.setBodyHorizationItemCount()
 
     # 点击服务，显示页面
     def enter_service(self, sid, text):
