@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>首页</title>
+    <link rel="stylesheet" href="css/home.css">
+    <script type="text/javascript" src="js/jquery-1.7.2.min.js" ></script>
+    <script type="text/javascript" src="js/qwebchannel.js" ></script>
+    <script type="text/javascript" src="js/public.js" ></script>
+    <script type="text/javascript" src="js/home.js" ></script>
+</head>
+<body>
+    <div class="news">
+        <div class="newsTitle"><span title="查看全部">新闻：</span></div>
+        <div class="newsList">
+            <!--<ul>-->
+                <!--<li>9月交易日来啦</li>-->
+                <!--<li>关于指定尿素期货交割仓库的公告</li>-->
+                <!--<li>9月交易日来啦</li>-->
+                <!--<li>关于指定尿素期货交割仓库的公告</li>-->
+                <!--<li>9月交易日来啦</li>-->
+                <!--<li>关于指定尿素期货交割仓库的公告</li>-->
+                <!--<li>9月交易日来啦</li>-->
+                <!--<li>关于指定尿素期货交割仓库的公告</li>-->
+                <!--<li>9月交易日来啦</li>-->
+                <!--<li>关于指定尿素期货交割仓库的公告</li>-->
+            <!--</ul>-->
+        </div>
+    </div>
+    <div class="bulletin">
+        <div class="bulletinTitle"><span title="查看全部">公告：</span></div>
+        <div class="bulletinList">
+            <!--<ul>-->
+                <!--<li>关于调整铁矿石品种指定交割仓库的通知</li>-->
+                <!--<li>关于中储发展股份有限公司下属库点分配交割仓库编号的公告</li>-->
+                <!--<li>关于调整铁矿石品种指定交割仓库的通知</li>-->
+                <!--<li>关于中储发展股份有限公司下属库点分配交割仓库编号的公告</li>-->
+                <!--<li>关于调整铁矿石品种指定交割仓库的通知</li>-->
+                <!--<li>关于中储发展股份有限公司下属库点分配交割仓库编号的公告</li>-->
+            <!--</ul>-->
+        </div>
+    </div>
+
+    <div class="nav">
+        <div class="passport">
+            <button>登录</button>
+            <em></em>
+            <a href="javascript:void(0);" onclick="userLogout()">退出</a>
+        </div>
+        <ul>
+            <li>
+                <a href="#" data-category="variety">品种</a>
+                <ul class="nav-show variety-show">
+                    <!--<li>-->
+                        <!--<span class="initExchange" data-value="shfe">上海期货交易所</span>-->
+                        <!--<ul class="belong-exchange" style="display: block;">-->
+                            <!--<li data-value="cu">铜</li>-->
+                            <!--<li data-value="al">铝</li>-->
+                            <!--<li>铝</li>-->
+                            <!--<li>铝</li>-->
+                            <!--<li>铝</li>-->
+                            <!--<li>铝</li>-->
+                            <!--<li>铝</li>-->
+                            <!--<li>铝</li>-->
+                            <!--<li>黄金</li>-->
+                            <!--<li>白糖</li>-->
+                            <!--<li>螺纹钢</li>-->
+                            <!--<li>线材</li>-->
+                            <!--<li>天然橡胶</li>-->
+                        <!--</ul>-->
+                    <!--</li>-->
+                    <!--<li>-->
+                        <!--<span data-value="dce">大连商品期货交易所</span>-->
+                        <!--<ul class="belong-exchange">-->
+                            <!--<li data-value="m">豆粕</li>-->
+                            <!--<li data-value="y">豆油</li>-->
+                            <!--<li>豆油</li>-->
+                            <!--<li>豆油</li>-->
+                            <!--<li>豆油</li>-->
+                            <!--<li>豆油</li>-->
+
+                        <!--</ul>-->
+                    <!--</li>-->
+                    <!--<li>-->
+                        <!--<span data-value="czce">郑州商品交易所</span>-->
+                        <!--<ul class="belong-exchange">-->
+                            <!--<li data-value="sr">白糖</li>-->
+                            <!--<li>棉花</li>-->
+                            <!--<li>棉花</li>-->
+                            <!--<li>棉花</li>-->
+                            <!--<li>棉花</li>-->
+                        <!--</ul>-->
+                    <!--</li>-->
+                </ul>
+            </li>
+            <li>
+                <a href="#" data-category="province">地区</a>
+                <ul class="nav-show province-show">
+                    <!--<li data-value="henan">河南省</li>-->
+                    <!--<li data-value="guangdong">广东省</li>-->
+                    <!--<li>山东省</li>-->
+                    <!--<li>江苏省</li>-->
+                    <!--<li>河南省</li>-->
+                    <!--<li>上海市</li>-->
+                    <!--<li>河北省</li>-->
+                    <!--<li>浙江省</li>-->
+                    <!--<li>浙江省</li>-->
+                    <!--<li>浙江省</li>-->
+                    <!--<li>浙江省</li>-->
+                    <!--<li>浙江省</li>-->
+                </ul>
+            </li>
+            <li>
+                <a href="#" data-category="service-guide">交割服务指引</a>
+                <ul class="nav-show guide">
+                    <!--<li>-->
+                        <!--<span class="initExchange" data-value="shfe">上海期货交易所</span>-->
+                        <!--<ul class="belong-exchange hedging-guide" style="display: block;">-->
+                            <!--<li data-value="register">仓库仓单注册流程</li>-->
+                            <!--<li data-value="cancel">仓库仓单注销流程</li>-->
+                            <!--<li data-value="delivery">交割流程</li>-->
+                            <!--<li data-value="brand">品牌名录</li>-->
+                            <!--<li data-value="hedging">套保业务</li>-->
+                        <!--</ul>-->
+                    <!--</li>-->
+                    <!--<li>-->
+                        <!--<span data-value="dce">大连商品期货交易所</span>-->
+                        <!--<ul class="belong-exchange hedging-guide">-->
+                            <!--<li data-value="register">厂库仓单注册流程</li>-->
+                            <!--<li data-value="cancel">仓库仓单注销流程</li>-->
+                            <!--<li data-value="delivery">交割流程</li>-->
+                            <!--<li data-value="brand">品牌名录</li>-->
+                            <!--<li data-value="hedging">套保业务</li>-->
+                        <!--</ul>-->
+                    <!--</li>-->
+                    <!--<li>-->
+                        <!--<span data-value="czce">郑州商品交易所</span>-->
+                        <!--<ul class="belong-exchange hedging-guide">-->
+                            <!--<li data-value="delivery">交割流程</li>-->
+                            <!--<li data-value="hedging">套保业务</li>-->
+                        <!--</ul>-->
+                    <!--</li>-->
+
+                </ul>
+            </li>
+            <li><a href="#" data-category="map" class="map">中国地图</a></li>
+            <li class="navSearch">
+                <input type="text" placeholder="请在地图页面搜索品种">
+                <button>搜索</button>
+            </li>
+        </ul>
+    </div>
+    <div class="content">
+        <iframe src="" frameborder="0" name="frameShow" id="frame"></iframe>
+        <div class="communication">
+            <div class="communication-title">
+                <a href="communication.html" target="_blank">更多</a>
+                <div>最新讨论</div>
+            </div>
+
+            <!--<div class="communication-item">-->
+                <!--<div class="question">-->
+                    <!--<div class="question-title">期货公司做原油交割需要具备什么样的条件？</div>-->
+                    <!--<div class="question-date">2019-09-04 12:24:20</div>-->
+                    <!--<div class="question-reply">回复:20</div>-->
+                <!--</div>-->
+
+                <!--<div class="answer">-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">必须是能够开具或者接收上海国际能源交易中心规定发票人的企业法人。境内机构在首次申报原油期货报税交割业务免税时，应向主管税务机关提交从事原油期货保税交割业务的书面证明，办理免税备案并购买可供开具的增值税普通发票。</div>-->
+                        <!--<div class="answer-date">2019-09-04 13:14:52</div>-->
+                        <!--<div class="answer-floor">#1楼</div>-->
+                    <!--</div>-->
+                <!--</div>-->
+            <!--</div>-->
+
+            <!--<div class="communication-item">-->
+                <!--<div class="question">-->
+                    <!--<div class="question-title">螺纹钢交割升贴水是怎么规定的？</div>-->
+                    <!--<div class="question-date">2019-09-04 12:24:20</div>-->
+                    <!--<div class="question-reply">回复:20</div>-->
+                <!--</div>-->
+                <!--<div class="answer">-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">天津地区仓库交割贴水90元，江苏徐州地区仓库交割贴水70元。</div>-->
+                        <!--<div class="answer-date">2019-09-04 13:14:52</div>-->
+                        <!--<div class="answer-floor">#1楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/girl.png" alt="头像">&nbsp;&nbsp;李柒</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">为啥这两个仓库会设有贴水？</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:14:52</div>-->
+                        <!--<div class="answer-floor">#2楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">您好！这个是上期所为了降低买方从产区运到销区的物流成本。</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:28:52</div>-->
+                        <!--<div class="answer-floor">#3楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/girl.png" alt="头像">&nbsp;&nbsp;李柒</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">谢谢！</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:28:52</div>-->
+                        <!--<div class="answer-floor">#4楼</div>-->
+                    <!--</div>-->
+
+                    <!--&lt;!&ndash;<ul>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>天津地区仓库交割贴水90元，江苏徐州地区仓库交割贴水70元。</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>为啥这两个仓库会设有贴水？</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>您好！这个是上期所为了降低买方从产区运到销区的物流成本。</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>谢谢！</li>&ndash;&gt;-->
+                    <!--&lt;!&ndash;</ul>&ndash;&gt;-->
+
+                <!--</div>-->
+
+            <!--</div>-->
+
+            <!--<div class="communication-item">-->
+                <!--<div class="question">-->
+                    <!--<div class="question-title">期货公司做原油交割需要具备什么样的条件？</div>-->
+                    <!--<div class="question-date">2019-09-04 12:24:20</div>-->
+                    <!--<div class="question-reply">回复:20</div>-->
+                <!--</div>-->
+                <!--<div class="answer">-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">必须是能够开具或者接收上海国际能源交易中心规定发票人的企业法人。境内机构在首次申报原油期货报税交割业务免税时，应向主管税务机关提交从事原油期货保税交割业务的书面证明，办理免税备案并购买可供开具的增值税普通发票。</div>-->
+                        <!--<div class="answer-date">2019-09-04 13:14:52</div>-->
+                        <!--<div class="answer-floor">#1楼</div>-->
+                    <!--</div>-->
+                <!--</div>-->
+
+            <!--</div>-->
+
+            <!--<div class="communication-item">-->
+                <!--<div class="question">-->
+                    <!--<div class="question-title">螺纹钢交割升贴水是怎么规定的？</div>-->
+                    <!--<div class="question-date">2019-09-04 12:24:20</div>-->
+                    <!--<div class="question-reply">回复:20</div>-->
+                <!--</div>-->
+                <!--<div class="answer">-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">天津地区仓库交割贴水90元，江苏徐州地区仓库交割贴水70元。</div>-->
+                        <!--<div class="answer-date">2019-09-04 13:14:52</div>-->
+                        <!--<div class="answer-floor">#1楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/girl.png" alt="头像">&nbsp;&nbsp;李柒</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">为啥这两个仓库会设有贴水？</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:14:52</div>-->
+                        <!--<div class="answer-floor">#2楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">您好！这个是上期所为了降低买方从产区运到销区的物流成本。</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:28:52</div>-->
+                        <!--<div class="answer-floor">#3楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/girl.png" alt="头像">&nbsp;&nbsp;李柒</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">谢谢！</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:28:52</div>-->
+                        <!--<div class="answer-floor">#4楼</div>-->
+                    <!--</div>-->
+
+                    <!--&lt;!&ndash;<ul>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>天津地区仓库交割贴水90元，江苏徐州地区仓库交割贴水70元。</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>为啥这两个仓库会设有贴水？</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>您好！这个是上期所为了降低买方从产区运到销区的物流成本。</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>谢谢！</li>&ndash;&gt;-->
+                    <!--&lt;!&ndash;</ul>&ndash;&gt;-->
+
+                <!--</div>-->
+
+            <!--</div>-->
+
+        </div>
+    </div>
+
+    <div class="login">
+        <div class="header">
+            <a href="#" class="header-active">用户登录</a>
+            <div class="split"></div>
+            <a href="#">用户注册</a>
+            <span>关闭</span>
+        </div>
+        <div class="bodyContent">
+            <div class="login-box">
+                <p>&nbsp;</p>
+                <div>
+                    <img src="media/user_icon.jpg" alt="用户">
+                    <input type="text" id="lmobile" placeholder="手机号">
+                </div>
+                <p>&nbsp;</p>
+                <div>
+                    <img src="media/mima_icon.jpg" alt="密码">
+                    <input type="password" id="lpsd" placeholder="密码">
+                </div>
+                <p>&nbsp;</p>
+                <button class="loginBtn">登录</button>
+            </div>
+            <div class="register-box">
+                <p>&nbsp;</p>
+                <div>
+                    <img src="media/user_icon.jpg" alt="用户">
+                    <input type="text" id="rusername" placeholder="用户名/昵称">
+                </div>
+                <p>&nbsp;</p>
+                <div>
+                    <img src="media/phone.png" alt="用户">
+                    <input type="text" id="rmobile" placeholder="手机号码">
+                </div>
+                <p>&nbsp;</p>
+                <div>
+                    <img src="media/mima_icon.jpg" alt="密码">
+                    <input type="password" id="rpsd1" placeholder="密码">
+                </div>
+                <p>&nbsp;</p>
+                <div>
+                    <img src="media/mima_icon.jpg" alt="确认密码">
+                    <input type="password" id="rpsd2" placeholder="确认密码">
+                </div>
+                <p>&nbsp;</p>
+                <div>
+                    <img src="media/yanzheng.png" alt="密码">
+                    <input type="text" id="ryanzheng" placeholder="输入验证码">
+                    <img src="" id="svryanzhenma" data-uuid="">
+                </div>
+                <p>&nbsp;</p>
+
+                <button class="registerBtn">注册</button>
+
+                <h2 class="agree">点击"注册"即表示您同意并愿意遵守 <a href="#">用户协议</a>及 <a href="#">隐私政策</a>.</h2>
+                <h2 class="agree">使用本软件表示您已清楚 <a href="#">免责声明</a>.</h2>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="license">
+        <div class="licenseHeader">
+            <div class="licenseName">xxxx协议</div>
+            <span>关闭</span>
+        </div>
+    </div>
+    <div class="cover"></div>
+    <div id="varietyBaseFile"><input type="hidden"></div>
+</body>
+
+</html>

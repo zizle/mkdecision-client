@@ -996,6 +996,6 @@ class Paginator(QWidget):
         if self.current_page == self.total_pages:
             return
         self.current_page += 1
-        print('下一页里',self.current_page)
+        # print('下一页里',self.current_page)
         self.setCurrentPageLable()
         self.clicked.emit(self.current_page)

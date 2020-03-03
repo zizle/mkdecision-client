@@ -441,14 +441,8 @@ class BaseWindow(QWidget):
                 page.getGroupVarieties()
                 page.getTrendPageCharts()
             elif module_text == '交割服务':
-                try:
-                    from delivery.windows.base import Base
-                    page = Base()
-                except Exception as e:
-                    import traceback
-                    traceback.print_exc()
-                    print(e)
-
+                from frame.hedging.delivery import DeliveryPage
+                page = DeliveryPage(parent=self.page_container)
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)

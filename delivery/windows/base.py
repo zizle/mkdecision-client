@@ -15,6 +15,7 @@ from delivery.widgets.web_view import WebView
 from delivery.piece.base import TitleBar
 from delivery.utils.channel import ChannelObj, NewsChannelObj
 from delivery.utils.pdf import ShowServerPDF
+import settings
 
 # 枚举左上右下以及四个定点
 Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
@@ -76,7 +77,8 @@ class Base(QWidget):
         self.web_show = WebView()
         # self.web_show.page().load(QUrl('file:///html/home.html'))
         # print(config.SERVER + 'media/html/home.html')
-        self.web_show.page().load(QUrl(config.SERVER + 'media/html/home.html'))  # 加载服务端html
+        # self.web_show.page().load(QUrl(config.SERVER + 'media/html/home.html'))  # 加载服务端html
+        self.web_show.page().load(QUrl(settings.STATIC_PREFIX + 'delivery/html/home.html'))  # 加载服务端html
         # new page更多讨论交流的页面
         self.href = WebView()
         # 新闻公告显示列表页面
@@ -384,5 +386,5 @@ class Base(QWidget):
         self.tab.tabBar().setTabButton(0, QTabBar.RightSide, None)
         self.tab.tabBar().setTabButton(1, QTabBar.RightSide, None)
         self.tab.tabBar().setTabButton(2, QTabBar.RightSide, None)
-        if config.CLIENT == 'management':
+        if settings.ADMINISTRATOR is True:
             self.tab.tabBar().setTabButton(3, QTabBar.RightSide, None)
