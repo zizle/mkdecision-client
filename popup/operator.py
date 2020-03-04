@@ -5,7 +5,7 @@ import json
 import requests
 from PyQt5.QtWidgets import QWidget, QDialog, QGridLayout, QHBoxLayout, QVBoxLayout, QLineEdit, QPushButton, QLabel,\
     QComboBox, QTabWidget, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QTreeWidget, QTreeWidgetItem, QMenu,\
-    QAction, QAbstractItemView
+    QAction, QAbstractItemView, QListView
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
 from PyQt5.QtGui import QCursor
 import settings
@@ -1060,9 +1060,22 @@ class CreateNewVarietyPopup(QDialog):
         self.variety_en_edit = QLineEdit()
         new_variety_layout.addWidget(self.variety_en_edit, 4, 1)
         new_variety_layout.addWidget(QLabel(parent=self, objectName='varietyEnEditError'), 5, 0, 1, 2)
+        # 品种所属的交易所
+        new_variety_layout.addWidget(QLabel("交易所:"), 6, 0)
+        self.exchange_combo = QComboBox(objectName='exchangeCombo')
+        # 增加选项
+        for exchange_item in [
+            (1, "郑州商品交易所"), (2, '上海期货交易所'),
+            (3, '大连商品交易所'), (4, '中国金融期货交易所'),
+            (5, '上海国际能源交易中心')
+        ]:
+            self.exchange_combo.addItem(exchange_item[1], exchange_item[0])
+        new_variety_layout.addWidget(self.exchange_combo, 6, 1)
+        # 占位
+        new_variety_layout.addWidget(QLabel(' '), 7, 0)
         # 提交按钮
         self.commit_button = QPushButton('确认提交', clicked=self.commit_new_variety)
-        new_variety_layout.addWidget(self.commit_button, 6, 1)
+        new_variety_layout.addWidget(self.commit_button, 8, 1)
         rlayout.addLayout(new_variety_layout)
         # 说明
         rlayout.addWidget(QLabel(
@@ -1080,7 +1093,23 @@ class CreateNewVarietyPopup(QDialog):
         #groupTree::item{
             height:20px;
         }
+        #exchangeCombo{
+            border: 1px solid rgb(240, 240, 240);
+            color: rgb(7,99,109);
+        }
+        #exchangeCombo QAbstractItemView::item{
+            height:20px;
+        }
+        #exchangeCombo::drop-down{
+            border: 0px;
+        }
+        #exchangeCombo::down-arrow{
+            image:url("media/more.png");
+            width: 15px;
+            height:15px;
+        }
         """)
+        self.exchange_combo.setView(QListView())
 
     # 获取分组和每个分组下的品种
     def getGroupWithVarieties(self):
@@ -1130,7 +1159,6 @@ class CreateNewVarietyPopup(QDialog):
 
     # 新增品种
     def commit_new_variety(self):
-        print('新增品种')
         if not self.attach_group.gid:
             self.findChild(QLabel, 'groupNameError').setText('请选择新品种所属的分组!')
             return
@@ -1144,6 +1172,8 @@ class CreateNewVarietyPopup(QDialog):
             self.findChild(QLabel, 'varietyEnEditError').setText('请输入正确的品种英文代码!')
             return
         name_en = name_en.group()
+        # 所属交易所
+        exchange_lib_id = self.exchange_combo.currentData()
         # 提交
         try:
             r = requests.post(
@@ -1151,7 +1181,8 @@ class CreateNewVarietyPopup(QDialog):
                 headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
                 data=json.dumps({
                     'name': name,
-                    'name_en': name_en
+                    'name_en': name_en,
+                    'exchange_lib': exchange_lib_id
                 })
             )
             response = json.loads(r.content.decode('utf-8'))

@@ -1,12 +1,12 @@
 $(function () {
     // 请求数据填充
     $.ajax({
-        url: host + 'questions/',
+        url: host + 'delivery/questions/',
         type: 'get',
         success: function (res) {
             console.log(res);
             // 展示数据
-            showContent(res)
+            showContent(res.data)
         },
         error: function (res) {
             // console.log(res);
@@ -152,14 +152,14 @@ $(function () {
         }
         // 发布问题
         $.ajax({
-            url: host + 'question/',
+            url: host + 'delivery/questions/',
             type: 'post',
             contentType: 'application/json',
             data: JSON.stringify({
                 content: ques,
             }),
             headers: {
-                "Authorization": "JWT " + token
+                "AUTHORIZATION": token
             },
             success: function (res) {
                 // console.log(res)
@@ -239,8 +239,7 @@ function showContent(discussions, message='*没有相关的记录') {
         var answers = question['answers'];
         if (questioner){
             questionerAvatar=questioner['avatar'];
-            console.log(questioner['username'].substring(0,3)+ "****" + questioner['username'].substring(7,11))
-            questionerNickName=questioner['nick_name'] || questioner['username'].substring(0,3) + "****" + questioner['username'].substring(8,11);
+            questionerNickName=questioner['username'] || questioner['phone'];
         }else{
             $('.unknowUser').show();
         }

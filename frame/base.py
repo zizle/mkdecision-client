@@ -7,12 +7,13 @@ import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
 from PyQt5.QtCore import Qt, QSize
-
 import settings
 from widgets.base import TitleBar, NavigationBar, LoadedPage
 from utils.machine import get_machine_code
+from utils.channel import DeliveryChannel
 from popup.tips import InformationPopup
 from frame.usercenter import UserCenter
+
 
 """ 欢迎页 """
 
@@ -141,6 +142,8 @@ class BaseWindow(QWidget):
         layout.addWidget(self.navigation_bar)
         layout.addWidget(self.page_container)
         self.setLayout(layout)
+        """主窗口与交割服务界面的js交互通道"""
+        self.delivery_web_channel = DeliveryChannel()  # 交互信号对象
 
     # 用户点击【登录】
     def user_to_login(self):
@@ -194,7 +197,10 @@ class BaseWindow(QWidget):
         else:
             s_key = 5
         settings.app_dawn.setValue('SKEY', s_key)
+        # token的处理
         settings.app_dawn.setValue('AUTHORIZATION', token)
+        # 传给交割服务的网页
+        self.delivery_web_channel.userHasLogin.emit(token)
         # 组织滚动显示用户名
         dynamic_username = response_data['username']
         if not response_data['username']:
@@ -442,7 +448,8 @@ class BaseWindow(QWidget):
                 page.getTrendPageCharts()
             elif module_text == '交割服务':
                 from frame.hedging.delivery import DeliveryPage
-                page = DeliveryPage(parent=self.page_container)
+                page = DeliveryPage(parent=self.page_container, navbar_web_channel=self.delivery_web_channel)
+
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)

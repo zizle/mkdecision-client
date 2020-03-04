@@ -160,7 +160,7 @@ $(function () {
             })
         },
         error: function (res) {
-            console.log(res)
+            // console.log(res)
         }
     });
 

@@ -3,13 +3,14 @@
 import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from PyQt5.QtGui import QColor
-from PyQt5.QtCore import QUrl, QFile
+from PyQt5.QtCore import QUrl, QTimer
+from PyQt5.QtWebChannel import QWebChannel
 import settings
 from widgets.web_view import WebView
 
 # 交割首页
 class DeliveryPage(QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, navbar_web_channel, *args, **kwargs):
         super(DeliveryPage, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=0)
         self.tab = QTabWidget(parent=self)
@@ -23,14 +24,24 @@ class DeliveryPage(QWidget):
         self.tab.setPalette(palette)
         # layout.addWidget(title_bar)
         layout.addWidget(self.tab)
+        # 定时向网页发送用户token
+        self.send_token_timer = QTimer()
+        self.send_token_timer.timeout.connect(self.send_token_to_web)
         # 主页面内容
         self.web_show = WebView()
         # .load(QUrl('file:///html/home.html')
         # html_path = QCoreApplication.applicationDirPath(se) /+ 'media/hedging/html/test.html'
         self.web_show.load(QUrl("file:///" + 'media/hedging/html/home.html'))  # 加载首页
+        # 主页与导航栏的交互通道（用于登录信息的传递）
+        self.navbar_web_channel = navbar_web_channel
+        self.navbar_web_channel.hasReceivedUserToken.connect(self.send_token_timer.stop)
+        self.navbar_web_channel.moreCommunicationSig.connect(self.more_communication)  # 更多交流讨论
+        web_show_channel = QWebChannel(self.web_show.page())
+        self.web_show.page().setWebChannel(web_show_channel)
+        web_show_channel.registerObject("GUIMsgChannel", self.navbar_web_channel)  # 注册信号对象
         # 交流讨论页
         self.href = WebView()
-        self.href.page().load(QUrl(settings.STATIC_PREFIX + 'delivery/html/communication.html'))
+        self.href.page().load(QUrl("file:///" + 'media/hedging/html/communication.html'))
         # 关于我们的页面
         self.link_us = WebView()
         self.link_us.page().load(QUrl(settings.STATIC_PREFIX + 'delivery/html/linkus.html'))
@@ -56,6 +67,18 @@ class DeliveryPage(QWidget):
             background: rgb(220,220,220)
         }
         """)
+        self.send_token_timer.start(10000)
+
+    # 定时向网页发送用户token
+    def send_token_to_web(self):
+        token = settings.app_dawn.value('AUTHORIZATION')
+        self.navbar_web_channel.userHasLogin.emit(token)
+
+    # 更多交流讨论
+    def more_communication(self, b):
+        if b:
+            self.href.reload()
+            self.tab.setCurrentWidget(self.href)
 
     # 关闭tab
     def close_tab(self, index):
