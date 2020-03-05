@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>新闻-公告</title>
+    <script type="text/javascript" src="js/jquery-1.7.2.min.js" ></script>
+    <script type="text/javascript" src="js/qwebchannel.js" ></script>
+    <script type="text/javascript" src="js/public.js" ></script>
+</head>
+<style>
+
+    .newsList li:hover, .bulletinList li:hover{
+        cursor: pointer;
+        background: -webkit-linear-gradient(
+        left, rgb(150,150,150), rgb(200,200,200), rgb(252,252,252)
+        );
+
+        color: #FFFFFF;
+    }
+    .newsList ul, .bulletinList ul{
+        margin: 5px 0  1px 10px;
+        padding: 0;
+    }
+    .newsList li, .bulletinList li{
+        margin: 5px 0;
+        padding: 2px;
+        list-style: none;
+    }
+    .newsList li span, .bulletinList li span{
+        font-size: 12px;
+        color: rgb(120,120,120);
+        margin-left: 50px;
+    }
+    .newsTitle, .bulletinTitle{
+        background: -webkit-linear-gradient(
+        left, #007799, #B0E0E6, #FFFFFF
+        );
+        padding: 2px 0 2px 5px;
+        color: #FFFFFF;
+        font-weight: bold;
+    }
+</style>
+<body>
+    <div>
+        <div class="newsTitle">新闻</div>
+        <div class="newsList"></div>
+    </div>
+    <div>
+        <div class="bulletinTitle">公告</div>
+        <div class="bulletinList"></div>
+    </div>
+</body>
+<script>
+    $(function () {
+        // 请求所有新闻公告列表
+        $.ajax({
+            url: host + 'newsbulletin/?scroll=0',
+            type: 'get',
+            success: function (res) {
+                // 填充列表
+                showNewsBulletin(res)
+                console.log(res)
+            },
+            error: function (res) {
+
+            }
+        });
+        // 点击条目事件
+        $('.newsList, .bulletinList').on('click', 'li', function () {
+            // console.log($(this).html());
+            var article = $(this).data('article');
+            var atype = $(this).data('atype');
+            new QWebChannel(qt.webChannelTransport, function (channel) {
+
+                var channelObj = channel.objects.newsChannel;
+                channelObj.showDetail([atype, article])  // 通道对象信号槽函数
+            });
+        });
+
+    });
+    // 填充新闻公告
+    function showNewsBulletin(newsBulletin) {
+        var newContent = "<ul>";
+        $.each(newsBulletin['news'], function (index, newsItem) {
+            newContent += "<li data-atype='news' data-article=" + newsItem['id'] + ">" + newsItem['title'] + "<span>"+newsItem['create_time']+"</span></li>";
+        });
+        newContent += "</ul>";
+        var bulletinContent = "<ul>";
+        $.each(newsBulletin['bulletin'], function (index, bulletinItem) {
+            bulletinContent += "<li data-atype='bulletin' data-article=" + bulletinItem['id'] + ">" + bulletinItem['title'] + "<span>"+ bulletinItem['create_time']+"</span></li>";
+        });
+        bulletinContent += "</ul>";
+        $('.newsList').html(newContent);
+        $('.bulletinList').html(bulletinContent);
+    }
+
+</script>
+</html>

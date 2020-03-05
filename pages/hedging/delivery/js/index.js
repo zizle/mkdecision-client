@@ -1,16 +1,14 @@
 $(function () {
-    // 网页信道对象
-    new QWebChannel(qt.webChannelTransport, function (channel) {
-        var channelObj = channel.objects.GUIMsgChannel;
-        // 收到来自界面的用户登录的token获取切换页面收到token
-        channelObj.userHasLogin.connect(function (userToken) {
-            // 设置token，存入本地存储
-            localStorage.token = userToken;
+    new QWebChannel(qt.webChannelTransport, function(channel){
+        var pageContact = channel.objects.pageContactChannel;
+        window.pageChannel = pageContact;
+        pageContact.senderUserToken.connect(function (userToken) {
+            localStorage.token = userToken;  // 设置token，存入本地存储
             token = localStorage.token;
-            // 返回关闭定时器
-            channelObj.webHasReceivedUserToken(true)
+            pageContact.hasReceivedUserToken(true);  // 告诉界面收到了token
         });
     });
+
     // 获取交易所数据(品种,服务内容等)
     $.ajax({
         url: host + 'exchanges/',
@@ -110,7 +108,6 @@ $(function () {
             var channelObj = channel.objects.messageChannel;
             channelObj.serviceGuide([whichExchange, current_service]);  // 通道对象信号槽函数
         });
-
     });
     // 最新讨论交流
     $.ajax({
@@ -132,11 +129,7 @@ $(function () {
     });
     // 点击讨论交流的[更多]传出信号,新跳页面
     $('.communication').on('click', 'a', function () {
-        new QWebChannel(qt.webChannelTransport, function (channel) {
-            // alert(parent_value)
-            var channelObj = channel.objects.GUIMsgChannel;
-            channelObj.moreCommunication(true);  // 通道对象信号槽函数
-        });
+        window.pageChannel.moreCommunication(true);
     });
     // 品种模式frame内请求文件转化为这里的点击事件
     $('#varietyBaseFile').click(function (e) {
@@ -159,33 +152,12 @@ $(function () {
         $("#frame")[0].contentWindow.reloadMap(keyword);  // 调用iframe页面里的函数
         // $('.map').click();
     })
-    // 各许可协议点击
-    $('.agree').on('click', 'a', function (e) {
-        e.preventDefault();
-        // 请求协议的内容
-        var licenseName = $.trim($(this).html());
-        var licenseContent = "<div class='licenseHeader'><div class='licenseName'>"+licenseName+"</div>";
-        licenseContent += "<span>关闭</span> </div>";
-        $(".license").html(licenseContent)
-        $.ajax({
-            url: host + 'license/?licenseName=' + licenseName,
-            type: 'get',
-            success: function (res) {
-                $(".license").append(res)
-            },
-            error: function (res) {
 
-            }
-        });
-        $('.license').show();
+    $(".nav").on('click', '.linkUs', function () {
+        window.pageChannel.toLinkUsPage(true);
     });
-    // 关闭协议
-    $('.license').on('click', 'span', function () {
-        $('.license').hide();
-    })
-
-
 });
+
 
 // 展示最新讨论数据
 function showLastedQuestion(questions) {
@@ -231,8 +203,6 @@ function showLastedQuestion(questions) {
     $('.communication').append(communicationList)
     // 轮询设置页面高度
     window.setInterval("reinitIframe()", 300)
-
-
 }
 
 

@@ -9,6 +9,7 @@ from widgets.base import LoadedPage
 from frame.homeCollector import HomePageCollector
 from frame.trendCollector import TrendPageCollector
 from frame.infoServiceCollector import InfoServicePageCollector
+from frame.hedging.deliveryCollector import DeliveryPageCollector
 
 
 # 管理的功能块
@@ -149,6 +150,7 @@ class CollectorMaintain(QWidget):
             {'text': u'首页管理', 'icon': 'media/collector_icon/home.png'},
             {'text': u'产品服务', 'icon': 'media/collector_icon/service.png'},
             {'text': u'数据分析', 'icon': 'media/collector_icon/trend.png'},
+            {'text': u'交割服务', 'icon': 'media/collector_icon/service.png'},
         ]:
             block = CollectorBlockIcon(text=block_item['text'], icon_path=block_item['icon'], parent=self)
             block.clicked_block.connect(self.enter_detail_collector)
@@ -202,6 +204,9 @@ class CollectorMaintain(QWidget):
             detail_widget = InfoServicePageCollector(parent=self.detail_collector)
         elif current_block == u'数据分析':
             detail_widget = TrendPageCollector(parent=self.detail_collector)
+        elif current_block == u'交割服务':
+
+            detail_widget = DeliveryPageCollector(parent=self.detail_collector)
         else:
             detail_widget = QLabel('【' + current_block + '】暂不支持数据管理...',
                                    styleSheet='font-size:16px;color:rgb(200, 120, 100);', alignment=Qt.AlignCenter)

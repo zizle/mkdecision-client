@@ -4,6 +4,12 @@
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 
 
+
+class NavigationBarChannel(QObject):
+    userHasLogin = pyqtSignal(str)  # 用户已经登录的信号，由此发出给js
+
+
+
 # 主窗口与webView交互信道
 class ChannelObj(QObject):
     moreCommunicationSig = pyqtSignal(bool)
@@ -38,10 +44,12 @@ class ChannelObj(QObject):
         self.userTokenSig.emit(str_param)
 
 
+
 class DeliveryChannel(QObject):
     userHasLogin = pyqtSignal(str)  # 用户已经登录的信号，由此发出给js
     hasReceivedUserToken = pyqtSignal(bool)
     moreCommunicationSig = pyqtSignal(bool)
+    linkUsPageSig = pyqtSignal(bool)
 
     @pyqtSlot(bool)  # 暴露函数给JS调用
     def moreCommunication(self, boolean):  # 页面点击更多时调用
@@ -50,6 +58,10 @@ class DeliveryChannel(QObject):
     @pyqtSlot(bool)
     def webHasReceivedUserToken(self, boolean):  # 收到token调用
         self.hasReceivedUserToken.emit(boolean)
+
+    @pyqtSlot(bool)
+    def toLinkUsPage(self, boolean):  # 跳转关于我们页面
+        self.linkUsPageSig.emit(boolean)
 
 
 

@@ -6,11 +6,13 @@ import time
 import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize,QUrl
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebChannel import QWebChannel
 import settings
 from widgets.base import TitleBar, NavigationBar, LoadedPage
 from utils.machine import get_machine_code
-from utils.channel import DeliveryChannel
+from utils.channel import DeliveryChannel, NavigationBarChannel
 from popup.tips import InformationPopup
 from frame.usercenter import UserCenter
 
@@ -101,6 +103,7 @@ class BaseWindow(QWidget):
 
     def __init__(self, *args, **kwargs):
         super(BaseWindow, self).__init__(*args, **kwargs)
+        self.web_browser = QWebEngineView(parent=self)  # 实例化网页承载器
         # self.mousePressed = False
         # 设置窗体的图标和名称
         self.setWindowIcon(QIcon("media/logo.png"))
@@ -142,8 +145,7 @@ class BaseWindow(QWidget):
         layout.addWidget(self.navigation_bar)
         layout.addWidget(self.page_container)
         self.setLayout(layout)
-        """主窗口与交割服务界面的js交互通道"""
-        self.delivery_web_channel = DeliveryChannel()  # 交互信号对象
+        self.navigation_bar_channel = NavigationBarChannel()
 
     # 用户点击【登录】
     def user_to_login(self):
@@ -199,8 +201,8 @@ class BaseWindow(QWidget):
         settings.app_dawn.setValue('SKEY', s_key)
         # token的处理
         settings.app_dawn.setValue('AUTHORIZATION', token)
-        # 传给交割服务的网页
-        self.delivery_web_channel.userHasLogin.emit(token)
+        # 发送token到网页页面
+        self.navigation_bar_channel.userHasLogin.emit(token)
         # 组织滚动显示用户名
         dynamic_username = response_data['username']
         if not response_data['username']:
@@ -409,6 +411,17 @@ class BaseWindow(QWidget):
         page.psd_changed.connect(self.navigation_bar.permit_bar.user_logout)
         self.page_container.addWidget(page)
 
+    # 注册交割服务信号通道
+    def register_delivery_channel(self):
+        """主窗口与交割服务界面的js交互通道"""
+        web_channel = DeliveryChannel()  # 交互信号对象
+        web_channel.hasReceivedUserToken.connect(self.send_token_timer.stop)
+        web_channel.moreCommunicationSig.connect(self.more_communication)  # 更多交流讨论
+        web_channel.linkUsPageSig.connect(self.to_link_us_page)
+        channel_qt_obj = QWebChannel(self.web_show.page())
+        self.web_show.page().setWebChannel(channel_qt_obj)
+        channel_qt_obj.registerObject("GUIMsgChannel", web_channel)  # 注册信号对象
+
     # 点击模块菜单事件(接受到模块的id和模块名称)
     def module_clicked(self, module_id, module_text):
         # print(module_id, module_text)
@@ -447,9 +460,26 @@ class BaseWindow(QWidget):
                 page.getGroupVarieties()
                 page.getTrendPageCharts()
             elif module_text == '交割服务':
-                from frame.hedging.delivery import DeliveryPage
-                page = DeliveryPage(parent=self.page_container, navbar_web_channel=self.delivery_web_channel)
+                from frame.hedging.delivery import DeliveryServicePage
+                page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
 
+                # try:
+                #     from frame.hedging.delivery import DeliveryPageHandler
+                #     print(1, self.web_browser)
+                #     handler = DeliveryPageHandler()
+                #     print(2)
+                #     page = handler.register_channel(self.web_browser)
+                #     page.page().load(QUrl("file:///" + 'media/hedging/html/home.html'))  # 加载首页
+                #     print(3, page)
+                # except Exception as e:
+                #     print(e)
+
+                # from frame.hedging.delivery import DeliveryPage
+                # # page = DeliveryPage(parent=self.page_container, navbar_web_channel=self.delivery_web_channel)
+                # page = self.web_browser
+                # self.register_delivery_channel()
+                # page.page().load(QUrl("file:///" + 'media/hedging/html/home.html'))  # 加载首页
+                # page.load(QUrl("file:///" + 'pages/hedging/delivery/home.html'))  # 加载交割服务首页
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)
@@ -466,5 +496,8 @@ class BaseWindow(QWidget):
                               styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
                               alignment=Qt.AlignCenter)
                 page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
-            self.page_container.clear()
-            self.page_container.addWidget(page)
+            try:
+                self.page_container.clear()
+                self.page_container.addWidget(page)
+            except Exception as e:
+                print(e)

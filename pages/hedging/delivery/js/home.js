@@ -232,6 +232,14 @@ function showLastedQuestion(questions) {
     // 轮询设置页面高度
     window.setInterval("reinitIframe()", 300)
 
+    $(".nav").on('click', '.linkUs', function () {
+        alert("点击关于我们")
+        new QWebChannel(qt.webChannelTransport, function (channel) {
+        var channelObj = channel.objects.GUIMsgChannel;
+            // 返回跳转页面的信号
+            channelObj.toLinkUsPage(true)
+        });
+    });
 
 }
 
