@@ -132,6 +132,7 @@ body{
 /*省份显示框ul大小样式在菜单栏下的块样式上的补充*/
 .nav .province-show{
     /*width: 500px;*/
+    width: 520px;
     border: none;
 }
 .nav .province-show li{

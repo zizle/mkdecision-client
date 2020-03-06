@@ -1,12 +1,14 @@
 $(function () {
     var queryParams = getQueryParams();  // 获取查询参数集
     var province = queryParams['province'];
-    console.log('选择' + province);
+    // alert(province)
+    // alert('选择' + province);
     // 获取地区下的仓库
     $.ajax({
-        url: host + 'storehouse/' + province + '/',
+        url: host + 'delivery/storehouse/' + province + '/',
         type: 'get',
         success: function (res) {
+            var res = res.data;
             console.log(res);
             if (isEmpty(res)){
                 $('.ware-house').html("<div>*无相关数据</div>");
@@ -57,7 +59,7 @@ function adjustFrameSize() {
 // 获取url查询参数集
 function getQueryParams() {
     var targetEle = parent.$("#frame"); // 寻找frame目标
-	var regexpParam = /\??([\w\d%]+)=([\w\d%]*)&?/g; // 分离参数的正则表达式
+	var regexpParam = /\??([\w\d%\u4e00-\u9fa5]+)=([\w\d%\u4e00-\u9fa5]*)&?/g; // 分离参数的正则表达式
 	var  paramMap=null; // 置空
 	if(!!targetEle) {
 	    var url = targetEle.attr("src"); // 取得iframe的url

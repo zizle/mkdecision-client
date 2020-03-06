@@ -33,7 +33,7 @@ $(function () {
                     serviceGuideBlock += "<ul class='belong-exchange hedging-guide'>";
                 }
                 $.each(exchange.varieties, function (vindx, variety) {
-                    varietyBlock += "<li data-value="+variety.en_code+">" + variety.name+"</li>"
+                    varietyBlock += "<li data-value="+variety.name_en+">" + variety.name+"</li>"
                 });
                 $.each(exchange.service_guides, function (sindx, guide) {
                     serviceGuideBlock += "<li data-value='"+guide.en_code+"'>"+guide.name+ "</li>"
@@ -54,7 +54,11 @@ $(function () {
     // 填写地区
     var areaEle = "";
     $.each(areaJson, function (aindx, area) {
-        areaEle += "<li data-value="+area.name+">" + area.name + "</li>";
+        var areaName = area.name;
+        if(area.name.length > 3){
+            areaName = area.s_name;
+        }
+        areaEle += "<li data-value="+area.name+">" + areaName + "</li>";
     });
     $('.province-show').html(areaEle);
 
@@ -86,6 +90,7 @@ $(function () {
     });
     // 点击品种的子菜单选项
     $('.variety-show').on('click', 'li', function (e) {
+        e.stopPropagation();
         var whichExchange = $(this).parent().prev().data('value');
         var current_variety = $(this).data('value');
         if (typeof (whichExchange)=="undefined" || typeof (current_variety) == "undefined"){return false}
@@ -96,6 +101,7 @@ $(function () {
     $('.province-show').on('click', 'li', function () {
        $('.nav-show').slideUp('fast');
         var current_province = $(this).data('value');  // 当前省份
+        // alert(current_province)
         $('#frame').attr('src', 'province.html?province=' + current_province);
     });
     // 点击服务指引
@@ -135,11 +141,9 @@ $(function () {
     $('#varietyBaseFile').click(function (e) {
         e.preventDefault();
         var fileUrl = $(this).children("input").val();
-        console.log(fileUrl);
-        new QWebChannel(qt.webChannelTransport, function (channel) {
-            var channelObj = channel.objects.messageChannel;
-            channelObj.fileUrlMessage(fileUrl);  // 通道对象信号槽函数
-        });
+        // alert(fileUrl);
+        //  发出信息通道到主UI界面
+        window.pageChannel.uiWebgetVarietyInfoFile(fileUrl)
         $(this).children("input").val('');
     });
     // 初始化显示中国地图
@@ -205,18 +209,16 @@ function showLastedQuestion(questions) {
     window.setInterval("reinitIframe()", 300)
 }
 
-
 function reinitIframe(){
 
 var iframe = document.getElementById("frame");
-
-iframe.height = 0; //只有先设置原来的iframe高度为0，之前的iframe高度才不会对现在的设置有影响
-try{
-var bHeight = iframe.contentWindow.document.body.scrollHeight;
-var dHeight = iframe.contentWindow.document.documentElement.scrollHeight;
-var height = Math.max(bHeight, dHeight);
-iframe.height = height;
-$('#frame').css('height', height);
-// console.log(height);
-}catch (ex){}
+    iframe.height = 0; //只有先设置原来的iframe高度为0，之前的iframe高度才不会对现在的设置有影响
+    try{
+    var bHeight = iframe.contentWindow.document.body.scrollHeight;
+    var dHeight = iframe.contentWindow.document.documentElement.scrollHeight;
+    var height = Math.max(bHeight, dHeight);
+    iframe.height = height;
+    $('#frame').css('height', height);
+    // console.log(height);
+    }catch (ex){}
 }

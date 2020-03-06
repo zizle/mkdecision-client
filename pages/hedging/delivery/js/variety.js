@@ -6,23 +6,23 @@ $(function () {
     // console.log('选择了' +exchange + '的' + selected)
     // 根据参数获取相应的内容显示
 	$.ajax({
-		url: host + 'storehouse/' + selected + "/",
+		url: host + 'delivery/storehouse/' + selected + "/",
 		type: 'get',
 		contentType: 'application/json',
 		success: function (res) {
 			// console.log(res);
+			var res = res.data;
 			if (isEmpty(res)){
 				$('.base-msg').html("<div>*无相关数据</div>");
 				return false;
 			}
 			var baseInfo = "<ul>";
-			baseInfo += "<li>交割标准(品牌)：<a href="+ host + "media/files/" + res.attach_to + res.name + res.en_code +"交割品牌.pdf>"+res.name +"交割品牌.pdf</a></li>";
-			baseInfo += "<li>交割单位："+ res.delivery_unit+"</li>";
+			baseInfo += "<li>交割标准(品牌)：<a href="+ host + "mkDecision/hedging/delivery/varietyFiles/" + res.exchange + res.name + res.name_en +"交割品牌.pdf>"+res.name +"交割品牌.pdf</a></li>";
+			baseInfo += "<li>最后交易日："+ res.delivery_date+"</li>";
 			baseInfo += "<li>最小交割单位："+ res.delivery_unit_min+"</li>";
-			baseInfo += "<li>交割时间："+ res.delivery_date+"</li>";
 			baseInfo += "<li>仓单有效期："+ res.warrant_expire_date+"</li>";
-			baseInfo += "<li>交割费用：<a href="+ host + "media/files/" + res.attach_to + res.name+res.en_code +"交割费用.pdf>"+ res.name +"交割费用.pdf</a></li>";
-			baseInfo += "<li>质检机构：<a href="+ host + "media/files/" + res.attach_to + res.name + res.en_code +"质检机构.pdf>"+ res.name+"质检机构.pdf</a></li>";
+			baseInfo += "<li>交割费用：<a href="+ host + "mkDecision/hedging/delivery/varietyFiles/"+ res.exchange + res.name+res.name_en +"交割费用.pdf>"+ res.name +"交割费用.pdf</a></li>";
+			baseInfo += "<li>质检机构：<a href="+ host + "mkdecision/hegding/delivery/varietyFiles/" + res.exchange + res.name + res.name_en +"质检机构.pdf>"+ res.name+"质检机构.pdf</a></li>";
 			baseInfo +=  "</ul>";
 			$('.base-msg').html(baseInfo);
 			// 取出仓库数据
@@ -99,11 +99,5 @@ function isEmpty(obj) {
 		return false
 	}
 	return true
-
 }
 
-// // 正则匹配出文件名称
-// function regexName(fileUrl) {
-// 	var index = fileUrl.lastIndexOf("\/");
-// 	return fileUrl.substring(index + 1, fileUrl.length);
-// }

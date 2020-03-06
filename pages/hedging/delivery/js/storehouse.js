@@ -5,10 +5,10 @@ $(function () {
     // console.log(houseId);
     // 请求仓库详情
     $.ajax({
-        url: host + 'storehouse/' + houseId + '/',
+        url: host + 'delivery/storehouse/' + houseId + '/',
         type:'get',
         success: function (res) {
-            console.log(res);
+            var res = res.data;
             if (isEmpty(res)){
                 $('.shDetail').html('*无此仓库相关数据')
                 return false;

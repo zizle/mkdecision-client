@@ -462,24 +462,6 @@ class BaseWindow(QWidget):
             elif module_text == '交割服务':
                 from frame.hedging.delivery import DeliveryServicePage
                 page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
-
-                # try:
-                #     from frame.hedging.delivery import DeliveryPageHandler
-                #     print(1, self.web_browser)
-                #     handler = DeliveryPageHandler()
-                #     print(2)
-                #     page = handler.register_channel(self.web_browser)
-                #     page.page().load(QUrl("file:///" + 'media/hedging/html/home.html'))  # 加载首页
-                #     print(3, page)
-                # except Exception as e:
-                #     print(e)
-
-                # from frame.hedging.delivery import DeliveryPage
-                # # page = DeliveryPage(parent=self.page_container, navbar_web_channel=self.delivery_web_channel)
-                # page = self.web_browser
-                # self.register_delivery_channel()
-                # page.page().load(QUrl("file:///" + 'media/hedging/html/home.html'))  # 加载首页
-                # page.load(QUrl("file:///" + 'pages/hedging/delivery/home.html'))  # 加载交割服务首页
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)

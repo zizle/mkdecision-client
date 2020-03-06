@@ -1,13 +1,10 @@
 # _*_ coding: utf-8 _*_
 # Author: zizle QQ: 462894999
-import os
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
-from PyQt5.QtGui import QColor
-from PyQt5.QtCore import QUrl, QTimer, QObject
+from PyQt5.QtCore import QUrl, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
 import settings
-from widgets.web_view import WebView
+from widgets.base import PDFContentPopup
 
 from frame.hedging.channels import DeliveryChannel
 
@@ -26,13 +23,17 @@ class DeliveryServicePage(QWebEngineView):
         self.contact_channel.receivedUserTokenBack.connect(self.web_has_received_token)  # 收到token的回馈
         self.contact_channel.moreCommunicationSig.connect(self.more_communication)  # 更多讨论交流页面
         self.contact_channel.linkUsPageSig.connect(self.to_link_us_page)  # 关于我们的界面
+        self.contact_channel.getVarietyInfoFile.connect(self.get_variety_information_file)  # 弹窗显示品种的相关PDF文件
         self.page().setWebChannel(channel_qt_obj)
         channel_qt_obj.registerObject("pageContactChannel", self.contact_channel)  # 信道对象注册信道，只能注册一个
         self.send_token_timer.start(8000)
 
+    def contextMenuEvent(self, event):
+        # 禁止右击菜单行为
+        pass
+
     # 定时向网页发送用户token
     def send_token_to_web(self):
-        print(1)
         token = settings.app_dawn.value('AUTHORIZATION')
         self.contact_channel.senderUserToken.emit(token)
 
@@ -48,4 +49,11 @@ class DeliveryServicePage(QWebEngineView):
     def to_link_us_page(self, b):
         if b:
             self.page().load(QUrl("file:///pages/hedging/delivery/linkus.html"))
+
+    def get_variety_information_file(self, file_url):
+        file_name = file_url.rsplit('/', 1)[1]
+        popup = PDFContentPopup(title=file_name, file=file_url, parent=self)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
 

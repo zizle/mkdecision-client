@@ -69,7 +69,7 @@ class AbstractMaintainWidget(QWidget):
         self.setLayout(layout)
         # initial data
         self.get_data_thread = None
-        self.get_data()
+        # self.get_data()
 
     def get_data(self):
         self.review_table.hide()
@@ -220,14 +220,14 @@ class StorehouseMaintain(AbstractMaintainWidget):
     data_url = settings.SERVER_ADDR + 'delivery/storehouses/'
 
     def data_thread_back(self, content):
-        # print('请求仓库数据成功', content)
         if content['error']:
             return
-        keys = [('serial_num', '序号'), ('house_code', '仓库编号'), ('update_time', '最近更新'), ("name", "名称"),
-                ("variety", "交割品种"), ('area', '所在省'), ('arrived', "到达站、港"), ('premium', '升贴水'),
-                ('address', '地址'), ('link', '联系人'), ('tel_phone', '联系电话'), ('fax', '传真'),
-                ('longitude', '地址经度'),('latitude', '地址纬度'), ('is_active', '有效')]
-        self.fill_data_show_table(data=content['data'], keys=keys)
+        keys = [('serial_num', '序号'), ("name", "名称"),('longitude', '地址经度'), ('latitude', '地址纬度')]
+        # keys = [('serial_num', '序号'), ('house_code', '仓库编号'), ('update_time', '最近更新'), ("name", "名称"),
+        #         ("variety", "交割品种"), ('area', '所在省'), ('arrived', "到达站、港"), ('premium', '升贴水'),
+        #         ('address', '地址'), ('link', '联系人'), ('tel_phone', '联系电话'), ('fax', '传真'),
+        #         ('longitude', '地址经度'),('latitude', '地址纬度'), ('is_active', '有效')]
+        self.fill_data_show_table(data=content['data']['data'], keys=keys)
 
     def get_header_labels(self):
         return ["仓库编码", "名称", '交割品种', '品种代号(小写)', '所属省份',
@@ -310,6 +310,7 @@ class HouseReportMaintain(AbstractMaintainWidget):
         # print('获取仓单数据：', content)
         if content['error']:
             return
+        # print(content)
         keys = [('serial_num', '序号'), ('date', '日期'), ('storehouse', '仓库编号'), ('house_name', '仓库'),
                 ('variety', '品种'), ("yesterday_report", "昨日仓单量"), ("today_report", "今日仓单量"),
                 ('regulation', '增减'), ('is_active', '有效')]
@@ -371,6 +372,79 @@ class HouseReportMaintain(AbstractMaintainWidget):
         # 上传数据
         self.upload_data(new_list)
 
+
+# 上传品种的基本信息
+class VarietyInformationMaintain(AbstractMaintainWidget):
+    data_url = settings.SERVER_ADDR + 'delivery/variety-info/'
+
+    def data_thread_back(self, content):
+        if content['error']:
+            return
+        keys = [('serial_num', '序号'), ("name", "名称"),("name_en", "品种代码"), ('delivery_date', '最后交易日'),
+                ('warrant_expire_date', "仓单有效期"), ('delivery_unit_min', '最小交割单位')]
+        self.fill_data_show_table(data=content['data'], keys=keys)
+
+    def get_header_labels(self):
+        return ["名称", '品种代码', '最后交易日', '仓单有效期', '最小交割单位']
+
+    def set_show_table_scale(self):
+        self.show_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)  # 列自适应
+        self.show_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 第一列根据文字宽自适应
+
+    def submit_new_data(self):
+        repeat_flag = False  # 标记重复
+        null_flag = False
+        self.submit_btn.setEnabled(False)  # 禁止重复点击提交
+        # 遍历表格中所有数据# 对比是否有重复(标准：名称或英文代号一致)
+        old_table_row = self.show_table.rowCount()
+        new_table_row = self.review_table.rowCount()
+        for old_row in range(old_table_row):
+            old_item_text = self.show_table.item(old_row, 1)  # 品种名称
+            old_item_code = self.show_table.item(old_row, 2)  # 品种代码
+            for new_row in range(new_table_row):
+                new_item_text = self.review_table.item(new_row, 0)  # 品种名称
+                new_item_code = self.review_table.item(new_row, 1)
+                if old_item_code.text() == new_item_code.text() and old_item_text.text() == new_item_text.text():
+                    print('相等了：', new_row, 1)
+                    # 重复了就改变当前行字体颜色
+                    [self.review_table.item(new_row, col).setForeground(QBrush(QColor(255, 10, 20))) for col in
+                     range(self.review_table.columnCount())]
+                    # new_item_zh.setForeground(QBrush(QColor(255, 10, 20)))  # 改变了当前的item字体色
+                    # item.setBackground(QBrush(QColor(220, 220, 220)))
+                    repeat_flag = True
+        # 重复数据标出, 禁止上传
+        if repeat_flag:
+            # print('数据重复,请检查后上传')
+            QMessageBox.warning(self, '错误', '红色标记数据重复.\n请检查后上传.', QMessageBox.Yes)
+            # 开放可提交
+            self.submit_btn.setEnabled(True)
+            return
+        # 所有数据非重复，上传
+        # print('数据重复检测通过')
+        # 获取数据
+        new_list = list()
+        for row in range(self.review_table.rowCount()):
+            item = dict()
+            item['name'] = self.review_table.item(row, 0).text()
+            item['name_en'] = self.review_table.item(row, 1).text()
+            item['delivery_date'] = self.review_table.item(row, 2).text()
+            item['warrant_expire_date'] = self.review_table.item(row, 3).text()
+            item['delivery_unit_min'] = self.review_table.item(row, 4).text()
+            # 检测数据完整性
+            if not all([item['name_en'], item['name']]):
+                null_flag = True
+                # 标记出本行
+                [self.review_table.item(row, col).setForeground(QBrush(QColor(255, 10, 20))) for col in
+                 range(self.review_table.columnCount())]
+                # break
+            new_list.append(item)
+        if null_flag:
+            # 数据缺失禁止上传
+            QMessageBox.warning(self, '错误', '红色标记数据条目有缺少.\n请检查后上传.', QMessageBox.Yes)
+            # 开放可提交
+            self.submit_btn.setEnabled(True)
+            return
+        self.upload_data(new_list)
 
 
 class DeliveryPageCollector(QWidget):
@@ -440,6 +514,7 @@ class DeliveryPageCollector(QWidget):
         menu_list = [
             {"name": u"仓库管理"},
             {"name": u"仓单管理"},
+            {"name": u"品种信息"}
         ]
         for menu_dict in menu_list:
             menu_item = QListWidgetItem(menu_dict['name'])
@@ -451,6 +526,9 @@ class DeliveryPageCollector(QWidget):
             elif menu_item.name == u"仓单管理":
                 stack_widget = HouseReportMaintain()
                 stack_widget.name = u"仓单管理"
+            elif menu_item.name == u"品种信息":
+                stack_widget = VarietyInformationMaintain()
+                stack_widget.name = u"品种信息"
             else:
                 stack_widget = NotFoundMaintain()
                 stack_widget.name = ""

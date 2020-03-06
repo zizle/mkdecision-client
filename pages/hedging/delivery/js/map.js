@@ -146,12 +146,12 @@ $(function () {
     var storehouseData = [];
     // 获取所有交割库的信息
     $.ajax({
-        url: host + 'storehouses/',
+        url: host + 'delivery/storehouses/',
         async:false,
         type: 'get',
         success: function (res) {
             // console.log(res);
-            $.each(res, function (hindx, house) {
+            $.each(res.data, function (hindx, house) {
                 storehouseData.push({
                     name: house.name,
                     value: [house.longitude, house.latitude],
@@ -267,18 +267,27 @@ $(function () {
         if (eventOption == 'geo'){
             // var cacheData = null;
             // 下方添加省份详情的页面
-            // 获取省份英文代号
-            var provinceEN = areaJson[(event['name'])];
-            if (typeof (provinceEN) == "undefined"){
+            // 获取省份的全名称
+            var province = "";
+            // alert(event.name);
+             $.each(areaJson, function (hindx, areaObj) {
+                if(areaObj.s_name == event['name']){
+                    province = areaObj.name;
+                    // alert(province)
+                }
+            });
+            // var provinceEN = areaJson[(event['name'])];
+            if (!province){
                 $('.clickDetail').html("*暂无相关数据");
                 adjustFrameSize();  // 调整iframe的大小
             }else{
                 // 请求省模式下仓库信息
                 $.ajax({
-                    url: host + 'storehouse/' + provinceEN + '/',
+                    url: host + 'delivery/storehouse/' + province + '/',
                     type: 'get',
                     success: function (res) {
                         // console.log(provinceEN + "仓库信息：",res);
+                        var res = res.data;
                         if (isEmpty(res)){
                             res['province']=event['name'];
                             res['count'] = 0;
@@ -312,10 +321,11 @@ $(function () {
             // console.log(storeId);
             // 仓库详情数据
             $.ajax({
-                url: host + 'storehouse/' + storeId + '/',
+                url: host + 'delivery/storehouse/' + storeId + '/',
                 type: 'get',
                 success: function (res) {
                     // console.log(res)
+                    var res = res.data;
                     var detailHouseData = {
                         name: res.name,
                         arrived:res.arrived,
@@ -346,10 +356,11 @@ $(function () {
             }
             // ajax获取仓库详情
             $.ajax({
-                url: host + 'storehouse/' + houseId + '/',
+                url: host + 'delivery/storehouse/' + houseId + '/',
                 type: 'get',
                 success: function (res) {
                     // console.log(res);
+                    var res=res.data;
                     var detailHouseData = {
                         name: res.name,
                         arrived:res.arrived,
@@ -434,12 +445,13 @@ function reloadMap(text) {
     var storehouseData = [];
     // 获取相关交割库的信息
     $.ajax({
-        url: host + 'storehouses/?keyword=' + text,
+        url: host + 'delivery/storehouses/?keyword=' + text,
         async:false,
         type: 'get',
         success: function (res) {
             // console.log(res);
             // 数据渲染在下方
+            var res = res.data;
             var dataContent = "<span>【搜索结果交割库】(" + res.length +"家)</span>";
             dataContent += "<div class='house-list'><ul>";
             // 循环添加地图显示的
