@@ -22,7 +22,7 @@ $(function () {
 			baseInfo += "<li>最小交割单位："+ res.delivery_unit_min+"</li>";
 			baseInfo += "<li>仓单有效期："+ res.warrant_expire_date+"</li>";
 			baseInfo += "<li>交割费用：<a href="+ host + "mkDecision/hedging/delivery/varietyFiles/"+ res.exchange + res.name+res.name_en +"交割费用.pdf>"+ res.name +"交割费用.pdf</a></li>";
-			baseInfo += "<li>质检机构：<a href="+ host + "mkdecision/hegding/delivery/varietyFiles/" + res.exchange + res.name + res.name_en +"质检机构.pdf>"+ res.name+"质检机构.pdf</a></li>";
+			baseInfo += "<li>质检机构：<a href="+ host + "mkDecision/hedging/delivery/varietyFiles/" + res.exchange + res.name + res.name_en +"质检机构.pdf>"+ res.name+"质检机构.pdf</a></li>";
 			baseInfo +=  "</ul>";
 			$('.base-msg').html(baseInfo);
 			// 取出仓库数据

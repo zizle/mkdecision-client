@@ -23,7 +23,7 @@ class DeliveryServicePage(QWebEngineView):
         self.contact_channel.receivedUserTokenBack.connect(self.web_has_received_token)  # 收到token的回馈
         self.contact_channel.moreCommunicationSig.connect(self.more_communication)  # 更多讨论交流页面
         self.contact_channel.linkUsPageSig.connect(self.to_link_us_page)  # 关于我们的界面
-        self.contact_channel.getVarietyInfoFile.connect(self.get_variety_information_file)  # 弹窗显示品种的相关PDF文件
+        self.contact_channel.getInfoFile.connect(self.get_information_file)  # 弹窗显示品种的相关PDF文件
         self.page().setWebChannel(channel_qt_obj)
         channel_qt_obj.registerObject("pageContactChannel", self.contact_channel)  # 信道对象注册信道，只能注册一个
         self.send_token_timer.start(8000)
@@ -50,7 +50,7 @@ class DeliveryServicePage(QWebEngineView):
         if b:
             self.page().load(QUrl("file:///pages/hedging/delivery/linkus.html"))
 
-    def get_variety_information_file(self, file_url):
+    def get_information_file(self, file_url):
         file_name = file_url.rsplit('/', 1)[1]
         popup = PDFContentPopup(title=file_name, file=file_url, parent=self)
         if not popup.exec_():

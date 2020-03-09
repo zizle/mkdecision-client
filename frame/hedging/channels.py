@@ -6,7 +6,7 @@ class DeliveryChannel(QObject):
     receivedUserTokenBack = pyqtSignal(bool)
     moreCommunicationSig = pyqtSignal(bool)
     linkUsPageSig = pyqtSignal(bool)
-    getVarietyInfoFile = pyqtSignal(str)
+    getInfoFile = pyqtSignal(str)
 
     @pyqtSlot(bool)  # 暴露函数给JS调用
     def moreCommunication(self, boolean):  # 页面点击更多时调用
@@ -21,6 +21,6 @@ class DeliveryChannel(QObject):
         self.linkUsPageSig.emit(boolean)
 
     @pyqtSlot(str)
-    def uiWebgetVarietyInfoFile(self, file_url):
-        self.getVarietyInfoFile.emit(file_url)
+    def uiWebgetInfoFile(self, file_url):
+        self.getInfoFile.emit(file_url)
 

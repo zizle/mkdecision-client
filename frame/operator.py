@@ -482,7 +482,7 @@ class VarietiesTable(ManageTable):
     def edit_button_clicked(self, edit_button):
         current_row, current_col = self.get_widget_index(edit_button)
         variety_id = self.item(current_row, 0).id
-        print('修改品种', variety_id)
+        # print('修改品种', variety_id)
         # 弹窗编辑信息
         edit_popup = EditVarietyInformationPopup(variety_id=variety_id, parent=self)
         edit_popup.getCurrentVariety()

@@ -144,8 +144,9 @@ body{
 }
 /*交割服务指引ul大小样式在菜单栏下的块样式上的补充*/
 .nav .guide, .nav .variety-show{
-    /*width: 500px;*/
     text-align: center;
+    max-width: 500px;
+    min-width: 500px;
 }
 
 /*交易所分类的块样式*/
@@ -155,6 +156,7 @@ body{
     left: 0;
     margin-top: 1px;
     background-color: #EEE9E9;
+    min-width: 500px;
 
 }
 .nav-show .initExchange{
@@ -162,7 +164,7 @@ body{
     font-weight: bold;
 }
 /*交易所名称样式*/
-.nav-show span{
+.variety-show span{
     font-size: 14px;
     color: #696969;
 }
@@ -180,19 +182,42 @@ body{
 }
 
 /*交易分类里的菜单悬停样式/省份菜单悬停样式*/
-.belong-exchange li:hover, .province-show li:hover{
+.belong-exchange li:hover, .province-show li:hover, .hedging-guide li:hover{
     cursor: pointer;
     color: #8DB6CD;
 }
 /*交割服务指引块样式在交易所分类快样式上的补充*/
-.hedging-guide, .belong-exchange{
+.belong-exchange,.hedging-guide{
     max-width: 486px;
     text-align: justify;
 }
 /*菜单样式在交易所分类菜单样式上的补充*/
-.hedging-guide li{
-    vertical-align: middle;
+.guide-li{
+    position: relative;
 }
+.guide-li span{
+    color: #696969;
+    font-weight: bold;
+    font-size: 14px;
+}
+.guide-li:hover{
+    cursor: pointer;
+}
+/*这是li里面的ul*/
+.hedging-guide{
+    position: absolute;
+    top: 34px;
+    left: -15px;
+    background-color: #EEE9E9;
+}
+.hedging-guide li{
+    /*left: 0;*/
+    display: block;
+    margin: 0;
+    width: 190px;
+    /*vertical-align: middle;*/
+}
+
 
 
 /*frame的大小*/

@@ -1228,13 +1228,45 @@ class EditVarietyInformationPopup(QDialog):
         layout.addWidget(QLabel(parent=self, objectName='nameEnError'), 3, 0, 1, 2)
         # 所属分组
         layout.addWidget(QLabel('所属组:'), 4, 0)
-        self.attach_group = QComboBox()
+        self.attach_group = QComboBox(objectName='exchangeCombo')
         layout.addWidget(self.attach_group, 4, 1)
         layout.addWidget(QLabel(parent=self, objectName='attachGroupError'), 5, 0, 1, 2)
+        # 交易所
+        layout.addWidget(QLabel('交易所:'), 6, 0)
+        self.attach_exchange = QComboBox(objectName='exchangeCombo')
+        # 增加选项
+        for exchange_item in [
+            (1, "郑州商品交易所"), (2, '上海期货交易所'),
+            (3, '大连商品交易所'), (4, '中国金融期货交易所'),
+            (5, '上海国际能源交易中心')
+        ]:
+            self.attach_exchange.addItem(exchange_item[1], exchange_item[0])
+        layout.addWidget(self.attach_exchange, 6, 1)
+        layout.addWidget(QLabel(parent=self, objectName='attachExchangeError'), 7, 0, 1, 2)  # 占位
         # 提交
         self.commit_button = QPushButton('确认提交', clicked=self.edit_variety_info)
-        layout.addWidget(self.commit_button, 6, 0, 1, 2)
+        layout.addWidget(self.commit_button, 8, 0, 1, 2)
         self.setLayout(layout)
+        self.setStyleSheet("""
+            #exchangeCombo{
+                border: 1px solid rgb(240, 240, 240);
+                color: rgb(7,99,109);
+            }
+            #exchangeCombo QAbstractItemView::item{
+                height:20px;
+            }
+            #exchangeCombo::drop-down{
+                border: 0px;
+            }
+            #exchangeCombo::down-arrow{
+                image:url("media/more.png");
+                width: 15px;
+                height:15px;
+            }
+            """)
+        self.setMinimumWidth(350)
+        self.attach_exchange.setView(QListView())
+        self.attach_group.setView(QListView())
 
     # 获取当前品种信息
     def getCurrentVariety(self):
@@ -1250,7 +1282,7 @@ class EditVarietyInformationPopup(QDialog):
             self.findChild(QLabel, 'attachGroupError').setText(str(e))
         else:
             variety_data = response['data']
-            print(variety_data)
+            # print(variety_data)
             self.name_edit.setText(variety_data['name'])
             self.name_en_edit.setText(variety_data['name_en'])
             # 设置所属组选项
@@ -1258,6 +1290,16 @@ class EditVarietyInformationPopup(QDialog):
                 self.attach_group.addItem(group_item['name'], group_item['id'])
                 if variety_data['group'] == group_item['name']:
                     self.attach_group.setCurrentText(group_item['name'])
+            # 设置所属交易所选项
+            exchange_lib = {
+                1: "郑州商品交易所",
+                2: "上海期货交易所",
+                3: "大连商品交易所",
+                4: "中国金融期货交易所",
+                5: "上海国际能源交易中心"
+            }
+            current_exchange = exchange_lib[variety_data['exchange']]
+            self.attach_exchange.setCurrentText(current_exchange)
 
     # 修改品种信息
     def edit_variety_info(self):
@@ -1271,6 +1313,7 @@ class EditVarietyInformationPopup(QDialog):
             return
         name_en = name_en.group()
         attach_group_id = self.attach_group.currentData()
+        exchange_id = self.attach_exchange.currentData()
         try:
             r = requests.put(
                 url=settings.SERVER_ADDR + 'variety/' + str(self.variety_id) + '/?mc=' + settings.app_dawn.value(
@@ -1279,13 +1322,14 @@ class EditVarietyInformationPopup(QDialog):
                 data=json.dumps({
                     'name': name,
                     'name_en': name_en,
-                    'group_id': int(attach_group_id)
+                    'group_id': int(attach_group_id),
+                    'exchange': int(exchange_id)
                 })
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.findChild(QLabel, 'attachGroupError').setText(str(e))
+            self.findChild(QLabel, 'attachExchangeError').setText(str(e))
         else:
-            self.findChild(QLabel, 'attachGroupError').setText(response['message'])
+            self.findChild(QLabel, 'attachExchangeError').setText(response['message'])

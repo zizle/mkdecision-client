@@ -15,36 +15,36 @@ $(function () {
         type: 'get',
         success: function (res) {
             var varietyBlock = "";
-            var serviceGuideBlock = "";
+            // var serviceGuideBlock = "";
             $.each(res.data, function (eindx, exchange) {
                 // 每一个交易所一个li标签
                 varietyBlock += "<li>";
-                serviceGuideBlock += "<li>";
+                // serviceGuideBlock += "<li>";
                 // 遍历交易所品种
                 if (eindx == 0){
                     varietyBlock += "<span class='initExchange' data-value="+exchange.en_code+">"+ exchange.name +"</span>";
                     varietyBlock += "<ul class='belong-exchange' style='display: block;'>";
-                    serviceGuideBlock += "<span class='initExchange' data-value="+exchange.en_code+">"+ exchange.name +"</span>";
-                    serviceGuideBlock += "<ul class='belong-exchange hedging-guide' style='display: block;'>";
+                    // serviceGuideBlock += "<span class='initExchange' data-value="+exchange.en_code+">"+ exchange.name +"</span>";
+                    // serviceGuideBlock += "<ul class='belong-exchange hedging-guide' style='display: block;'>";
                 }else{
                     varietyBlock += "<span data-value="+exchange.en_code+">"+ exchange.name +"</span>";
                     varietyBlock += "<ul class='belong-exchange'>";
-                    serviceGuideBlock += "<span data-value="+exchange.en_code+">"+ exchange.name +"</span>";
-                    serviceGuideBlock += "<ul class='belong-exchange hedging-guide'>";
+                    // serviceGuideBlock += "<span data-value="+exchange.en_code+">"+ exchange.name +"</span>";
+                    // serviceGuideBlock += "<ul class='belong-exchange hedging-guide'>";
                 }
                 $.each(exchange.varieties, function (vindx, variety) {
                     varietyBlock += "<li data-value="+variety.name_en+">" + variety.name+"</li>"
                 });
-                $.each(exchange.service_guides, function (sindx, guide) {
-                    serviceGuideBlock += "<li data-value='"+guide.en_code+"'>"+guide.name+ "</li>"
-                });
+                // $.each(exchange.service_guides, function (sindx, guide) {
+                //     serviceGuideBlock += "<li data-value='"+guide.en_code+"'>"+guide.name+ "</li>"
+                // });
                 varietyBlock += "</ul>";
                 varietyBlock += "</li>";
-                serviceGuideBlock += "</ul>";
-                serviceGuideBlock += "</li>";
+                // serviceGuideBlock += "</ul>";
+                // serviceGuideBlock += "</li>";
             });
             $('.variety-show').html(varietyBlock);
-            $('.guide').html(serviceGuideBlock);
+            // $('.guide').html(serviceGuideBlock);
         },
         error: function (res) {
             // console.log(res)
@@ -79,8 +79,8 @@ $(function () {
         $(this).parent().siblings().children('.nav-show').hide();
     });
     // 悬浮交易所显示相应品种
-    $('.nav-show').on('hover', 'span', function () {
-        $(this).attr('class', 'initExchange')
+    $('.variety-show').on('hover', 'span', function () {
+        $(this).attr('class', 'initExchange');
         var next = $(this).next();
         next.show();
         // 其他交易所的隐藏
@@ -104,8 +104,22 @@ $(function () {
         // alert(current_province)
         $('#frame').attr('src', 'province.html?province=' + current_province);
     });
+    //  悬浮服务指引的内容项
+    $('.guide-li').on('hover', 'span', function () {
+        $(this).attr('class', 'initExchange');
+        var next = $(this).next();
+        next.show();
+        // 其他选项的隐藏
+        $(this).parent().siblings().children('.hedging-guide').hide();
+        $(this).parent().siblings().children('span').removeAttr('class')
+
+    })
     // 点击服务指引
-    $('.guide').on('click', 'li', function () {
+    $('.hedging-guide').on('click', 'li', function () {
+        // 获取文件名称
+        var fileUrl = host + 'mkDecision/hedging/delivery/guide/' +$(this).text() + ".pdf";
+        // 发出信号到界面
+        window.pageChannel.uiWebgetInfoFile(fileUrl);
         var whichExchange = $(this).parent().prev().data('value');
         var current_service = $(this).data('value');
         if (typeof (whichExchange)=="undefined" || typeof (current_service) == "undefined"){return false}
@@ -115,6 +129,8 @@ $(function () {
             channelObj.serviceGuide([whichExchange, current_service]);  // 通道对象信号槽函数
         });
     });
+
+
     // 最新讨论交流
     $.ajax({
         url: host + 'delivery/questions/',
@@ -143,7 +159,7 @@ $(function () {
         var fileUrl = $(this).children("input").val();
         // alert(fileUrl);
         //  发出信息通道到主UI界面
-        window.pageChannel.uiWebgetVarietyInfoFile(fileUrl)
+        window.pageChannel.uiWebgetInfoFile(fileUrl);
         $(this).children("input").val('');
     });
     // 初始化显示中国地图
