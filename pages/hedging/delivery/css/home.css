@@ -1,0 +1,451 @@
+body{
+    margin: 1px;
+}
+.mapItem {
+    width: 100%;
+    height: 480px;
+    background-color: #FFFFFF;
+}
+/*新闻*/
+.news,.bulletin{
+    width: 100%;
+    font-size: 0;
+}
+.newsTitle, .bulletinTitle:hover{
+    cursor: pointer;
+}
+.news span, .bulletin span{
+    display: inline-block;
+    width: 45px;
+    height: 28px;
+    line-height: 28px;
+    font-size: 15px;
+}
+.news div, .bulletin div{
+    display: inline-block;
+    vertical-align: middle;
+}
+.newsList, .bulletinList{
+    width: calc(100% - 45px);
+    height: 28px;
+    line-height: 28px;
+    overflow: hidden;
+}
+.newsList ul, .bulletinList ul{
+    padding: 0;
+    margin: 0;
+
+}
+.news li, .bulletin li{
+    display: inline-block;
+    font-size: 13px;
+    padding-left: 10px;
+}
+.news li:hover, .bulletin li:hover{
+    color: #FF3030;
+    cursor: pointer;
+}
+/*菜单标题*/
+.nav{
+    background-color: #B0E0E6;
+    height: 32px;
+}
+
+
+.nav .navSearch input{
+    height: 20px;
+    background-color: #F5F5F5;
+    border: none;
+    margin-bottom: 3px;
+    position: relative;
+    line-height: 28px;
+    border-radius: 10px;
+    padding-left: 5px;
+    vertical-align: middle;
+}
+.nav .navSearch input:focus{
+    outline: none;
+}
+.nav .navSearch button{
+    border: none;
+    border-radius: 4px;
+}
+.nav .navSearch button:hover{
+    cursor: pointer;
+}
+
+.nav .linkUs{
+    float: right;
+    margin-right: 5px;
+    line-height: 32px;
+    font-size:11px;
+    cursor:pointer;
+}
+.nav .linkUs:hover{
+    color:rgb(140, 180, 200);
+
+}
+.nav .passport{
+    float: right;
+    margin-right: 15px;
+
+}
+.nav .passport button{
+    padding: 0;
+    line-height: 32px;
+    border: none;
+    font-size: 12px;
+    background-color: powderblue;
+}
+.nav .passport em{
+    font-size: 12px;
+    line-height: 32px;
+}
+.nav .passport a{
+    display: none;
+    font-size: 12px;
+    line-height: 32px;
+}
+.nav ul{
+    margin: 0;
+    padding:0 5px;
+    line-height: 32px;
+}
+.nav li{
+    margin: 0 10px;
+    list-style: none;
+    display: inline-block;
+}
+
+/*菜单栏下的块样式*/
+.nav .nav-show{
+    z-index: 99;
+    /*width: 450px;*/
+    display: none;
+    position: absolute;
+    left: 0px;
+    background-color: #EEE9E9;
+    border-bottom: 1px solid #CDCDB4;
+
+}
+
+/*省份显示框ul大小样式在菜单栏下的块样式上的补充*/
+.nav .province-show{
+    /*width: 500px;*/
+    width: 520px;
+    border: none;
+}
+.nav .province-show li{
+    width: 66px;
+    height: 28px;
+    line-height: 28px;
+    vertical-align: middle;
+    overflow: auto;
+}
+/*交割服务指引ul大小样式在菜单栏下的块样式上的补充*/
+.nav .guide, .nav .variety-show{
+    text-align: center;
+    max-width: 500px;
+    min-width: 500px;
+}
+
+/*交易所分类的块样式*/
+.nav-show .belong-exchange{
+    display: none;
+    position: absolute;
+    left: 0;
+    margin-top: 1px;
+    background-color: #EEE9E9;
+    min-width: 500px;
+
+}
+.nav-show .initExchange{
+    color: #000000;
+    font-weight: bold;
+}
+/*交易所名称样式*/
+.variety-show span{
+    font-size: 14px;
+    color: #696969;
+}
+/*交易所名称悬停样式*/
+.nav-show span:hover{
+    cursor: pointer;
+}
+
+/*交易所分类菜单样式*/
+.belong-exchange li{
+    width: 75px;
+    text-align: center;
+    vertical-align: center;
+    font-size: 14px;
+}
+
+/*交易分类里的菜单悬停样式/省份菜单悬停样式*/
+.belong-exchange li:hover, .province-show li:hover, .hedging-guide li:hover{
+    cursor: pointer;
+    color: #8DB6CD;
+}
+/*交割服务指引块样式在交易所分类快样式上的补充*/
+.belong-exchange,.hedging-guide{
+    max-width: 486px;
+    text-align: justify;
+}
+/*菜单样式在交易所分类菜单样式上的补充*/
+.guide-li{
+    position: relative;
+}
+.guide-li span{
+    color: #696969;
+    font-weight: bold;
+    font-size: 14px;
+}
+.guide-li:hover{
+    cursor: pointer;
+}
+/*这是li里面的ul*/
+.hedging-guide{
+    position: absolute;
+    top: 34px;
+    left: -15px;
+    background-color: #EEE9E9;
+}
+.hedging-guide li{
+    /*left: 0;*/
+    display: block;
+    margin: 0;
+    width: 190px;
+    /*vertical-align: middle;*/
+}
+
+
+
+/*frame的大小*/
+#frame{
+    margin: 2px 0 0 0;
+    width: 72%;
+}
+/*讨论交流*/
+.communication{
+    margin:10px 10px 0 0;
+    width: calc(28% - 20px);
+    float: right;
+}
+
+.communication-title{
+    margin-bottom: 20px;
+}
+.communication-title a{
+    float: right;
+    margin-right: 5px;
+}
+.communication-item{
+    padding-top: 20px;
+    border-bottom: 2px solid #8DB6CD;
+}
+.communication-item:hover{
+    background-color: #EDEDED;
+}
+.question:hover{
+    cursor: pointer;
+    color: cadetblue;
+}
+.question .question-title{
+    font-size: 15px;
+}
+.question .question-date, .answer .answer-date{
+    width: 80%;
+    display: inline-block;
+    font-size: 9px;
+    color:#CDCDB4;
+}
+.question .question-reply, .answer .answer-floor{
+    display: inline-block;
+    font-size: 10px;
+    color: #CDCDB4;
+    margin-bottom: 10px;
+}
+.answer{
+    display: none;
+    vertical-align: top;
+    border-top: 1px dotted #CDCDB4;
+    padding: 0 10px;
+}
+.answer .answerer div{
+    display: inline-block;
+}
+.answer img{
+    width: 30px;
+    height: 30px;
+    vertical-align: middle;
+    border-radius: 15px;
+}
+.answer .answerAuthor{
+    line-height: 25px;
+    font-size: 12px;
+    margin-top: 15px;
+
+}
+.answer .answer-title{
+    font-size: 13px;
+    line-height: 25px;
+}
+
+
+/*提问弹窗*/
+.login{
+    display: none;
+    position:fixed;
+    top:45%;
+    left:50%;
+    /*transform: translate(-50%, -50%);*/
+    transform:translateX(-50%) translateY(-50%);
+    width: 35%;
+    /*height: 500px;*/
+    background-color: #EEE9E9;
+    z-index: 4;
+    border: 1px solid #DEDEDE;
+    border-radius: 10px;
+    opacity: 0.95;
+}
+.login p{
+    font-size: 12px;
+    margin: 0 0 0 20px;
+    color: red;
+}
+.login .header{
+    border-bottom: 2px solid #8DB6CD;
+    padding: 5px 0 5px 10px;
+    text-shadow: #fff 0px 0px 5px;
+    line-height: 25px;
+}
+.login .header a{
+    text-decoration: none;
+    line-height: 25px;
+}
+.login .header a:hover{
+    cursor: pointer;
+}
+.login .header .split{
+    display: inline-block;
+    height: 10px;
+    border: 1px solid #cccccc;
+    vertical-align: middle;
+}
+.login .header span{
+    float: right;
+    font-size: 12px;
+    color: dimgrey;
+    margin-right: 15px;
+    border-radius: 8px;
+}
+.login .header span:hover{
+    color: #FF3030;
+    cursor: pointer;
+}
+
+.login-box{
+    font-size: 0;
+}
+.register-box{
+    font-size: 0;
+    display: none;
+}
+.login-box div, .register-box div{
+    margin: 10px 20px 0 20px;
+    border: 1px solid #CDCDB4;
+    border-radius: 5px;
+}
+.login-box input, .register-box input{
+    line-height: 35px;
+    padding: 0 0 0 5px;
+    border: none;
+    font-size: 15px;
+    width: calc(100% - 41px);
+    vertical-align: top;
+    border-radius: 5px;
+
+}
+.login-box button, .register-box button{
+    width: 90%;
+    display: block;
+    height: 35px;
+    margin: 10px auto;
+    border: 0;
+    color: #FFFFFF;
+    border-radius: 10px;
+    background-color: #007799;
+
+}
+.register-box .agree{
+    color: #494949;
+    font-size: 12px;
+    font-weight: normal;
+    text-align: center;
+}
+.register-box img{
+    width: 35px;
+    height: 35px;
+}
+#ryanzheng{
+    width: calc(100% - 121px); /* 41px+*/
+}
+#svryanzhenma{
+    width: 80px;
+}
+.header-active{
+    color: #2f0099;
+    font-weight: bold;
+}
+
+.cover{
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    background-color: #696969;
+    opacity: 0.6;
+    z-index: 3;
+}
+.noData {
+    text-align: center;
+    margin-top: 50px;
+    font-size: 15px;
+    color: #494949;
+    font-style: italic;
+}
+.license{
+    padding: 2px 10px 10px 10px;
+    width: 80%;
+    height: 500px;
+    display: none;
+    position:fixed;
+    top:20px;
+    left:10%;
+    overflow: auto;
+    z-index: 9;
+    background-color: #DEDEDE;
+    border-radius: 5px;
+}
+.license .licenseHeader{
+    border-bottom: 2px solid #8DB6CD;
+    text-shadow: #fff 0px 0px 5px;
+    line-height: 25px;
+    padding: 5px 0 5px 0;
+}
+.licenseHeader span{
+    float: right;
+    font-size: 12px;
+    color: dimgrey;
+    margin-right: 15px;
+    border-radius: 8px;
+}
+.licenseHeader span:hover{
+    color: #FF3030;
+    cursor: pointer;
+}
+.license .licenseName{
+    display: inline-block;
+}

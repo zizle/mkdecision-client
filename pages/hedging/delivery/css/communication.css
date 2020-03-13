@@ -1,0 +1,225 @@
+body{
+    margin: 0;
+}
+.ask, .myQuestion{
+    float: right;
+    line-height: 30px;
+    margin-right: 15px;
+}
+.logo{
+    text-align: center;
+    font-size: 28px;
+    font-style: italic;
+}
+.navBar{
+    background-color: #8DB6CD;
+    font-size: 13px;
+    height: 30px;
+
+}
+.navBar .search input{
+    width: 50%;
+    height: 24px;
+    border: 2px solid #8DB6CD;
+    /*border-left: 15px solid #8DB6CD;*/
+    padding-left: 10px;
+    border-radius: 10px;
+}
+.navBar .search input:focus{
+    outline: none;
+}
+.navBar ul{
+    height: 27px;
+    margin: 0;
+    padding: 0;
+}
+.navBar li{
+    display: inline-block;
+    padding: 5px;
+}
+
+
+
+.communication-item{
+    padding-top: 20px;
+    border-bottom: 2px solid #8DB6CD;
+    margin-left: 10px;
+}
+
+.question:hover{
+    cursor: pointer;
+}
+.question .iAnswer{
+    float: right;
+    font-size: 14px;
+    margin-right: 20px;
+    padding: 2px;
+}
+.question .iAnswer:hover{
+    color: #FF3030;
+}
+.question .question-title{
+    font-size: 15px;
+}
+.question .question-date, .answer .answer-date{
+    display: inline-block;
+    font-size: 9px;
+    color:#CDCDB4;
+}
+.question .question-reply, .answer .answer-floor{
+    display: inline-block;
+    font-size: 10px;
+    color: #CDCDB4;
+    margin-bottom: 10px;
+    margin-left: 10px;
+
+}
+.answer{
+    display: none;
+    vertical-align: top;
+    border-top: 1px dotted #CDCDB4;
+    padding: 0 10px;
+}
+.answer .answerer div{
+    display: inline-block;
+}
+.answer img{
+    width: 32px;
+    height: 30px;
+    vertical-align: middle;
+    border-radius: 15px;
+}
+.question img{
+    width: 38px;
+    height: 35px;
+    vertical-align: middle;
+    border-radius: 17px;
+}
+.question .questionAuthor{
+    line-height: 28px;
+    font-size: 16px;
+    font-weight: bold;
+
+}
+.answer .answer-item:hover{
+    background-color: #DEDEDE;
+    border-radius: 5px;
+}
+.answer .answerAuthor{
+    line-height: 25px;
+    font-size: 12px;
+    margin-top: 15px;
+
+}
+.answer .answer-title{
+    font-size: 13px;
+    line-height: 25px;
+}
+.noData {
+    text-align: center;
+    margin-top: 50px;
+    font-size: 15px;
+    color: #494949;
+    font-style: italic;
+}
+
+
+/*提问弹窗*/
+.askQuestion, .answerQuestion{
+    display: none;
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translateX(-50%) translateY(-50%);
+    width: 50%;
+    /*height: 500px;*/
+    background-color: #EEE9E9;
+    z-index: 4;
+    border: 1px solid #DEDEDE;
+    border-radius: 10px;
+}
+.askQuestion .header, .answerQuestion .header{
+    border-bottom: 2px solid #8DB6CD;
+    padding: 5px 0 5px 10px;
+    text-shadow: #fff 0px 0px 5px;
+    line-height: 25px;
+}
+.askQuestion .header span, .answerQuestion .header span{
+    float: right;
+    font-size: 12px;
+    color: dimgrey;
+    margin-right: 15px;
+    border-radius: 8px;
+}
+.askQuestion .header span:hover, .answerQuestion .header span:hover{
+    color: #FF3030;
+    cursor: pointer;
+}
+.askQuestion .bodyContent span, .answerQuestion .bodyContent span{
+    display: none;
+    text-align: center;
+    font-size: 10px;
+    color: #FF3030;
+}
+.askQuestion .bodyContent form, .answerQuestion .bodyContent form{
+    padding: 15px;
+}
+.askQuestion .bodyContent form p, .answerQuestion .bodyContent form p{
+    margin: 10px 0;
+}
+.askQuestion .bodyContent select{
+    width: calc(100% - 71px);
+    height: 30px;
+}
+.askQuestion .bodyContent label, .askQuestion .bodyContent input, .answerQuestion .bodyContent label, .answerQuestion .bodyContent input{
+    vertical-align: top;
+}
+.askQuestion .bodyContent label{
+    width: 65px;
+    display: inline-block;
+    text-align: right;
+}
+.answerQuestion .bodyContent label{
+    width: 85px;
+    display: inline-block;
+    text-align: right;
+}
+.askQuestion .bodyContent textarea{
+    resize: none;
+    width: calc(100% - 76px);
+    height: 40px;
+}
+.answerQuestion .bodyContent textarea{
+    resize: none;
+    width: calc(100% - 96px);
+    height: 40px;
+}
+
+.askQuestion .bodyContent input[type='submit'], .answerQuestion .bodyContent input[type='submit']{
+    width: 100px;
+    height: 30px;
+    float: right;
+    margin-bottom: 15px;
+}
+.cover{
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    background-color: #696969;
+    opacity: 0.6;
+    z-index: 3;
+}
+.answerQuestion .bodyContent .questionDetail{
+    margin-top: 0;
+    color: #104E8B;
+}
+.unknowUser{
+    display: none;
+    margin: 20px 0 0 10px;
+    font-size: 9px;
+    color: #696969;
+}
+

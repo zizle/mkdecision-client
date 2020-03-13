@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>讨论交流</title>
+    <link rel="stylesheet" href="css/communication.css">
+    <script type="text/javascript" src="js/jquery-1.7.2.min.js" ></script>
+    <script type="text/javascript" src="js/public.js" ></script>
+    <script type="text/javascript" src="js/communication.js" ></script>
+</head>
+<body>
+    <div class="logo">讨论与交流</div>
+    <div class="navBar">
+        <div class="myQuestion"><a href="#">我的问题</a></div>
+        <div class="ask"><a href="#">我要提问</a></div>
+        <div class="search">
+            <input type="text">
+            <button>搜索</button>
+        </div>
+    </div>
+    <div class="communication">
+        <!--<div class="communication-item">-->
+                <!--<div class="question">-->
+                    <!--<div class="questionAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;王五</div>-->
+                    <!--<div class="question-title">螺纹钢交割升贴水是怎么规定的？</div>-->
+                    <!--<div class="question-date">2019-09-04 12:24:20</div>-->
+                    <!--<div class="question-reply">回复:20</div>-->
+                <!--</div>-->
+                <!--<div class="answer">-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">天津地区仓库交割贴水90元，江苏徐州地区仓库交割贴水70元。</div>-->
+                        <!--<div class="answer-date">2019-09-04 13:14:52</div>-->
+                        <!--<div class="answer-floor">#1楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/girl.png" alt="头像">&nbsp;&nbsp;李柒</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">为啥这两个仓库会设有贴水？</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:14:52</div>-->
+                        <!--<div class="answer-floor">#2楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">您好！这个是上期所为了降低买方从产区运到销区的物流成本。</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:28:52</div>-->
+                        <!--<div class="answer-floor">#3楼</div>-->
+                    <!--</div>-->
+                    <!--<div class="answerAuthor"><img src="media/girl.png" alt="头像">&nbsp;&nbsp;李柒</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">谢谢！</div>-->
+                        <!--<div class="answer-date">2019-09-04 14:28:52</div>-->
+                        <!--<div class="answer-floor">#4楼</div>-->
+                    <!--</div>-->
+
+                    <!--&lt;!&ndash;<ul>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>天津地区仓库交割贴水90元，江苏徐州地区仓库交割贴水70元。</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>为啥这两个仓库会设有贴水？</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>您好！这个是上期所为了降低买方从产区运到销区的物流成本。</li>&ndash;&gt;-->
+                        <!--&lt;!&ndash;<li>谢谢！</li>&ndash;&gt;-->
+                    <!--&lt;!&ndash;</ul>&ndash;&gt;-->
+
+                <!--</div>-->
+
+            <!--</div>-->
+
+        <!--<div class="communication-item">-->
+                <!--<div class="question">-->
+                    <!--<div class="questionAuthor"><img src="media/girl.png" alt="头像">&nbsp;&nbsp;赵六</div>-->
+                    <!--<div class="question-title">期货公司做原油交割需要具备什么样的条件？</div>-->
+                    <!--<div class="question-date">2019-09-04 12:24:20</div>-->
+                    <!--<div class="question-reply">回复:20</div>-->
+                <!--</div>-->
+                <!--<div class="answer">-->
+                    <!--<div class="answerAuthor"><img src="media/boy.png" alt="头像">&nbsp;&nbsp;张三</div>-->
+                    <!--<div class="answer-item">-->
+                        <!--<div class="answer-title">必须是能够开具或者接收上海国际能源交易中心规定发票人的企业法人。境内机构在首次申报原油期货报税交割业务免税时，应向主管税务机关提交从事原油期货保税交割业务的书面证明，办理免税备案并购买可供开具的增值税普通发票。</div>-->
+                        <!--<div class="answer-date">2019-09-04 13:14:52</div>-->
+                        <!--<div class="answer-floor">#1楼</div>-->
+                    <!--</div>-->
+                <!--</div>-->
+
+            <!--</div>-->
+    </div>
+
+    <div class="unknowUser">注：【未知用户】表示用户注销或停用</div>
+
+    <div class="askQuestion">
+        <div class="header">
+            发布讨论
+            <span>关闭</span>
+        </div>
+        <div class="bodyContent">
+            <form action="">
+                <p>
+                    <label for="textInput">问题：</label>
+                    <textarea id="textInput"></textarea>
+                    <span class="noQuestionSkip">*请填写您的问题描述</span>
+                </p>
+                <input type="submit" value="发布">
+            </form>
+        </div>
+    </div>
+
+    <div class="cover"></div>
+
+    <div class="answerQuestion">
+        <div class="header">
+            问题交流
+            <span>关闭</span>
+        </div>
+        <div class="bodyContent">
+            <form action="">
+                <p class="questionDetail">
+                    当前回答的问题
+                </p>
+                <p>
+                    <label for="answerInput">我的看法：</label>
+                    <textarea id="answerInput"></textarea>
+                    <span class="noAnswerSkip">*请描述您的看法</span>
+                </p>
+                <input type="submit" value="发布">
+            </form>
+        </div>
+    </div>
+</body>
+</html>
