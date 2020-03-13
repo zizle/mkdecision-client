@@ -467,12 +467,15 @@ class ModuleManagePage(QWidget):
 
 # 品种显示管理表格
 class VarietiesTable(ManageTable):
+
     KEY_LABELS = [
         ('id', '序号'),
         ('name', '名称'),
         ('name_en', '英文代码'),
         ('group', '所属组'),
+        ('is_active', '有效'),
     ]
+    CHECK_COLUMNS = [4]
 
     def resetTableMode(self, row_count):
         super(VarietiesTable, self).resetTableMode(row_count)
@@ -482,13 +485,32 @@ class VarietiesTable(ManageTable):
     def edit_button_clicked(self, edit_button):
         current_row, current_col = self.get_widget_index(edit_button)
         variety_id = self.item(current_row, 0).id
-        print('修改品种', variety_id)
+        # print('修改品种', variety_id)
         # 弹窗编辑信息
         edit_popup = EditVarietyInformationPopup(variety_id=variety_id, parent=self)
         edit_popup.getCurrentVariety()
         if not edit_popup.exec_():
             edit_popup.deleteLater()
             del edit_popup
+
+    def check_box_changed(self, check_box):
+        current_row, current_col = self.get_widget_index(check_box)
+        variety_id = self.item(current_row, 0).id
+        try:
+            r = requests.put(
+                url=settings.SERVER_ADDR + 'variety/' + str(variety_id) + '/?mc=' + settings.app_dawn.value(
+                    'machine'),
+                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                data=json.dumps({'is_active': check_box.check_box.isChecked()})
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            self.network_result.emit(response['message'])
+
 
 
 # 品种管理页面

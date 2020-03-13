@@ -1,0 +1,41 @@
+body{
+    margin: 0 8px 2px 10px;
+}
+.house-leader{
+    border-bottom: 1px solid #CDCDB4;
+    color: #494949;
+    font-weight: bold;
+    padding-bottom: 2px;
+    padding-top: 5px;
+    font-size: 17px;
+}
+.house-leader:hover{
+    cursor: pointer;
+}
+.house-leader .pcount{
+    font-size: 15px ;
+    color: #696969;
+    float: right;
+}
+.house-leader .pcount:hover{
+    color: #FF3030;
+}
+.house-list ul{
+    margin: 5px 0 5px 0;
+    padding-left: 15px;
+}
+.house-list li{
+    list-style: none;
+    padding: 3px 0 3px 5px;
+
+}
+.house-list li:hover{
+    background-color: #EDEDED;
+    cursor: pointer;
+}
+.ware-house span{
+    display: block;
+    padding-bottom: 8px;
+    font-size: 16px;
+    color: #104E8B;
+}

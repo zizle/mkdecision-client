@@ -3,8 +3,8 @@
 
 import sys
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtWebEngineWidgets import QWebEngineView
 from frame.base import WelcomePage, BaseWindow
+from PyQt5.QtWebEngineWidgets import QWebEngineView  # 必须在QApplication实例化之前导入
 
 app = QApplication(sys.argv)
 splash = WelcomePage()  # welcome
