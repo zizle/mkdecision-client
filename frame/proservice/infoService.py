@@ -1,9 +1,10 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
 import json
+import chardet
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QTableWidget, QTextBrowser, \
-    QAbstractItemView, QHeaderView, QTableWidgetItem
+    QAbstractItemView, QHeaderView, QTableWidgetItem, QPushButton
 from widgets.base import ScrollFoldedBox, LoadedPage, Paginator, TableRowReadButton, PDFContentPopup, PDFContentShower
 from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal, QPoint
 import settings
@@ -591,25 +592,60 @@ class SMSLinkWidget(QWidget):
 class SMSLinkPage(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(SMSLinkPage, self).__init__(*args, **kwargs)
+        self.setObjectName("scrollView")
         self.container = QWidget()
         layout = QVBoxLayout()
         self.container.setLayout(layout)
         self.setWidget(self.container)
         self.setWidgetResizable(True)
+        self.read_more_button = QPushButton("<<< 加载更多 >>>", objectName='moreSms', parent=self.container,
+                                            clicked=self.read_more_sms, cursor=Qt.PointingHandCursor)
+        self.current_page = 1
+        self.total_page = 1
+        self.currentScrollValue = 0  # 记录当前滚动条的滚动位置，用于填充数据后再次移动到该位置。
+        # 设置滚动条样式
+        self.setStyleSheet("""
+        #moreSms{
+            max-width: 200px;
+            min-width:200px;
+            min-height:60px;
+            border:none;
+            color:rgb(100, 130, 180);
+        }
+        """)
 
     # 请求数据
-    def getSMSContents(self):
+    def getSMSContents(self, insert_index=0):
         try:
-            r = requests.get(url=settings.SERVER_ADDR + 'info/sms/?mc=' + settings.app_dawn.value('machine'))
+            r = requests.get(url=settings.SERVER_ADDR + 'info/sms/?current_page='+str(self.current_page)+'&mc=' + settings.app_dawn.value('machine'))
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError('获取数据失败.')
         except Exception:
             return
         else:
-            for sms_item in response['data']:
-                self.container.layout().addWidget(SMSLinkWidget(sms_item))
+            # 设置当前页和总页数
+            self.total_page = response['data']['total_page']
+            content = response['data']['contacts']
+            for sms_item in content:
+                self.container.layout().insertWidget(insert_index, SMSLinkWidget(sms_item))
+                insert_index += 1
+            if self.current_page == 1:  # 加载更多的按钮
+                self.container.layout().addWidget(self.read_more_button, alignment=Qt.AlignHCenter)
+            if self.current_page < self.total_page:
+                self.current_page += 1
+                self.read_more_button.setText("<<< 加载更多 >>>")
+                self.read_more_button.setEnabled(True)
+            else:
+                self.read_more_button.setText("- 已经到底了 -")
+                self.read_more_button.setEnabled(False)
+            self.verticalScrollBar().setValue(self.currentScrollValue)  # 设置滚动条位置
 
+    # 加载更多数据
+    def read_more_sms(self):
+        self.currentScrollValue = self.verticalScrollBar().value()  # 记录当前的滚动条位置
+        count = self.container.layout().count()   # 获取当前的数量
+        self.getSMSContents(insert_index=count - 1)
 
 # 产品服务主页
 class InfoServicePage(QWidget):

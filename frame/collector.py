@@ -6,9 +6,9 @@ from PyQt5.QtCore import Qt, pyqtSignal, QPropertyAnimation, QRect
 from PyQt5.QtGui import QFont, QPixmap
 import settings
 from widgets.base import LoadedPage
-from frame.homeCollector import HomePageCollector
-from frame.trendCollector import TrendPageCollector
-from frame.infoServiceCollector import InfoServicePageCollector
+from frame.homepage.homeCollector import HomePageCollector
+from frame.basetrend.trendCollector import TrendPageCollector
+from frame.proservice.infoServiceCollector import InfoServicePageCollector
 from frame.hedging.deliveryCollector import DeliveryPageCollector
 
 

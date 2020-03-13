@@ -9,7 +9,7 @@ $(function () {
         });
     });
 
-    // 获取交易所数据(品种,服务内容等)
+    // 获取交易所数据(品种)
     $.ajax({
         url: host + 'exchanges/',
         type: 'get',

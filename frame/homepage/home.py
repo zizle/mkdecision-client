@@ -434,13 +434,15 @@ class NormalReportPage(QWidget):
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.network_message_label.setText(str(e))
+            pass
         else:
             self.variety_combo.clear()
             # 加入全部
             self.variety_combo.addItem('全部', 0)
             for variety_group in response['data']:
                 for variety_item in variety_group['varieties']:
+                    if not variety_item['is_active']:
+                        continue
                     self.variety_combo.addItem(variety_item['name'], variety_item['id'])
             self.getCurrentReports()  # 获取当前报告
 
@@ -1048,7 +1050,7 @@ class HomePage(QScrollArea):
                 popup.deleteLater()
                 del popup
 
-    # 获取折叠窗的数据
+    # 从mlib文件获取折叠窗的数据
     def getFoldedBoxContent(self):
         try:
             r = requests.get(
@@ -1065,7 +1067,7 @@ class HomePage(QScrollArea):
             for category_item in response['data']:
                 group = category_item['group']
                 if group not in data_category.keys():
-                    data_category[group] = list()
+                    data_category[group] = [{'id': 0, 'name': '全部'}]
                 data_category[group].append({'id': category_item['id'], 'name': category_item['name']})
             for key, values in data_category.items():
                 data_category[key].append({'id': -1, 'name': '其他'})  # 加入其他选项

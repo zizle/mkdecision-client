@@ -235,11 +235,46 @@ class TrendPage(QWidget):
         layout = QHBoxLayout(margin=2)
         self.variety_folded = ScrollFoldedBox()
         self.variety_folded.left_mouse_clicked.connect(self.variety_clicked)
-        self.variety_folded.setMaximumWidth(250)
         layout.addWidget(self.variety_folded)
         self.frame = LoadedPage()
         layout.addWidget(self.frame)
         self.setLayout(layout)
+        # 设置折叠窗的样式
+        self.variety_folded.setFoldedStyleSheet("""
+        #foldedHead{
+            background-color: rgb(145,202,182);
+            border-bottom: 1px solid rgb(200,200,200);
+            max-height: 30px;
+        }
+        #headLabel{
+            padding:8px 5px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        #foldedBody{
+            background-color: rgb(240, 240, 240);
+        }
+        /*折叠窗内滚动条样式*/
+        #foldedBox QScrollBar:vertical{
+            width: 5px;
+            background: transparent;
+        }
+        #foldedBox QScrollBar::handle:vertical {
+            background: rgba(0, 0, 0, 30);
+            width: 5px;
+            border-radius: 5px;
+            border: none;
+        }
+        #foldedBox QScrollBar::handle:vertical:hover,QScrollBar::handle:horizontal:hover {
+            background: rgba(0, 0, 0, 80);
+        }
+        """)
+
+    def resizeEvent(self, event):
+        # 设置折叠窗的大小
+        box_width = self.parent().width() * 0.228
+        self.variety_folded.setFixedWidth(box_width + 5)
+        self.variety_folded.setBodyHorizationItemCount()
 
     # 获取所有品种组和品种
     def getGroupVarieties(self):
@@ -256,7 +291,7 @@ class TrendPage(QWidget):
             for group_item in response['data']:
                 head = self.variety_folded.addHead(group_item['name'])
                 body = self.variety_folded.addBody(head=head)
-                body.addButtons(group_item['varieties'])
+                body.addButtons([variety_item for variety_item in group_item['varieties'] if variety_item['is_active']])
             self.variety_folded.container.layout().addStretch()
 
     # 获取主页的图表

@@ -4,10 +4,8 @@
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 
 
-
 class NavigationBarChannel(QObject):
     userHasLogin = pyqtSignal(str)  # 用户已经登录的信号，由此发出给js
-
 
 
 # 主窗口与webView交互信道

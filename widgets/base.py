@@ -259,8 +259,8 @@ class ModuleBar(QWidget):
                 drop_down_menu = DropdownMenu()  # 创建下拉菜单
                 drop_down_menu.triggered.connect(self.module_action_selected)  # 下拉菜单信号
                 # 先加入原来的模块
-                drop_action = drop_down_menu.addAction(menu_dict_item['name'])
-                drop_action.aid = menu_dict_item['id']
+                # drop_action = drop_down_menu.addAction(menu_dict_item['name'])
+                # drop_action.aid = menu_dict_item['id']
                 for sub_module in sub_module_items:
                     drop_action = drop_down_menu.addAction(sub_module['name'])
                     drop_action.aid = sub_module['id']
@@ -499,6 +499,7 @@ class FoldedBodyButton(QPushButton):
         self.clicked.connect(self.left_mouse_clicked)
         self.setCursor(Qt.PointingHandCursor)
         self.setObjectName('button')
+
         self.setStyleSheet("""
         #button{
             border:none;

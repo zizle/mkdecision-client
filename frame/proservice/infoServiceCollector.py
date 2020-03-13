@@ -1009,8 +1009,13 @@ class MessageServiceMaintain(QWidget):
         combo_message_layout = QHBoxLayout()
         self.date_combo = QComboBox(activated=self.getCurrentSMS)
         combo_message_layout.addWidget(self.date_combo, alignment=Qt.AlignLeft)
+        # 页码控制器
+        self.paginator = Paginator()
+        self.paginator.clicked.connect(self.getCurrentSMS)
+        combo_message_layout.addWidget(self.paginator)
         self.network_message_label = QLabel()
         combo_message_layout.addWidget(self.network_message_label)
+        combo_message_layout.addStretch()
         combo_message_layout.addWidget(QPushButton('新增', clicked=self.create_new_sms), alignment=Qt.AlignRight)
         layout.addLayout(combo_message_layout)
         # 展示短信通的表格
@@ -1018,6 +1023,7 @@ class MessageServiceMaintain(QWidget):
         layout.addWidget(self.sms_table)
         self.setLayout(layout)
         self._addCombo()
+
 
     # 添加时间选择
     def _addCombo(self):
@@ -1031,21 +1037,23 @@ class MessageServiceMaintain(QWidget):
 
     # 获取当前短信通信息
     def getCurrentSMS(self):
+        current_page = self.paginator.current_page
         current_data = self.date_combo.currentData()
         current_date = QDate.currentDate()
         if current_data != 'all':
             min_date = current_date.addDays(current_data)
-            url = settings.SERVER_ADDR + 'info/sms/?mc='+settings.app_dawn.value('machine')+'&min_date=' + min_date.toString('yyyy-MM-dd')
+            url = settings.SERVER_ADDR + 'info/sms/?current_page='+str(current_page)+'&mc='+settings.app_dawn.value('machine')+'&min_date=' + min_date.toString('yyyy-MM-dd')
         else:
-            url = settings.SERVER_ADDR + 'info/sms/?mc=' + settings.app_dawn.value('machine')
+            url = settings.SERVER_ADDR + 'info/sms/?current_page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
         try:
             r = requests.get(url=url)
             response = json.loads(r.content.decode('utf-8'))
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            print(response)
-            self.sms_table.showRowContents(response['data'])
+            sms_data = response['data']['contacts']
+            self.sms_table.showRowContents(sms_data)
+            self.paginator.setTotalPages(response['data']['total_page'])
 
     # 新增一条短信通
     def create_new_sms(self):

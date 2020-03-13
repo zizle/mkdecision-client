@@ -6,7 +6,7 @@ import time
 import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
-from PyQt5.QtCore import Qt, QSize,QUrl
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
 import settings
@@ -92,7 +92,7 @@ class WelcomePage(QSplashScreen):
 
     # 导入模块到运行环境
     def import_packages(self):
-        import pandas as pd
+        pass
 
 
 # 主窗口(无边框)
@@ -445,17 +445,17 @@ class BaseWindow(QWidget):
             return
         else:  # 模块权限验证通过
             if module_text == u'首页':
-                from frame.home import HomePage
+                from frame.homepage.home import HomePage
                 page = HomePage(parent=self.page_container)
                 page.getCurrentNews()
                 page.getCurrentSliderAdvertisement()
                 page.getFoldedBoxContent()
                 page.folded_box_clicked(category_id=1, head_text='常规报告') # 默认点击常规报告分类id=1
             elif module_text == u'产品服务':
-                from frame.infoService import InfoServicePage
+                from frame.proservice.infoService import InfoServicePage
                 page = InfoServicePage(parent=self.page_container)
             elif module_text == '基本分析':
-                from frame.trend import TrendPage
+                from frame.basetrend.trend import TrendPage
                 page = TrendPage(parent=self.page_container)
                 page.getGroupVarieties()
                 page.getTrendPageCharts()
