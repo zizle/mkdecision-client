@@ -490,12 +490,13 @@ class LoadedPage(QStackedWidget):
 
 # 折叠盒子的按钮
 class FoldedBodyButton(QPushButton):
-    mouse_clicked = pyqtSignal(int)
+    mouse_clicked = pyqtSignal(int, str)
 
-    def __init__(self, text, bid, *args, **kwargs):
+    def __init__(self, text, bid, name_en=None, *args, **kwargs):
         super(FoldedBodyButton, self).__init__(*args, **kwargs)
         self.setText(text)
         self.bid = bid
+        self.name_en=name_en
         self.clicked.connect(self.left_mouse_clicked)
         self.setCursor(Qt.PointingHandCursor)
         self.setObjectName('button')
@@ -524,7 +525,9 @@ class FoldedBodyButton(QPushButton):
 
     def left_mouse_clicked(self):
         # print(self.bid)
-        self.mouse_clicked.emit(self.bid)
+        name_en = self.name_en if self.name_en else ""
+        self.mouse_clicked.emit(self.bid, name_en)
+
 
 
 # FoldedHead(), FoldedBody()
@@ -593,7 +596,7 @@ class FoldedHead(QWidget):
 
 # 折叠盒子的身体
 class FoldedBody(QWidget):
-    mouse_clicked = pyqtSignal(int, str)
+    mouse_clicked = pyqtSignal(int, str, str)
 
     def __init__(self, *args, **kwargs):
         super(FoldedBody, self).__init__(*args, **kwargs)
@@ -607,20 +610,22 @@ class FoldedBody(QWidget):
     # 添加按钮
     def addButtons(self, button_list, horizontal_count=3):
         self.button_list.clear()
+
         for button_item in button_list:
             button = FoldedBodyButton(
                 text=button_item['name'],
                 bid=button_item['id'],
+                name_en=button_item.get('name_en', None),
                 parent=self
             )
             button.mouse_clicked.connect(self.body_button_clicked)
             self.button_list.append(button)
 
     # 按钮被点击
-    def body_button_clicked(self, bid):
+    def body_button_clicked(self, bid, name_en):
         # 获取body的parent
         head = self.get_head()
-        self.mouse_clicked.emit(bid, head.head_text)
+        self.mouse_clicked.emit(bid, head.head_text, name_en)
 
     # 设置身体控件(由于设置parent后用findChild没找到，用此法)
     def setHead(self, head):
@@ -648,7 +653,7 @@ class FoldedBody(QWidget):
 
 # 滚动折叠盒子
 class ScrollFoldedBox(QScrollArea):
-    left_mouse_clicked = pyqtSignal(int, str)  # 当前id 与父级的text
+    left_mouse_clicked = pyqtSignal(int, str, str)  # 当前id 与父级的text
 
     def __init__(self, *args, **kwargs):
         super(ScrollFoldedBox, self).__init__(*args, **kwargs)

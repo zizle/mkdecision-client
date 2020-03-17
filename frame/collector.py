@@ -150,7 +150,7 @@ class CollectorMaintain(QWidget):
             {'text': u'首页管理', 'icon': 'media/collector_icon/home.png'},
             {'text': u'产品服务', 'icon': 'media/collector_icon/service.png'},
             {'text': u'数据分析', 'icon': 'media/collector_icon/trend.png'},
-            {'text': u'交割服务', 'icon': 'media/collector_icon/service.png'},
+            # {'text': u'交割服务', 'icon': 'media/collector_icon/service.png'},
         ]:
             block = CollectorBlockIcon(text=block_item['text'], icon_path=block_item['icon'], parent=self)
             block.clicked_block.connect(self.enter_detail_collector)

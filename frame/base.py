@@ -95,15 +95,23 @@ class WelcomePage(QSplashScreen):
         pass
 
 
+
+# class BaseWindow(QWidget):
+#     # 枚举左上右下以及四个定点
+#     Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
+#     MARGIN = 5  # 边缘宽度小用于调整窗口大小
+#
+#     def __init__(self, *a , **kwargs):
+#         super(BaseWindow, self).__init__(*a, **kwargs)
+
 # 主窗口(无边框)
 class BaseWindow(QWidget):
     # 枚举左上右下以及四个定点
     Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
-    MARGIN = 3  # 边缘宽度小用于调整窗口大小
+    MARGIN = 5  # 边缘宽度小用于调整窗口大小
 
     def __init__(self, *args, **kwargs):
         super(BaseWindow, self).__init__(*args, **kwargs)
-        self.web_browser = QWebEngineView(parent=self)  # 实例化网页承载器
         # self.mousePressed = False
         # 设置窗体的图标和名称
         self.setWindowIcon(QIcon("media/logo.png"))
@@ -312,7 +320,7 @@ class BaseWindow(QWidget):
     def paintEvent(self, event):
         super(BaseWindow, self).paintEvent(event)
         painter = QPainter(self)
-        painter.setPen(QPen(QColor(255, 255, 255, 1), 2 * self.MARGIN))
+        painter.setPen(QPen(QColor(155, 255, 255, 1), 2 * self.MARGIN))
         painter.drawRect(self.rect())
 
     # 调整窗口大小
@@ -462,6 +470,10 @@ class BaseWindow(QWidget):
             elif module_text == '交割服务':
                 from frame.hedging.delivery import DeliveryServicePage
                 page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
+            elif module_text == '公式计算':
+                from frame.formulas.index_page import FormulasCalculate
+                page = FormulasCalculate(parent=self.page_container)
+                page.getGroupVarieties()
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)

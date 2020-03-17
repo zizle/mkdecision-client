@@ -2,14 +2,13 @@
 
 import requests
 import xlrd
-from delivery import config
 import json
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QListWidget, QStackedWidget, QListWidgetItem,\
     QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QHeaderView, QFileDialog
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor
-from delivery.thread.request import RequestThread
-from delivery.widgets.table import TableCheckBox
+# from delivery.thread.request import RequestThread
+# from delivery.widgets.table import TableCheckBox
 from popup.tips import InformationPopup
 import settings
 
@@ -304,7 +303,7 @@ class StorehouseMaintain(AbstractMaintainWidget):
 
 
 class HouseReportMaintain(AbstractMaintainWidget):
-    data_url = config.SERVER + 'maintain/housereports/'
+    data_url = settings.SERVER_ADDR + 'maintain/housereports/'
 
     def data_thread_back(self, content):
         # print('获取仓单数据：', content)

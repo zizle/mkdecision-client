@@ -46,7 +46,7 @@ def get_machine_code():
         md.update(main_board.encode('utf-8'))
         md.update(disk.encode('utf-8'))
         machine_code = md.hexdigest()
-        machine_code = machine_code[:-1] + '4'  # 15759566200  运营员(除设置人员身份外的所有超级管理员权限)
+        # machine_code = machine_code[:-1] + '4'  # 15759566200  运营员(除设置人员身份外的所有超级管理员权限)
         # machine_code = machine_code[:-1] + '5'  # 15759566201  信息管理员(跨模块的数据上传)
         # machine_code = machine_code[:-1] + '6'  # 15759566202 研究员（甲醇、尿素、纯碱、橡胶）
         # machine_code = machine_code[:-1] + '7'  # 18800000006 普通用户（006）开放产品服务至20200213

@@ -12,8 +12,8 @@ from PyQt5.QtWidgets import QApplication, QLabel
 from PyQt5.QtGui import QPixmap, QFont, QPalette, QIcon
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer
 
-# HTTP_SERVER = "http://192.168.191.2:8000/"
-HTTP_SERVER = "http://210.13.218.130:9004/"
+HTTP_SERVER = "http://192.168.0.103:8000/"
+# HTTP_SERVER = "http://210.13.218.130:9002/"
 ADMINISTRATOR = True
 APP_DAWN = QSettings('dawn/initial.ini', QSettings.IniFormat)
 
@@ -38,6 +38,7 @@ class CheckUpdatingVersion(QThread):
                 raise ValueError('检测版本失败。')
             response = json.loads(r.content.decode('utf-8'))
         except Exception as e:
+            print(e)
             self.check_fail.emit(True)
         else:
             self.check_successful.emit(response['data'])
