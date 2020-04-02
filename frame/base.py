@@ -7,7 +7,6 @@ import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
 import settings
 from widgets.base import TitleBar, NavigationBar, LoadedPage
@@ -79,9 +78,14 @@ class WelcomePage(QSplashScreen):
         except Exception:
             pass
         else:
-            # 清空slider文件夹
-            for path in ['media/slider/' + path for path in os.listdir('media/slider')]:
-                os.remove(path)
+            # 判断是否有slider文件夹
+            slider_folder_exist = os.path.exists("media/slider")
+            if slider_folder_exist:
+                # 清空slider文件夹
+                for path in ['media/slider/' + path for path in os.listdir('media/slider')]:
+                    os.remove(path)
+            else:
+                os.makedirs('media/slider')# 创建文件夹
             # 遍历请求每一个图片
             for ad_item in response['data']:
                 image_name = ad_item['image'].rsplit('/', 1)[1]
@@ -92,18 +96,17 @@ class WelcomePage(QSplashScreen):
 
     # 导入模块到运行环境
     def import_packages(self):
-        pass
+        import pandas
 
 
 # 主窗口(无边框)
 class BaseWindow(QWidget):
     # 枚举左上右下以及四个定点
     Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
-    MARGIN = 3  # 边缘宽度小用于调整窗口大小
+    MARGIN = 5  # 边缘宽度小用于调整窗口大小
 
     def __init__(self, *args, **kwargs):
         super(BaseWindow, self).__init__(*args, **kwargs)
-        self.web_browser = QWebEngineView(parent=self)  # 实例化网页承载器
         # self.mousePressed = False
         # 设置窗体的图标和名称
         self.setWindowIcon(QIcon("media/logo.png"))
@@ -312,7 +315,7 @@ class BaseWindow(QWidget):
     def paintEvent(self, event):
         super(BaseWindow, self).paintEvent(event)
         painter = QPainter(self)
-        painter.setPen(QPen(QColor(255, 255, 255, 1), 2 * self.MARGIN))
+        painter.setPen(QPen(QColor(155, 255, 255, 1), 2 * self.MARGIN))
         painter.drawRect(self.rect())
 
     # 调整窗口大小
@@ -462,6 +465,10 @@ class BaseWindow(QWidget):
             elif module_text == '交割服务':
                 from frame.hedging.delivery import DeliveryServicePage
                 page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
+            elif module_text == '公式计算':
+                from frame.formulas.index_page import FormulasCalculate
+                page = FormulasCalculate(parent=self.page_container)
+                page.getGroupVarieties()
             elif module_text == '数据管理':
                 from frame.collector import CollectorMaintain
                 page = CollectorMaintain(parent=self.page_container)
