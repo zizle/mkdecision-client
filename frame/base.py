@@ -7,7 +7,6 @@ import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
 import settings
 from widgets.base import TitleBar, NavigationBar, LoadedPage
@@ -79,9 +78,14 @@ class WelcomePage(QSplashScreen):
         except Exception:
             pass
         else:
-            # 清空slider文件夹
-            for path in ['media/slider/' + path for path in os.listdir('media/slider')]:
-                os.remove(path)
+            # 判断是否有slider文件夹
+            slider_folder_exist = os.path.exists("media/slider")
+            if slider_folder_exist:
+                # 清空slider文件夹
+                for path in ['media/slider/' + path for path in os.listdir('media/slider')]:
+                    os.remove(path)
+            else:
+                os.makedirs('media/slider')# 创建文件夹
             # 遍历请求每一个图片
             for ad_item in response['data']:
                 image_name = ad_item['image'].rsplit('/', 1)[1]
@@ -92,17 +96,8 @@ class WelcomePage(QSplashScreen):
 
     # 导入模块到运行环境
     def import_packages(self):
-        pass
+        import pandas
 
-
-
-# class BaseWindow(QWidget):
-#     # 枚举左上右下以及四个定点
-#     Left, Top, Right, Bottom, LeftTop, RightTop, LeftBottom, RightBottom = range(8)
-#     MARGIN = 5  # 边缘宽度小用于调整窗口大小
-#
-#     def __init__(self, *a , **kwargs):
-#         super(BaseWindow, self).__init__(*a, **kwargs)
 
 # 主窗口(无边框)
 class BaseWindow(QWidget):
