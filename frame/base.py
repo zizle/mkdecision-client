@@ -50,6 +50,7 @@ class WelcomePage(QSplashScreen):
         try:
             r = requests.post(
                 url=settings.SERVER_ADDR + 'client/',
+                headers={'Content-Type': 'application/json; charset=utf-8'},
                 data=json.dumps({
                     'machine_code': machine_code,
                     'is_manager': settings.ADMINISTRATOR
@@ -64,7 +65,7 @@ class WelcomePage(QSplashScreen):
             time.sleep(1.5)
         else:
             # 写入配置
-            settings.app_dawn.setValue('machine', response['data']['machine_code'])
+            settings.app_dawn.setValue('machine', response['machine_code'])
 
     # 启动访问广告图片文件并保存至本地
     def getCurrentAdvertisements(self):
@@ -85,7 +86,7 @@ class WelcomePage(QSplashScreen):
                 for path in ['media/slider/' + path for path in os.listdir('media/slider')]:
                     os.remove(path)
             else:
-                os.makedirs('media/slider')# 创建文件夹
+                os.makedirs('media/slider')  # 创建文件夹
             # 遍历请求每一个图片
             for ad_item in response['data']:
                 image_name = ad_item['image'].rsplit('/', 1)[1]
@@ -189,19 +190,8 @@ class BaseWindow(QWidget):
     # 用户登录成功(注册成功)
     def user_login_successfully(self, response_data):
         # 保存token
-        token = response_data['Authorization']
-        # 保存用户的身份证明
-        if response_data['role'] == "超级管理员":
-            s_key = 9
-        elif response_data['role'] == "运营管理员":
-            s_key = 8
-        elif response_data['role'] == "信息管理员":
-            s_key = 7
-        elif response_data['role'] == "研究员":
-            s_key = 6
-        else:
-            s_key = 5
-        settings.app_dawn.setValue('SKEY', s_key)
+        token = response_data['utoken']
+        settings.app_dawn.setValue('SKEY', response_data['role_num'])
         # token的处理
         settings.app_dawn.setValue('AUTHORIZATION', token)
         # 发送token到网页页面
@@ -231,6 +221,12 @@ class BaseWindow(QWidget):
         if not register_popup.exec_():
             register_popup.deleteLater()
             del register_popup
+
+    # 用户注册成功
+    def user_register_success(self, userinfo):
+        print(userinfo)
+        # 再发起登录
+
 
     # 用户点击【注销】
     def user_to_logout(self):

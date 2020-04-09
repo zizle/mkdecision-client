@@ -2,9 +2,9 @@
 # Author: zizle  QQ:462894999
 import os
 from PyQt5.QtCore import QSettings
-# SERVER_ADDR = "http://127.0.0.1:8000/"
+SERVER_ADDR = "http://127.0.0.1:5000/"
 # SERVER_ADDR = "http://210.13.218.130:9002/"
-SERVER_ADDR = "http://192.168.0.109:8000/"
+# SERVER_ADDR = "http://192.168.0.109:8000/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ADMINISTRATOR = True
 # app设置
