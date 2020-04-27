@@ -14,10 +14,10 @@ splash.import_packages()  # 事先导入一些会卡顿的包，后面模块用�
 splash.make_client_existed()  # 启动使当前客户端存在（发送请求,不存在就注册）
 splash.getCurrentAdvertisements()
 base_window = BaseWindow()  # main window
-base_window.getSystemStartModules()  # 获取系统模块
+# base_window.getSystemStartModules()  # 获取系统模块
 base_window.show()
 base_window.running_auto_login()  # 自动登录
-base_window.module_clicked(module_id=1, module_text=u'首页')  # 启动后显示首页
+# base_window.module_clicked(module_id=1, module_text=u'首页')  # 启动后显示首页
 splash.finish(base_window)  # close welcome when main page loaded  # 执行到这句话才会消失欢迎页
 sys.exit(app.exec_())
 # 'pkg_resources.py2_warn'

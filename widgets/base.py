@@ -5,7 +5,7 @@ import chardet
 import requests
 from math import floor
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QCheckBox, QGridLayout, QScrollArea,\
-    QVBoxLayout, QStackedWidget, QDialog, QTextBrowser
+    QVBoxLayout, QStackedWidget, QDialog, QTextBrowser, QLineEdit, QFileDialog
 from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from widgets.CAvatar import CAvatar
@@ -23,7 +23,8 @@ __all__ = [
     'PDFContentPopup',
     'PDFContentShower',
     'TextContentPopup',
-    'Paginator'
+    'Paginator',
+    'FileLineEdit'
 ]  # 别的模块 import * 时控制可导入的类
 
 
@@ -216,9 +217,6 @@ class ModuleBar(QWidget):
     def __init__(self, *args, **kwargs):
         super(ModuleBar, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0, spacing=0)
-        self.system_manager_button = QPushButton('系统管理')
-        self.actions_menu = DropdownMenu()
-        self.actions_menu.triggered.connect(self.module_action_selected)
         self.setLayout(layout)
         # 样式设计
         self.setObjectName('moduleBar')
@@ -241,17 +239,28 @@ class ModuleBar(QWidget):
             background-color: #CD3333;
         }
         """)
+        self.set_default_menu()
 
-    # 清除系统之外的即管理菜单菜单
-    def clearActionMenu(self):
-        self.actions_menu.clear()
-        self.system_manager_button.hide()
-        self.system_manager_button.setText('系统管理')
+    def clear(self):
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+            del widget
+        self.set_default_menu()
+
+    def set_default_menu(self):
+        menu = ModuleButton(mid=0, text='首页')
+        menu.clicked_module.connect(self.module_menu_clicked)
+        self.layout().addWidget(menu)
 
     # 设置菜单按钮
     def setMenus(self, menu_obj_list):
+        self.clear()
         # print('添加前模块菜单个数%d个 %s' % (self.layout().count(), 'piece.base.ModuleBar.setMenus'))
-        self.clearActionMenu()
+        if len(menu_obj_list) > 1:
+            system_menu = menu_obj_list.pop(0)
+            menu_obj_list.append(system_menu)
         for menu_dict_item in menu_obj_list:
             menu = ModuleButton(mid=menu_dict_item['id'], text=menu_dict_item['name'])
             sub_module_items = menu_dict_item['subs']
@@ -264,6 +273,13 @@ class ModuleBar(QWidget):
                 for sub_module in sub_module_items:
                     drop_action = drop_down_menu.addAction(sub_module['name'])
                     drop_action.aid = sub_module['id']
+                    if sub_module['name'] == "数据管理":
+                        sub_module_menu = DropdownMenu()
+                        # sub_module_menu.triggered.connect(self.module_action_selected)
+                        for sub_action in ["首页管理", "产品服务", '基本分析','交割服务']:
+                            sub_action = sub_module_menu.addAction(sub_action)
+                            sub_action.aid = -9
+                        drop_action.setMenu(sub_module_menu)
                 menu.setMenu(drop_down_menu)
             else:  # 没有子菜单关联原菜单的点击事件
                 menu.clicked_module.connect(self.module_menu_clicked)
@@ -607,6 +623,11 @@ class FoldedBody(QWidget):
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
 
+    def addButton(self, id, name,name_en=None):
+        button = FoldedBodyButton(text=name,bid=id,name_en=name_en,parent=self)
+        button.mouse_clicked.connect(self.body_button_clicked)
+        self.button_list.append(button)
+
     # 添加按钮
     def addButtons(self, button_list, horizontal_count=3):
         self.button_list.clear()
@@ -837,16 +858,18 @@ class PDFContentShower(QScrollArea):
 class PDFContentPopup(QDialog):
     def __init__(self, title, file, *args, **kwargs):
         super(PDFContentPopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         self.file = file
         self.file_name = title
         # auth doc type
         self.setWindowTitle(title)
-        self.setMinimumSize(1010, 600)
-        self.download = QPushButton("下载PDF")
+        self.setFixedSize(1010, 600)
+        self.download = QPushButton("下载PDF", self)
         self.download.setIcon(QIcon('media/download-file.png'))
         self.setWindowIcon(QIcon("media/reader.png"))
         # scroll
         scroll_area = QScrollArea()
+        scroll_area.setParent(self)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         # 设置滚动条样式
@@ -856,9 +879,10 @@ class PDFContentPopup(QDialog):
             content = content.decode(encoding.get("encoding") or "utf-8")
         scroll_area.setStyleSheet(content)
         # content
-        self.page_container = QWidget()
-        self.page_container.setLayout(QVBoxLayout())
+        self.page_container = QWidget(self)
+        self.page_container.setLayout(QVBoxLayout(self.page_container))
         layout = QVBoxLayout(margin=0)
+        layout.setParent(self)
         # initial data
         self.add_pages()
         # add to show
@@ -871,14 +895,14 @@ class PDFContentPopup(QDialog):
     def add_pages(self):
         # 请求文件
         if not self.file:
-            message_label = QLabel('没有文件.')
+            message_label = QLabel('没有文件.', self)
             self.page_container.layout().addWidget(message_label)
             return
         try:
             response = requests.get(self.file)
             doc = fitz.Document(filename=self.file_name, stream=response.content)
         except Exception as e:
-            message_label = QLabel('获取文件内容失败.\n{}'.format(e))
+            message_label = QLabel('获取文件内容失败.\n{}'.format(e), self)
             self.page_container.layout().addWidget(message_label)
             return
         for page_index in range(doc.pageCount):
@@ -1005,3 +1029,13 @@ class Paginator(QWidget):
         # print('下一页里',self.current_page)
         self.setCurrentPageLable()
         self.clicked.emit(self.current_page)
+
+class FileLineEdit(QLineEdit):
+    def __init__(self):
+        super(FileLineEdit, self).__init__()
+        self.setReadOnly(True)
+        self.setPlaceholderText("点击选择文件")
+
+    def mousePressEvent(self, event):
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开文件', '', "PDF files(*.pdf)")
+        self.setText(file_path)

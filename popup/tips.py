@@ -32,6 +32,7 @@ class InformationPopup(QDialog):
             color:rgb(254,254,254)
         }
         """)
+        self.setAttribute(Qt.WA_DeleteOnClose)
 
 
 # 警示信息

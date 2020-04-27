@@ -169,13 +169,15 @@ class LoginPopup(QDialog):
     def _login_post(self, phone, password):
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'user/login/?mc=' + settings.app_dawn.value('machine', ''),
+                url=settings.SERVER_ADDR + 'login/',
                 headers={
+                    "Content-Type": "application/json;charset=utf8",
                     "AUTHORIZATION": settings.app_dawn.value('AUTHORIZATION'),
                 },
                 data=json.dumps({
                     "phone": phone,
                     "password": password,
+                    "machine_code":settings.app_dawn.value('machine', '')
                 }),
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -187,11 +189,8 @@ class LoginPopup(QDialog):
             settings.app_dawn.remove('AUTHORIZATION')
             return False
         else:
-            if response['data']:
-                self.user_listed.emit(response['data'])
-                return True
-            else:
-                return False
+            self.user_listed.emit(response['user_data'])
+            return True
 
 
 # 图片验证码控件
@@ -210,12 +209,12 @@ class ImageCodeLabel(QLabel):
     def get_image_code(self):
         image_uuid = self.generate_uuid()
         try:
-            r = requests.get(url=settings.SERVER_ADDR + 'image_code/' + image_uuid + '/')
+            r = requests.get(url=settings.SERVER_ADDR + 'image_code/?imgcid=' + image_uuid)
             response_img = r.content
             # if r.status_code != 200:
             #     raise ValueError('get image code error.')
         except Exception as e:
-            print(e)
+            # print(e)
             pass
         else:
             # 保存uuid
@@ -408,20 +407,22 @@ class RegisterPopup(QDialog):
             "phone": phone,
             "username": username,
             "password": password,
-            "image_code": image_code,
+            "imgcode": image_code,
+            "machine_code": settings.app_dawn.value("machine"),
             "image_code_id": settings.app_dawn.value('IMGCODEID')
         }
         response_data = self._register_post(data)
         if response_data:
             # 注册成功
-            self.user_registered.emit(response_data)
+            self.user_registered.emit({"username": username, "password": password, "phone":phone})
             self.close()
 
     # 提交注册
     def _register_post(self, data):
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'user/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'register/',
+                headers={"Content-Type":"application/json;charset=utf-8"},
                 data=json.dumps(data),
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -430,6 +431,6 @@ class RegisterPopup(QDialog):
         except Exception as e:
             self.findChild(QLabel, 'registerError').setText(str(e))
             # 移除token
-            return {}
+            return False
         else:  # 注册成功
-            return response['data']
+            return True

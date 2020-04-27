@@ -4,7 +4,8 @@ import json
 import chardet
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QTableWidget, QTextBrowser, \
-    QAbstractItemView, QHeaderView, QTableWidgetItem, QPushButton
+    QAbstractItemView, QHeaderView, QTableWidgetItem, QPushButton, QTextEdit
+from PyQt5.QtGui import QFont, QBrush,QColor
 from widgets.base import ScrollFoldedBox, LoadedPage, Paginator, TableRowReadButton, PDFContentPopup, PDFContentShower
 from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal, QPoint
 import settings
@@ -17,65 +18,63 @@ import settings
 class HedgePlanTable(QTableWidget):
     network_result = pyqtSignal(str)
 
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '文件名称'),
-        ('update_time', '日期'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(HedgePlanTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setMouseTracking(True)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.cellClicked.connect(self.mouseClickedCell)
+        self.setStyleSheet("""
+                font-size: 14px;
+                selection-color: red;
+                alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+                """)
+
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(QPoint(event.pos().x(), event.pos().y()))
+        if index.column() == 3:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mouseClickedCell(self, row, col):
+        if col != 3:
+            return
+        item = self.item(row, col)
+        title = self.item(row, 2).text()
+        file_addr = settings.STATIC_PREFIX + item.file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
 
     def showRowContents(self, row_list):
         self.clear()
+        table_headers = ['序号', '创建日期', '标题', '']
+        self.setColumnCount(len(table_headers))
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        for row, content_item in enumerate(row_list):
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                    table_item.file = content_item['file']
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
-                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
-                #     check_button = TableCheckBox(checked=content_item[header[0]])
-                #     check_button.check_activated.connect(self.checked_button_changed)
-                #     self.setCellWidget(row, col, check_button)
-                if col == len(self.KEY_LABELS) - 1:
-                    # 增加【查看】按钮
-                    read_button = TableRowReadButton('阅读')
-                    read_button.button_clicked.connect(self.read_button_clicked)
-                    self.setCellWidget(row, col + 1, read_button)
-                    # # 增加【删除】按钮
-                    # delete_button = TableRowDeleteButton('删除')
-                    # delete_button.button_clicked.connect(self.delete_button_clicked)
-                    # self.setCellWidget(row, col + 2, delete_button)
-
-    # 查看一个专题研究
-    def read_button_clicked(self, read_button):
-        current_row, _ = self.get_widget_index(read_button)
-        file = self.item(current_row, 0).file
-        # 显示文件
-        file = settings.STATIC_PREFIX + file
-        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
-
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(row_list):
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['create_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['title'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem('阅读')
+            item3.setForeground(QBrush(QColor(50, 50, 220)))
+            item3.setTextAlignment(Qt.AlignCenter)
+            item3.file_url = row_item['file_url']
+            self.setItem(row, 3, item3)
 
 # 套保方案主页
 class HedgePlanPage(QWidget):
@@ -95,7 +94,7 @@ class HedgePlanPage(QWidget):
     def getCurrentPlanContents(self):
         current_page = self.paginator.current_page
         try:
-            url = settings.SERVER_ADDR + 'info/hedge-plan/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
+            url = settings.SERVER_ADDR + 'strategy/hedgeplan/?page='+str(current_page)
             r = requests.get(url=url)
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -103,8 +102,8 @@ class HedgePlanPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['data']['total_page'])
-            self.table.showRowContents(response['data']['contacts'])
+            self.paginator.setTotalPages(response['total_page'])
+            self.table.showRowContents(response['records'])
 
 
 """ 策略服务-投资方案相关 """
@@ -114,65 +113,63 @@ class HedgePlanPage(QWidget):
 class InvestPlanTable(QTableWidget):
     network_result = pyqtSignal(str)
 
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '文件名称'),
-        ('update_time', '日期'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(InvestPlanTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setMouseTracking(True)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.cellClicked.connect(self.mouseClickedCell)
+        self.setStyleSheet("""
+        font-size: 14px;
+        selection-color: red;
+        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        """)
+
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(QPoint(event.pos().x(), event.pos().y()))
+        if index.column() == 3:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mouseClickedCell(self, row, col):
+        if col != 3:
+            return
+        item = self.item(row, col)
+        title = self.item(row, 2).text()
+        file_addr = settings.STATIC_PREFIX + item.file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
 
     def showRowContents(self, row_list):
         self.clear()
+        table_headers = ['序号', '创建日期', '标题', '']
+        self.setColumnCount(len(table_headers))
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        for row, content_item in enumerate(row_list):
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                    table_item.file = content_item['file']
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
-                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
-                #     check_button = TableCheckBox(checked=content_item[header[0]])
-                #     check_button.check_activated.connect(self.checked_button_changed)
-                #     self.setCellWidget(row, col, check_button)
-                if col == len(self.KEY_LABELS) - 1:
-                    # 增加【查看】按钮
-                    read_button = TableRowReadButton('阅读')
-                    read_button.button_clicked.connect(self.read_button_clicked)
-                    self.setCellWidget(row, col + 1, read_button)
-                    # # 增加【删除】按钮
-                    # delete_button = TableRowDeleteButton('删除')
-                    # delete_button.button_clicked.connect(self.delete_button_clicked)
-                    # self.setCellWidget(row, col + 2, delete_button)
-
-    # 查看一个专题研究
-    def read_button_clicked(self, read_button):
-        current_row, _ = self.get_widget_index(read_button)
-        file = self.item(current_row, 0).file
-        # 显示文件
-        file = settings.STATIC_PREFIX + file
-        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
-
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(row_list):
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['create_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['title'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem('阅读')
+            item3.setForeground(QBrush(QColor(50, 50, 220)))
+            item3.setTextAlignment(Qt.AlignCenter)
+            item3.file_url = row_item['file_url']
+            self.setItem(row, 3, item3)
 
 # 投资方案主页
 class InvestPlanPage(QWidget):
@@ -192,7 +189,7 @@ class InvestPlanPage(QWidget):
     def getCurrentPlanContents(self):
         current_page = self.paginator.current_page
         try:
-            url = settings.SERVER_ADDR + 'info/invest-plan/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
+            url = settings.SERVER_ADDR + 'strategy/investmentplan/?page='+str(current_page)
             r = requests.get(url=url)
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -200,8 +197,8 @@ class InvestPlanPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['data']['total_page'])
-            self.table.showRowContents(response['data']['contacts'])
+            self.paginator.setTotalPages(response['total_page'])
+            self.table.showRowContents(response['records'])
 
 
 
@@ -270,65 +267,63 @@ class TradePolicyPage(QScrollArea):
 class SearchReportTable(QTableWidget):
     network_result = pyqtSignal(str)
 
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '文件名称'),
-        ('update_time', '日期'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(SearchReportTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.cellClicked.connect(self.mouseClickedCell)
+        self.setMouseTracking(True)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.setStyleSheet("""
+        font-size: 14px;
+        selection-color: red;
+        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        """)
+
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(QPoint(event.pos().x(), event.pos().y()))
+        if index.column() == 3:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mouseClickedCell(self, row, col):
+        if col != 3:
+            return
+        item = self.item(row, col)
+        title = self.item(row, 2).text()
+        file_addr = settings.STATIC_PREFIX + item.file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
 
     def showRowContents(self, row_list):
         self.clear()
+        table_headers = ['序号', '创建日期', '标题', '']
+        self.setColumnCount(len(table_headers))
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        for row, content_item in enumerate(row_list):
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                    table_item.file = content_item['file']
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
-                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
-                #     check_button = TableCheckBox(checked=content_item[header[0]])
-                #     check_button.check_activated.connect(self.checked_button_changed)
-                #     self.setCellWidget(row, col, check_button)
-                if col == len(self.KEY_LABELS) - 1:
-                    # 增加【查看】按钮
-                    read_button = TableRowReadButton('阅读')
-                    read_button.button_clicked.connect(self.read_button_clicked)
-                    self.setCellWidget(row, col + 1, read_button)
-                    # # 增加【删除】按钮
-                    # delete_button = TableRowDeleteButton('删除')
-                    # delete_button.button_clicked.connect(self.delete_button_clicked)
-                    # self.setCellWidget(row, col + 2, delete_button)
-
-    # 查看一个调研报告
-    def read_button_clicked(self, read_button):
-        current_row, _ = self.get_widget_index(read_button)
-        file = self.item(current_row, 0).file
-        # 显示文件
-        file = settings.STATIC_PREFIX + file
-        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
-
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(row_list):
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['create_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['title'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem('阅读')
+            item3.setForeground(QBrush(QColor(50, 50, 220)))
+            item3.setTextAlignment(Qt.AlignCenter)
+            item3.file_url = row_item['file_url']
+            self.setItem(row, 3, item3)
 
 # 调研报告主页
 class SearchReportPage(QWidget):
@@ -348,7 +343,7 @@ class SearchReportPage(QWidget):
     def getCurrentReportContents(self):
         current_page = self.paginator.current_page
         try:
-            url = settings.SERVER_ADDR + 'info/search-report/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
+            url = settings.SERVER_ADDR + 'advise/searchreport/?page='+str(current_page)
             r = requests.get(url=url)
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -356,8 +351,8 @@ class SearchReportPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['data']['total_page'])
-            self.table.showRowContents(response['data']['contacts'])
+            self.paginator.setTotalPages(response['total_page'])
+            self.table.showRowContents(response['records'])
 
 
 """ 专题研究 """
@@ -367,64 +362,63 @@ class SearchReportPage(QWidget):
 class TopicSearchTable(QTableWidget):
     network_result = pyqtSignal(str)
 
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '文件名称'),
-        ('update_time', '日期'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(TopicSearchTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setMouseTracking(True)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.cellClicked.connect(self.mouseClickedCell)
+        self.setStyleSheet("""
+        font-size: 14px;
+        selection-color: red;
+        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        """)
+
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(QPoint(event.pos().x(), event.pos().y()))
+        if index.column() == 3:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mouseClickedCell(self, row, col):
+        if col != 3:
+            return
+        item = self.item(row, col)
+        title = self.item(row, 2).text()
+        file_addr = settings.STATIC_PREFIX + item.file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
 
     def showRowContents(self, row_list):
         self.clear()
+        table_headers = ['序号', '创建日期', '标题', '']
+        self.setColumnCount(len(table_headers))
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        for row, content_item in enumerate(row_list):
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                    table_item.file = content_item['file']
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
-                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
-                #     check_button = TableCheckBox(checked=content_item[header[0]])
-                #     check_button.check_activated.connect(self.checked_button_changed)
-                #     self.setCellWidget(row, col, check_button)
-                if col == len(self.KEY_LABELS) - 1:
-                    # 增加【查看】按钮
-                    read_button = TableRowReadButton('阅读')
-                    read_button.button_clicked.connect(self.read_button_clicked)
-                    self.setCellWidget(row, col + 1, read_button)
-                    # # 增加【删除】按钮
-                    # delete_button = TableRowDeleteButton('删除')
-                    # delete_button.button_clicked.connect(self.delete_button_clicked)
-                    # self.setCellWidget(row, col + 2, delete_button)
-
-    # 查看一个专题研究
-    def read_button_clicked(self, read_button):
-        current_row, _ = self.get_widget_index(read_button)
-        file = self.item(current_row, 0).file
-        # 显示文件
-        file = settings.STATIC_PREFIX + file
-        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(row_list):
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['create_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['title'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem('阅读')
+            item3.setForeground(QBrush(QColor(50, 50, 220)))
+            item3.setTextAlignment(Qt.AlignCenter)
+            item3.file_url = row_item['file_url']
+            self.setItem(row, 3, item3)
 
 
 # 专题研究主页
@@ -445,7 +439,7 @@ class TopicSearchPage(QWidget):
     def getCurrentTopicContents(self):
         current_page = self.paginator.current_page
         try:
-            url = settings.SERVER_ADDR + 'info/topic-search/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
+            url = settings.SERVER_ADDR + 'advise/topicsearch/?page='+str(current_page)
             r = requests.get(url=url)
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -453,8 +447,8 @@ class TopicSearchPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['data']['total_page'])
-            self.table.showRowContents(response['data']['contacts'])
+            self.paginator.setTotalPages(response['total_page'])
+            self.table.showRowContents(response['records'])
 
 
 """ 市场分析 """
@@ -464,65 +458,63 @@ class TopicSearchPage(QWidget):
 class MarketAnalysisTable(QTableWidget):
     network_result = pyqtSignal(str)
 
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '文件名称'),
-        ('update_time', '日期'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(MarketAnalysisTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.cellClicked.connect(self.mouseClickedCell)
+        self.setMouseTracking(True)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.setStyleSheet("""
+        font-size: 14px;
+        selection-color: red;
+        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        """)
+
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(QPoint(event.pos().x(), event.pos().y()))
+        if index.column() == 3:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mouseClickedCell(self, row, col):
+        if col != 3:
+            return
+        item = self.item(row, col)
+        title = self.item(row, 2).text()
+        file_addr = settings.STATIC_PREFIX + item.file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
 
     def showRowContents(self, row_list):
         self.clear()
+        table_headers = ['序号', '创建日期', '标题', '']
+        self.setColumnCount(len(table_headers))
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 1)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + [''])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        for row, content_item in enumerate(row_list):
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                    table_item.file = content_item['file']
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
-                # if col in self.COLUMNS_CHECKED:  # 复选框按钮
-                #     check_button = TableCheckBox(checked=content_item[header[0]])
-                #     check_button.check_activated.connect(self.checked_button_changed)
-                #     self.setCellWidget(row, col, check_button)
-                if col == len(self.KEY_LABELS) - 1:
-                    # 增加【查看】按钮
-                    read_button = TableRowReadButton('阅读')
-                    read_button.button_clicked.connect(self.read_button_clicked)
-                    self.setCellWidget(row, col + 1, read_button)
-                    # # 增加【删除】按钮
-                    # delete_button = TableRowDeleteButton('删除')
-                    # delete_button.button_clicked.connect(self.delete_button_clicked)
-                    # self.setCellWidget(row, col + 2, delete_button)
-
-    # 查看一个市场分析
-    def read_button_clicked(self, read_button):
-        current_row, _ = self.get_widget_index(read_button)
-        file = self.item(current_row, 0).file
-        # 显示文件
-        file = settings.STATIC_PREFIX + file
-        popup = PDFContentPopup(title='阅读文件', file=file, parent=self)
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
-
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(row_list):
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['create_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['title'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem('阅读')
+            item3.setForeground(QBrush(QColor(50, 50, 220)))
+            item3.setTextAlignment(Qt.AlignCenter)
+            item3.file_url = row_item['file_url']
+            self.setItem(row, 3, item3)
 
 # 市场分析主页
 class MarketAnalysisPage(QWidget):
@@ -542,7 +534,7 @@ class MarketAnalysisPage(QWidget):
     def getCurrentMarketContents(self):
         current_page = self.paginator.current_page
         try:
-            url = settings.SERVER_ADDR + 'info/market-analysis/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine')
+            url = settings.SERVER_ADDR + 'advise/marketanalysis/?page='+str(current_page)
             r = requests.get(url=url)
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -550,8 +542,8 @@ class MarketAnalysisPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['data']['total_page'])
-            self.table.showRowContents(response['data']['contacts'])
+            self.paginator.setTotalPages(response['total_page'])
+            self.table.showRowContents(response['records'])
 
 
 """ 短信通 """
@@ -563,12 +555,23 @@ class SMSLinkWidget(QWidget):
         super(SMSLinkWidget, self).__init__(*args, **kwargs)
         self.sms_id = sms_data['id']
         layout = QVBoxLayout(margin=0, spacing=1)
+        option_layout = QHBoxLayout(margin=0)
         date = QDate.fromString(sms_data['date'], 'yyyy-MM-dd')
         time = QTime.fromString(sms_data['time'], 'HH:mm:ss')
         date_time = date.toString('yyyy-MM-dd ') + time.toString('HH:mm') if date != QDate.currentDate() else time.toString('HH:mm')
-        layout.addWidget(QLabel(date_time, objectName='timeLabel'))
+        option_layout.addWidget(QLabel(date_time, objectName='timeLabel'))
+        self.open_button = QPushButton('展开', self, objectName='openCloseBtn')
+        self.open_button.clicked.connect(self.resize_text_browser)
+        self.open_button.setCursor(Qt.PointingHandCursor)
+        option_layout.addWidget(self.open_button, alignment=Qt.AlignRight)
+        layout.addLayout(option_layout)
         self.text_browser = QTextBrowser(objectName='textBrowser')
         self.text_browser.setText(sms_data['content'])
+        self.text_browser.setFixedHeight(27)
+        font = QFont()
+        font.setPointSize(13)
+        self.text_browser.setFont(font)
+        self.text_browser.verticalScrollBar().hide()
         layout.addWidget(self.text_browser)
         self.setLayout(layout)
         self.setStyleSheet("""
@@ -580,12 +583,30 @@ class SMSLinkWidget(QWidget):
         #textBrowser{
             margin:0 0 2px 25px;
             border:1px solid rgb(210,210,210);
-            font-size:13px;
             color: rgb(0,0,0);
             border-radius: 5px;
             background-color:rgb(225,225,225)
         }
+        #openCloseBtn{
+            border:none;
+            color:rgb(25,75,150)
+        }
         """)
+
+    def resize_text_browser(self):
+        print('改变text_browser大小')
+        print(self.text_browser.height(),self.text_browser.document().size().height())
+        if self.open_button.text() == "展开":
+            self.text_browser.setFixedHeight(self.text_browser.document().size().height())
+            self.open_button.setText("合上")
+        else:
+            self.text_browser.setFixedHeight(27)
+            self.open_button.setText("展开")
+
+    def is_show_open_button(self):
+        print(self.text_browser.height(), self.text_browser.document().size().height())
+        if self.text_browser.height() >= self.text_browser.document().size().height():
+            self.open_button.hide()
 
 
 # 短信通主页
@@ -617,7 +638,7 @@ class SMSLinkPage(QScrollArea):
     # 请求数据
     def getSMSContents(self, insert_index=0):
         try:
-            r = requests.get(url=settings.SERVER_ADDR + 'info/sms/?current_page='+str(self.current_page)+'&mc=' + settings.app_dawn.value('machine'))
+            r = requests.get(url=settings.SERVER_ADDR + 'advise/shortmessage/?page='+str(self.current_page))
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
                 raise ValueError('获取数据失败.')
@@ -625,10 +646,13 @@ class SMSLinkPage(QScrollArea):
             return
         else:
             # 设置当前页和总页数
-            self.total_page = response['data']['total_page']
-            content = response['data']['contacts']
+            self.total_page = response['total_page']
+            content = response['records'] * 50
             for sms_item in content:
-                self.container.layout().insertWidget(insert_index, SMSLinkWidget(sms_item))
+                sms_widget = SMSLinkWidget(sms_item)
+                self.container.layout().insertWidget(insert_index, sms_widget)
+                print(sms_widget.text_browser.height())
+                print(sms_widget.text_browser.document().size())
                 insert_index += 1
             if self.current_page == 1:  # 加载更多的按钮
                 self.container.layout().addWidget(self.read_more_button, alignment=Qt.AlignHCenter)
@@ -744,11 +768,11 @@ class InfoServicePage(QWidget):
             page = SearchReportPage(parent=self.frame)
             page.getCurrentReportContents()
         elif sid == 6:  # 顾问服务-人才培养
-            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/personTra/产品服务_人才培养.pdf', parent=self.frame)
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'pserver/persontrain/人才培养.pdf', parent=self.frame)
         elif sid == 7:  # 顾问服务-部门组建
-            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/deptBuild/产品服务_部门组建.pdf', parent=self.frame)
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'pserver/deptbuild/部门组建.pdf', parent=self.frame)
         elif sid == 8:  # 顾问服务-制度考核
-            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/instExamine/产品服务_制度考核.pdf', parent=self.frame)
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'pserver/rulexamine/制度考核.pdf', parent=self.frame)
         elif sid == 9:  # 策略服务-交易策略
             page = TradePolicyPage(parent=self.frame)
             page.getTradePolicyContents()
@@ -759,7 +783,7 @@ class InfoServicePage(QWidget):
             page = HedgePlanPage(parent=self.frame)
             page.getCurrentPlanContents()
         elif sid == 12:  # 培训服务-品种介绍
-            page = PDFContentShower(file=settings.STATIC_PREFIX + 'info/varietyIntro/培训服务_品种介绍.pdf', parent=self.frame)
+            page = PDFContentShower(file=settings.STATIC_PREFIX + 'pserver/varietyintro/品种介绍.pdf', parent=self.frame)
         else:
             page = QLabel('当前模块正在加紧开放...',
                           styleSheet='color:rgb(50,180,100); font-size:15px;font-weight:bold', alignment=Qt.AlignCenter)

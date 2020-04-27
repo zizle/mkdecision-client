@@ -60,6 +60,9 @@ class ManageTable(QTableWidget):
 
     # 设置表格数据
     def setRowContents(self, row_list):
+
+
+
         self.resetTableMode(len(row_list))
         for row, user_item in enumerate(row_list):
             for col, header in enumerate(self.KEY_LABELS):

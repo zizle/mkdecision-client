@@ -3,6 +3,7 @@
 import os
 import json
 import time
+import pickle
 import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
@@ -50,6 +51,7 @@ class WelcomePage(QSplashScreen):
         try:
             r = requests.post(
                 url=settings.SERVER_ADDR + 'client/',
+                headers={'Content-Type': 'application/json; charset=utf-8'},
                 data=json.dumps({
                     'machine_code': machine_code,
                     'is_manager': settings.ADMINISTRATOR
@@ -64,13 +66,13 @@ class WelcomePage(QSplashScreen):
             time.sleep(1.5)
         else:
             # 写入配置
-            settings.app_dawn.setValue('machine', response['data']['machine_code'])
+            settings.app_dawn.setValue('machine', response['machine_code'])
 
     # 启动访问广告图片文件并保存至本地
     def getCurrentAdvertisements(self):
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/advertise/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'ad/',
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -85,12 +87,16 @@ class WelcomePage(QSplashScreen):
                 for path in ['media/slider/' + path for path in os.listdir('media/slider')]:
                     os.remove(path)
             else:
-                os.makedirs('media/slider')# 创建文件夹
+                os.makedirs('media/slider')  # 创建文件夹
             # 遍历请求每一个图片
-            for ad_item in response['data']:
-                image_name = ad_item['image'].rsplit('/', 1)[1]
+            for ad_item in response['adments']:
+                file_name = ad_item['file_url'].rsplit('/', 1)[1]
+                file_name = file_name.rsplit('.', 1)[0]
+                image_name = ad_item['image_url'].rsplit('/', 1)[1]
+                image_suffix = image_name.rsplit('.', 1)[1]
+                image_name = file_name + '.' + image_suffix  # 用文件名保存后续可直接访问文件
                 time.sleep(0.0001)
-                r = requests.get(url=settings.STATIC_PREFIX + ad_item['image'])
+                r = requests.get(url=settings.STATIC_PREFIX + ad_item['image_url'])
                 with open('media/slider/' + image_name, 'wb') as img:
                     img.write(r.content)
 
@@ -162,15 +168,13 @@ class BaseWindow(QWidget):
     # 启动自动登录
     def running_auto_login(self):
         if settings.app_dawn.value('auto') == '1':  # 自动登录
-            machine_code = settings.app_dawn.value('machine')
             token = settings.app_dawn.value('AUTHORIZATION')
-            if not machine_code or not token:
+            if not token:
                 self.user_to_login()
                 return
             try:
                 r = requests.get(
-                    url=settings.SERVER_ADDR + 'user/keep-online/?mc=' + machine_code,
-                    headers={'AUTHORIZATION': token}
+                    url=settings.SERVER_ADDR + 'login/?utoken=' + token,
                 )
                 response = json.loads(r.content.decode('utf-8'))
                 if r.status_code != 200:
@@ -180,8 +184,9 @@ class BaseWindow(QWidget):
                 self.user_to_login()
                 return  # 自动登录失败
             else:
-                if response['data']:
-                    self.user_login_successfully(response['data'])
+                # print(response)
+                if response['user_data']:
+                    self.user_login_successfully(response['user_data'])
         else:
             # 删除token
             settings.app_dawn.remove('AUTHORIZATION')
@@ -189,19 +194,9 @@ class BaseWindow(QWidget):
     # 用户登录成功(注册成功)
     def user_login_successfully(self, response_data):
         # 保存token
-        token = response_data['Authorization']
-        # 保存用户的身份证明
-        if response_data['role'] == "超级管理员":
-            s_key = 9
-        elif response_data['role'] == "运营管理员":
-            s_key = 8
-        elif response_data['role'] == "信息管理员":
-            s_key = 7
-        elif response_data['role'] == "研究员":
-            s_key = 6
-        else:
-            s_key = 5
-        settings.app_dawn.setValue('SKEY', s_key)
+        token = response_data['utoken']
+        settings.app_dawn.setValue('UROLE', pickle.dumps(response_data['role_num']))
+        settings.app_dawn.setValue('UKEY', pickle.dumps(response_data['id']))
         # token的处理
         settings.app_dawn.setValue('AUTHORIZATION', token)
         # 发送token到网页页面
@@ -219,18 +214,60 @@ class BaseWindow(QWidget):
         self.navigation_bar.permit_bar.show_username(dynamic_username)
         # 设置用户id
         self.navigation_bar.permit_bar.set_user_id(response_data['id'])
-        # 设置管理角色的菜单
-        self.navigation_bar.module_bar.setMenuActions(response_data['actions'])
+        # 菜单
+        modules = self.get_system_modules()
+        self.navigation_bar.module_bar.setMenus(modules)
+
+    # 请求菜单项
+    def get_system_modules(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'module/',
+                headers={'Content-Type':'application/json;charset=utf8'},
+                data=json.dumps({
+                    'utoken':settings.app_dawn.value("AUTHORIZATION"),
+                    'machine_code':settings.app_dawn.value("machine")
+                })
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            return []
+        else:
+            return response['modules']
 
     # 用户点击【注册】
     def user_to_register(self):
         # print('用户点击注册按钮')
         from popup.base import RegisterPopup
         register_popup = RegisterPopup(parent=self)
-        register_popup.user_registered.connect(self.user_login_successfully)
-        if not register_popup.exec_():
-            register_popup.deleteLater()
-            del register_popup
+        register_popup.setAttribute(Qt.WA_DeleteOnClose)
+        register_popup.user_registered.connect(self.user_register_success)
+        register_popup.exec_()
+
+    # 用户注册成功
+    def user_register_success(self, userinfo):
+        # 再发起登录
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'login/',
+                headers={'Content-Type': "application/json;charset=utf-8"},
+                data=json.dumps({
+                    "username": userinfo['username'],
+                    "phone": userinfo["phone"],
+                    "password": userinfo["password"],
+                    "machine_code": settings.app_dawn.value('machine', '')
+                })
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response["message"])
+        except Exception as e:
+            tip = InformationPopup(title="提示", message=str(e))
+            tip.exec_()
+        else:
+            self.user_login_successfully(response['user_data'])
 
     # 用户点击【注销】
     def user_to_logout(self):
@@ -238,7 +275,7 @@ class BaseWindow(QWidget):
             return
         # print('用户点击注销按钮生效')
         # 清除菜单
-        self.navigation_bar.module_bar.clearActionMenu()
+        self.navigation_bar.module_bar.clear()
         # 移除token
         settings.app_dawn.remove('AUTHORIZATION')
         self.navigation_bar.permit_bar.user_logout()  # 注销
@@ -427,66 +464,78 @@ class BaseWindow(QWidget):
 
     # 点击模块菜单事件(接受到模块的id和模块名称)
     def module_clicked(self, module_id, module_text):
-        # print(module_id, module_text)
-        # 查询权限
-        machine_code = settings.app_dawn.value('machine')
-        machine_code = machine_code if machine_code else ''
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'limit/access-module/' + str(module_id) + '/?mc=' + machine_code,
-                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if not response['data']['permission']:
-                raise ValueError(response['message'])
-        except Exception as e:
-            # 弹窗提示
-            info_popup = InformationPopup(parent=self, message=str(e))
-            if not info_popup.exec_():
-                info_popup.deleteLater()
-                del info_popup
-            return
-        else:  # 模块权限验证通过
-            if module_text == u'首页':
-                from frame.homepage.home import HomePage
-                page = HomePage(parent=self.page_container)
-                page.getCurrentNews()
-                page.getCurrentSliderAdvertisement()
-                page.getFoldedBoxContent()
-                page.folded_box_clicked(category_id=1, head_text='常规报告') # 默认点击常规报告分类id=1
-            elif module_text == u'产品服务':
-                from frame.proservice.infoService import InfoServicePage
-                page = InfoServicePage(parent=self.page_container)
-            elif module_text == '基本分析':
-                from frame.basetrend.trend import TrendPage
-                page = TrendPage(parent=self.page_container)
-                page.getGroupVarieties()
-                page.getTrendPageCharts()
-            elif module_text == '交割服务':
-                from frame.hedging.delivery import DeliveryServicePage
-                page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
-            elif module_text == '公式计算':
-                from frame.formulas.index_page import FormulasCalculate
-                page = FormulasCalculate(parent=self.page_container)
-                page.getGroupVarieties()
-            elif module_text == '数据管理':
-                from frame.collector import CollectorMaintain
-                page = CollectorMaintain(parent=self.page_container)
-            elif module_text == u'运营管理':
-                from frame.operator import OperatorMaintain
-                page = OperatorMaintain(parent=self.page_container)
-                page.addListItem()  # 加入管理项目
-            elif module_text == u'权限管理':
-                from frame.authority import AuthorityMaintain
-                page = AuthorityMaintain(parent=self.page_container)
-                page.getCurrentUsers()
+        print(module_id, module_text)
+        if module_id == -9:
+            if module_text == u"首页管理":
+                from frame.homepage.homeCollector import HomePageCollector
+                page = HomePageCollector(parent=self.page_container)
+            elif module_text == u"产品服务":
+                from frame.proservice.infoServiceCollector import InfoServicePageCollector
+                page = InfoServicePageCollector(parent=self.page_container)
+            elif module_text == u'基本分析':
+                from frame.basetrend.trendCollector import TrendPageCollector
+                page = TrendPageCollector(parent=self.page_container)
+            elif module_text == u'交割服务':
+                from frame.hedging.deliveryCollector import DeliveryPageCollector
+                page = DeliveryPageCollector(parent=self.page_container)
             else:
                 page = QLabel(parent=self.page_container,
                               styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
                               alignment=Qt.AlignCenter)
-                page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
+                page.setText("「" + module_text + "-数据管理」暂未开放\n敬请期待,感谢支持~.")
+        else:
             try:
-                self.page_container.clear()
-                self.page_container.addWidget(page)
+                r = requests.get(
+                    url=settings.SERVER_ADDR + 'module/' + str(module_id) + '/',
+                    headers={'Content-Type': "application/json;charset=utf8"},
+                    data=json.dumps({"utoken":settings.app_dawn.value('AUTHORIZATION')})
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if not response['auth']:
+                    raise ValueError("您还没开通这个功能,联系管理员开通。")
             except Exception as e:
-                print(e)
+                # 弹窗提示
+                info_popup = InformationPopup(parent=self, message=str(e))
+                info_popup.exec_()
+                return
+            else:  # 模块权限验证通过
+                if module_text == u'首页':
+                    from frame.homepage.home import HomePage
+                    page = HomePage(parent=self.page_container)
+                    page.getCurrentNews()
+                    page.getCurrentSliderAdvertisement()
+                    page.getFoldedBoxContent()
+                    page.folded_box_clicked(category_id=1, head_text='常规报告') # 默认点击常规报告分类id=1
+                elif module_text == u'产品服务':
+                    from frame.proservice.infoService import InfoServicePage
+                    page = InfoServicePage(parent=self.page_container)
+                elif module_text == '基本分析':
+                    from frame.basetrend.trend import TrendPage
+                    page = TrendPage(parent=self.page_container)
+                    page.getGroupVarieties()
+                    page.getTrendPageCharts()
+                elif module_text == '交割服务':
+                    from frame.hedging.delivery import DeliveryServicePage
+                    page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
+                elif module_text == '公式计算':
+                    from frame.formulas.index_page import FormulasCalculate
+                    page = FormulasCalculate(parent=self.page_container)
+                    page.getGroupVarieties()
+                # elif module_text == '数据管理':
+                #     from frame.collector import CollectorMaintain
+                #     page = CollectorMaintain(parent=self.page_container)
+                elif module_text == u'运营管理':
+                    from frame.operator import OperatorMaintain
+                    page = OperatorMaintain(parent=self.page_container)
+                    page.addListItem()  # 加入管理项目
+                elif module_text == u'权限管理':
+                    from frame.authority import AuthorityMaintain
+                    page = AuthorityMaintain(parent=self.page_container)
+                    page.getCurrentUsers()
+                else:
+                    page = QLabel(parent=self.page_container,
+                                  styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
+                                  alignment=Qt.AlignCenter)
+                    page.setText("「" + module_text + "」暂未开放\n敬请期待,感谢支持~.")
+        self.page_container.clear()
+        self.page_container.addWidget(page)

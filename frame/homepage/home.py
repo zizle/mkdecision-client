@@ -18,15 +18,16 @@ from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, Loa
 
 # 新闻公告条目Item
 class NewsItem(QWidget):
-    item_clicked = pyqtSignal(int)
+    item_clicked = pyqtSignal(str, str)
 
-    def __init__(self, title='', create_time='', item_id=None, *args, **kwargs):
+    def __init__(self, title='', create_time='', item_id=None, file_url='', *args, **kwargs):
         super(NewsItem, self).__init__(*args, **kwargs)
         layout = QHBoxLayout(margin=0)
-        title_label = QLabel(title, objectName='title')
+        self.title_label = QLabel(title, objectName='title')
         self.item_id = item_id
+        self.file_url = file_url
         time_label = QLabel(create_time, objectName='createTime')
-        layout.addWidget(title_label, alignment=Qt.AlignLeft)
+        layout.addWidget(self.title_label, alignment=Qt.AlignLeft)
         layout.addWidget(time_label, alignment=Qt.AlignRight)
         self.setLayout(layout)
         # 样式
@@ -86,15 +87,13 @@ class NewsItem(QWidget):
         self.setCursor(Qt.ArrowCursor)
         self.initialStyleSheet()
 
-    # 鼠标弹起事件
-    def mouseReleaseEvent(self, event):
-        super(NewsItem, self).mouseReleaseEvent(event)
-        self.item_clicked.emit(self.item_id)
+    def mousePressEvent(self, event):
+        self.item_clicked.emit(self.title_label.text(), self.file_url)
 
 
 # 首页中新闻公告板块
 class NewsBox(QWidget):
-    news_item_clicked = pyqtSignal(int)
+    news_item_clicked = pyqtSignal(str, str)
 
     def __init__(self, *args, **kwargs):
         super(NewsBox, self).__init__(*args, **kwargs)
@@ -168,8 +167,8 @@ class MoreNewsPage(QWidget):
         current_page = self.paginator.current_page
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/news-more/?page=' + str(
-                    current_page) + '&mc=' + settings.app_dawn.value('machine')
+                url=settings.SERVER_ADDR + 'bulletin/?page=' + str(
+                    current_page)
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -178,18 +177,19 @@ class MoreNewsPage(QWidget):
             pass
         else:
             self.resetNewsBox()
-            news_data = response['data']['contacts']
+            news_data = response['bulletins']
             for news_obj in news_data:
                 news_item = NewsItem(
                     title=news_obj['title'],
                     create_time=news_obj['create_time'],
                     item_id=news_obj['id'],
+                    file_url=news_obj['file_url'],
                     parent=self.news_box
                 )
                 news_item.item_clicked.connect(self.read_detail_news)
                 self.news_box.layout().addWidget(news_item)
             self.news_box.layout().addStretch()
-            self.paginator.setTotalPages(response['data']['total_page'])
+            self.paginator.setTotalPages(response['total_page'])
 
     # 清除控件内的条目
     def resetNewsBox(self):
@@ -201,32 +201,14 @@ class MoreNewsPage(QWidget):
         self.news_scroll.setWidget(self.news_box)
 
     # 阅读新闻
-    def read_detail_news(self, news_id):
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'home/news/' + str(news_id) + '/',
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            self.network_result.emit(str(e))
-        else:
-            # 根据具体情况显示内容
-            news_data = response['data']
-            if news_data['file']:
-                # 显示文件
-                file = settings.STATIC_PREFIX + news_data['file']
-                popup = PDFContentPopup(title=news_data['title'], file=file, parent=self)
-            else:
-                popup = TextContentPopup(title=news_data['title'], content=news_data['content'], parent=self)  # 显示内容
-            if not popup.exec_():
-                popup.deleteLater()
-                del popup
-
+    def read_detail_news(self, title, file_url):
+        file_addr = settings.STATIC_PREFIX + file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
 
 
 """ 图片广告轮播相关 """
+
 
 # 轮播图的label
 class SliderLabel(QLabel):
@@ -294,23 +276,16 @@ class ImageSlider(QStackedWidget):
 
 # 常规报告展示表格
 class NormalReportTable(QTableWidget):
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '报告名'),
-        ('category', '报告类型'),
-        ('date', '报告日期'),
-        ('varieties', '关联品种'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(NormalReportTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)  # 内容不可更改
         self.setFocusPolicy(Qt.NoFocus)
-        self.cellClicked.connect(self.read_report)  # 点击事件
         self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setMouseTracking(True)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
         self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.cellClicked.connect(self.mouseClickedCell)
         self.horizontalHeader().setStyleSheet("""
         QHeaderView::section,
         QTableCornerButton::section {
@@ -328,27 +303,52 @@ class NormalReportTable(QTableWidget):
         alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
         """)
 
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(QPoint(event.pos().x(), event.pos().y()))
+        if index.column() == 4:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mouseClickedCell(self, row, col):
+        if col != 4:
+            return
+        item = self.item(row, col)
+        title = self.item(row, 2).text()
+        file_addr = settings.STATIC_PREFIX + item.file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
+
     # 显示报告内容
     def showRowContents(self, report_list):
         self.clear()
+        table_headers = ["序号",'日期', "标题", '类型', '']
+        self.setColumnCount(len(table_headers))
+        self.setHorizontalHeaderLabels(table_headers)
         self.setRowCount(len(report_list))
-        self.setColumnCount(len(self.KEY_LABELS))
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)  # 自动拉伸大小
-        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 随表头文字宽度
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)  # 自定义设置
-        self.setColumnWidth(1, 400)  # 第一列(标题列)自定义宽度
-        for row, content_item in enumerate(report_list):
-            self.setRowHeight(row, 32)  # 设置固定行高
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                    table_item.file = content_item['file']
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        for row, report_item in enumerate(report_list):
+            self.setRowHeight(row, 32)
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = report_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(report_item['custom_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(report_item['title'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem(report_item['category'])
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
+            item4 = QTableWidgetItem("阅读")
+            item4.setTextAlignment(Qt.AlignCenter)
+            item4.setForeground(QBrush(QColor(50, 50, 220)))
+            item4.file_url = report_item['file_url']
+            self.setItem(row, 4, item4)
         # 设置表格高度
         self.setMinimumHeight(self.rowCount() * 33 + 30)
         # 竖向自动拉伸
@@ -356,22 +356,6 @@ class NormalReportTable(QTableWidget):
             self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
         else:
             self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)  # 固定行高，设置的大小
-
-    def read_report(self, row, col):
-        if col == 1:
-            report_file = self.item(row, 0).file
-            file_name = self.item(row, col).text()
-            # 显示文件
-            file = settings.STATIC_PREFIX + report_file
-            popup = PDFContentPopup(title=file_name, file=file, parent=self)
-            if not popup.exec_():
-                popup.deleteLater()
-                del popup
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
 
 
 # 显示常规报告
@@ -427,8 +411,7 @@ class NormalReportPage(QWidget):
     def getVarietyCombo(self):
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value(
-                    'machine'),
+                url=settings.SERVER_ADDR + 'variety/?way=group'
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -439,12 +422,9 @@ class NormalReportPage(QWidget):
             self.variety_combo.clear()
             # 加入全部
             self.variety_combo.addItem('全部', 0)
-            for variety_group in response['data']:
-                for variety_item in variety_group['varieties']:
-                    if not variety_item['is_active']:
-                        continue
+            for variety_group in response['variety']:
+                for variety_item in variety_group['subs']:
                     self.variety_combo.addItem(variety_item['name'], variety_item['id'])
-            self.getCurrentReports()  # 获取当前报告
 
     # 选择了品种
     def varietyChanged(self):
@@ -456,19 +436,18 @@ class NormalReportPage(QWidget):
         current_page = self.paginator.current_page
         current_variety_id = self.variety_combo.currentData()
         try:
-            # 发起上传请求
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/normal-report/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine'),
-                data=json.dumps({'category': self.category_id, 'variety': current_variety_id})
+                url=settings.SERVER_ADDR + 'report/?page=' + str(current_page) +
+                    '&page_size=50&variety='+ str(current_variety_id) + '&category=' + str(self.category_id)
             )
-            response = json.loads(r.content.decode('utf-8'))
+            response = json.loads(r.content.decode('utf8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception:
             pass
         else:
-            self.report_table.showRowContents(response['data']['contacts'])
-            self.paginator.setTotalPages(response['data']['total_page'])
+            self.report_table.showRowContents(response['reports'])
+            self.paginator.setTotalPages(response['total_page'])
 
 
 """ 交易通知显示相关 """
@@ -476,12 +455,6 @@ class NormalReportPage(QWidget):
 
 # 交易通知表格
 class TransactionNoticeTable(QTableWidget):
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '通知文件'),
-        ('category', '通知类型'),
-        ('date', '通知日期'),
-    ]
 
     def __init__(self, *args, **kwargs):
         super(TransactionNoticeTable, self).__init__(*args, **kwargs)
@@ -489,9 +462,10 @@ class TransactionNoticeTable(QTableWidget):
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
         self.setAlternatingRowColors(True)
+        self.setMouseTracking(True)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.cellClicked.connect(self.read_notice)
+        self.cellClicked.connect(self.mouseClickedCell)
         self.horizontalHeader().setStyleSheet("""
         QHeaderView::section,
         QTableCornerButton::section {
@@ -509,27 +483,49 @@ class TransactionNoticeTable(QTableWidget):
         alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
         """)
 
-    # 显示报告内容
-    def showRowContents(self, report_list):
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(QPoint(event.pos().x(), event.pos().y()))
+        if index.column() == 3:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mouseClickedCell(self, row, col):
+        if col != 3:
+            return
+        item = self.item(row, col)
+        title = self.item(row, 1).text()
+        file_addr = settings.STATIC_PREFIX + item.file_url
+        popup = PDFContentPopup(title=title, file=file_addr)
+        popup.exec_()
+
+    def showRowContents(self, notice_list):
+        print(notice_list)
         self.clear()
-        self.setRowCount(len(report_list))
-        self.setColumnCount(len(self.KEY_LABELS))
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        table_headers = ['序号', '标题', '日期', '']
+        self.setColumnCount(len(table_headers))
+        self.setRowCount(len(notice_list))
+        self.setHorizontalHeaderLabels(table_headers)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.setColumnWidth(1, 450)
-        for row, content_item in enumerate(report_list):
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(notice_list):
             self.setRowHeight(row, 32)
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                    table_item.file = content_item['file']
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['title'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['create_time'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem("阅读")
+            item3.setForeground(QBrush(QColor(50, 50, 220)))
+            item3.file_url = row_item['file_url']
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
         # 设置表格高度
         self.setMinimumHeight(self.rowCount() * 32 + 45)
         if self.rowCount() >= 45:
@@ -538,33 +534,7 @@ class TransactionNoticeTable(QTableWidget):
         else:
             self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)  # 固定行高，设置的大小
 
-    # 阅读一个通知
-    def read_notice(self, row, col):
-        if col == 1:
-            notice_file = self.item(row, 0).file
-            notice_name = self.item(row, col).text()
-            # 显示文件
-            file = settings.STATIC_PREFIX + notice_file
-            popup = PDFContentPopup(title=notice_name, file=file, parent=self)
-            if not popup.exec_():
-                popup.deleteLater()
-                del popup
 
-    # 阅读一个通知
-    def read_button_clicked(self, read_button):
-        current_row, _ = self.get_widget_index(read_button)
-        report_file = self.item(current_row, 0).file
-        # 显示文件
-        file = settings.STATIC_PREFIX + report_file
-        popup = PDFContentPopup(title='阅读通知', file=file, parent=self)
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
-
-    # 获取控件所在行和列
-    def get_widget_index(self, widget):
-        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
-        return index.row(), index.column()
 
 
 # 显示交易通知
@@ -598,8 +568,7 @@ class TransactionNoticePage(QWidget):
         try:
             # 发起请求当前数据
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/transaction_notice/?page='+str(current_page)+'&mc=' + settings.app_dawn.value('machine'),
-                data=json.dumps({'category_id': self.category_id})
+                url=settings.SERVER_ADDR + 'exnotice/?page='+str(current_page)+'&page_size=50&category=' + str(self.category_id),
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -607,8 +576,9 @@ class TransactionNoticePage(QWidget):
         except Exception:
             pass
         else:
-            self.notice_table.showRowContents(response['data']['contacts'])
-            self.paginator.setTotalPages(response['data']['total_page'])
+            self.notice_table.showRowContents(response['exnotices'])
+            self.paginator.setTotalPages(response['total_page'])
+
 
 """ 现货报表相关 """
 
@@ -653,38 +623,43 @@ class SpotCommodityTable(QTableWidget):
 
     def showRowContents(self, row_list):
         self.clear()
+        table_headers = ["序号", "名称", "地区", "等级", "价格", "增减","日期"]
+        self.setColumnCount(len(table_headers))
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS))
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        self.setHorizontalHeaderLabels(table_headers)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        for row, content_item in enumerate(row_list):
+        for row, row_item in enumerate(row_list):
             self.setRowHeight(row, 32)
-            for col, header in enumerate(self.KEY_LABELS):
-                color = QBrush(QColor(0,0,0))
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                else:
-                    if header[0] == 'price':
-                        text = str(int(content_item[header[0]]))
-                    elif header[0] == 'increase':
-                        num = int(content_item[header[0]])
-                        text = str(num)
-                        if num > 0:
-                            # print('数大于0')
-                            color.setColor(QColor(220, 100, 100))
-                        elif num < 0:
-                            # print('数《0')
-                            color.setColor(QColor(100, 220, 100))
-                        else:
-                            pass
-                    else:
-                        text = content_item[header[0]]
-                    table_item = QTableWidgetItem(text)
-                    table_item.setForeground(color)
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['name'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['area'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem(row_item['level'])
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
+            item4 = QTableWidgetItem(row_item['price'])
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 4, item4)
+            increase = row_item['increase']
+
+            item5 = QTableWidgetItem(increase)
+            item5.setTextAlignment(Qt.AlignCenter)
+            if float(increase) > 0:
+                item5.setForeground(QBrush(QColor(220, 100, 100)))
+            else:
+                item5.setForeground(QBrush(QColor(100, 220, 100)))
+            self.setItem(row, 5, item5)
+            item6 = QTableWidgetItem(row_item['custom_time'])
+            item6.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 6, item6)
+
         # 设置表格高度
         self.setMinimumHeight(self.rowCount() * 33 + 30)
         # 竖向自动拉伸
@@ -741,10 +716,10 @@ class SpotCommodityPage(QWidget):
 
     def getCurrentSpotCommodity(self):
         current_date = self.date_edit.text()
+        current_page = 1
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/spot-commodity/?date=' + current_date + '&mc=' + settings.app_dawn.value(
-                    'machine')
+                url=settings.SERVER_ADDR + 'spot/?page='+str(current_page)+'&page_size=50&date=' + current_date
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -753,8 +728,8 @@ class SpotCommodityPage(QWidget):
             self.spot_table.hide()
             self.no_data_label.show()
         else:
-            if response['data']:
-                self.spot_table.showRowContents(response['data'])
+            if response['spots']:
+                self.spot_table.showRowContents(response['spots'])
                 self.spot_table.show()
                 self.no_data_label.hide()
             else:
@@ -803,23 +778,31 @@ class FinanceCalendarTable(QTableWidget):
 
     def showRowContents(self, row_list):
         self.clear()
+        table_headers = ['序号','日期', '时间', '事件','预期值']
+        self.setColumnCount(len(table_headers))
         self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS))
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS])
+        self.setHorizontalHeaderLabels(table_headers)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.setColumnWidth(4, 350)
-        for row, content_item in enumerate(row_list):
+        for row,row_item in enumerate(row_list):
             self.setRowHeight(row, 32)
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = content_item[header[0]]
-                else:
-                    table_item = QTableWidgetItem(str(content_item[header[0]]))
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['date'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1,item1)
+            item2 = QTableWidgetItem(row_item['time'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem(row_item['event'])
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
+            item4 = QTableWidgetItem(row_item['expected'])
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 4, item4)
+
         # 设置表格高度
         self.setMinimumHeight(self.rowCount() * 33 + 30)
         # 竖向自动拉伸
@@ -874,14 +857,13 @@ class FinanceCalendarPage(QWidget):
         }
         """)
 
-
     # 获取当前日期财经日历
     def getCurrentFinanceCalendar(self):
         current_date = self.date_edit.text()
+        current_page = 1
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/finance-calendar/?date=' + current_date + '&mc=' + settings.app_dawn.value(
-                    'machine')
+                url=settings.SERVER_ADDR + 'fecalendar/?page='+str(current_page)+'&page_size=50&date=' + current_date
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -890,8 +872,8 @@ class FinanceCalendarPage(QWidget):
             self.finance_table.hide()
             self.no_data_label.show()
         else:
-            if response['data']:
-                self.finance_table.showRowContents(response['data'])
+            if response['fecalendar']:
+                self.finance_table.showRowContents(response['fecalendar'])
                 self.finance_table.show()
                 self.no_data_label.hide()
             else:
@@ -979,34 +961,16 @@ class HomePage(QScrollArea):
         page.getCurrentNews()  # 请求数据
 
     # 阅读一条新闻
-    def read_news_item(self, news_id):
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'home/news/' + str(news_id) + '/',
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            self.network_result.emit(str(e))
-        else:
-            # 根据具体情况显示内容
-            news_data = response['data']
-            if news_data['file']:
-                # 显示文件
-                file = settings.STATIC_PREFIX + news_data['file']
-                popup = PDFContentPopup(title=news_data['title'], file=file, parent=self)
-            else:
-                popup = TextContentPopup(title=news_data['title'], content=news_data['content'], parent=self)  # 显示内容
-            if not popup.exec_():
-                popup.deleteLater()
-                del popup
+    def read_news_item(self, title, news_url):
+        file_url = settings.STATIC_PREFIX + news_url
+        popup = PDFContentPopup(title=title, file=file_url)
+        popup.exec_()
 
     # 根据当前需求显示获取新闻公告数据
     def getCurrentNews(self):
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'home/news/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'bulletin/',
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -1014,9 +978,12 @@ class HomePage(QScrollArea):
         except Exception:
             pass
         else:
-            news_list = [NewsItem(title=news_item['title'],
-                                  create_time=news_item['create_time'],
-                                  item_id=news_item['id'], parent=self) for news_item in response['data']]
+            news_list = [NewsItem(
+                title=news_item['title'],
+                create_time=news_item['create_time'],
+                item_id=news_item['id'],
+                file_url=news_item['file_url']
+            ) for news_item in response['bulletins']]
             self.news_box.addItems(news_list)
             more_button = self.news_box.setMoreNewsButton()
             more_button.clicked.connect(self.read_more_news)  # 阅读更多新闻
@@ -1027,63 +994,65 @@ class HomePage(QScrollArea):
 
     # 点击阅读广告
     def read_advertisement(self, name):
-        # 请求广告数据
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'home/advertise/' + name + '/?mc=' +settings.app_dawn.value('machine')
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception:
-            pass
-        else:
-            # 根据具体情况显示内容
-            ad_data = response['data']
-            if ad_data['file']:
-                # 显示文件
-                file = settings.STATIC_PREFIX + ad_data['file']
-                popup = PDFContentPopup(title=ad_data['name'], file=file, parent=self)
-            else:
-                popup = TextContentPopup(title=ad_data['name'], content=ad_data['content'], parent=self)  # 显示内容
-            if not popup.exec_():
-                popup.deleteLater()
-                del popup
+        # 请求广告具体数据
+        file_name = name.rsplit('.', 1)[0]
+        file_addr = settings.STATIC_PREFIX + 'homepage/ad/' + file_name + '.pdf'
+        popup = PDFContentPopup(title='查看内容', file=file_addr, parent=self)
+        popup.exec_()
 
-    # 从mlib文件获取折叠窗的数据
+    # 添加折叠窗的数据
     def getFoldedBoxContent(self):
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'home/data-category/all/?mc=' + settings.app_dawn.value('machine')
-            )
-            if r.status_code != 200:
-                raise ValueError('获取折叠窗数据失败.')
-            response = json.loads(r.content.decode('utf-8'))
-        except Exception:
-            pass
-        else:
-            # 重新组织数据
-            data_category = dict()
-            for category_item in response['data']:
-                group = category_item['group']
-                if group not in data_category.keys():
-                    data_category[group] = [{'id': 0, 'name': '全部'}]
-                data_category[group].append({'id': category_item['id'], 'name': category_item['name']})
-            for key, values in data_category.items():
-                data_category[key].append({'id': -1, 'name': '其他'})  # 加入其他选项
-                head = self.folded_box.addHead(key)  # 一个group就得一个Head
-                body = self.folded_box.addBody(head=head)
-                body.addButtons(values)
-                # body.setHead(head)
-            # 加入现货报表和财经日历
-            spot_head = self.folded_box.addHead('现货报表')
-            finance_head = self.folded_box.addHead('财经日历')
-            spot_body = self.folded_box.addBody(head=spot_head)
-            spot_body.addButtons([{'id': -1, 'name': '昨日数据'}, {'id': 0, 'name': '今日数据'}])
-            # spot_body.setHead(spot_head)
-            finance_body = self.folded_box.addBody(head=finance_head)
-            finance_body.addButtons([{'id': -1, 'name': '昨日数据'}, {'id': 0, 'name': '今日数据'}])
-            self.folded_box.container.layout().addStretch()
+        # menus的id需与后端对应
+        folded_menus = [
+            {
+                "id": 1,
+                "name":"常规报告",
+                "menus":[
+                    {"id": -1, "name": "全部"},
+                    {"id": 1, "name": "日报"},
+                    {"id": 2, "name": "周报"},
+                    {"id": 3, "name": "月报"},
+                    {"id": 4, "name": "年报"},
+                    {"id": 5, "name": "专题报告"},
+                    {"id": 0, "name": "其他"},
+                ]
+            },
+            {
+                "id": 2,
+                "name": "交易通知",
+                "menus":[
+                    {"id": -1, "name": "全部"},
+                    {"id": 1, "name": "公司"},
+                    {"id": 2, "name":"交易所"},
+                    {"id": 3, "name":"系统"},
+                    {"id": 0, "name": "其他"},
+                ]
+            },
+            {
+                "id": 3,
+                "name": "现货报表",
+                "menus": [
+                    {"id": -1, "name": "昨日"},
+                    {"id": 0, "name": "今日"},
+                    {"id": 1, "name": "明日"},
+                ]
+            },
+            {
+                "id": 4,
+                "name": "财经日历",
+                "menus": [
+                    {"id": -1, "name": "昨日"},
+                    {"id": 0, "name": "今日"},
+                    {"id": 1, "name": "明日"},
+                ]
+            },
+        ]
+        for group_item in folded_menus:
+            head = self.folded_box.addHead(group_item['name'])
+            body = self.folded_box.addBody(head=head)
+            for menu_item in group_item['menus']:
+                body.addButton(id=menu_item['id'], name=menu_item['name'])
+        self.folded_box.container.layout().addStretch()
 
     # 折叠盒子被点击
     def folded_box_clicked(self, category_id, head_text):
@@ -1092,6 +1061,7 @@ class HomePage(QScrollArea):
         if head_text == u'常规报告':
             page = NormalReportPage(category_id=category_id, parent=self.frame_window)
             page.getVarietyCombo()
+            page.getCurrentReports()
         elif head_text == u'交易通知':
             page = TransactionNoticePage(category_id=category_id, parent=self.frame_window)
             page.getCurrentNotices()

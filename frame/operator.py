@@ -2,69 +2,253 @@
 # __Author__： zizle
 import json
 import requests
-from PyQt5.QtWidgets import QWidget, QListWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QLabel, QComboBox, \
-    QHeaderView, QPushButton, QTableWidgetItem, QLineEdit, QListView, QAbstractItemView, QTableWidget
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint
-from PyQt5.QtGui import QPainter, QBrush, QColor
+from PIL import Image
+from PyQt5.QtWidgets import QWidget, QListWidget, QHBoxLayout, QVBoxLayout,QMessageBox, QTabWidget, QLabel, QComboBox, \
+    QHeaderView, QPushButton, QTableWidgetItem, QLineEdit, QListView, QAbstractItemView, QTableWidget, QDialog, QMenu
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QUrl
+from PyQt5.QtGui import QPainter, QBrush, QColor, QImage, QPixmap, QCursor, QIcon
 from PyQt5.QtChart import QChartView
 from popup.operator import EditUserInformationPopup, EditClientInformationPopup, CreateNewModulePopup,\
-     ModuleSubsInformationPopup,CreateNewVarietyPopup, EditVarietyInformationPopup
+     ModuleSubsInformationPopup,CreateNewVarietyPopup, EditVarietyInformationPopup, CreateAdvertisementPopup
+from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 import settings
 from widgets.operator import ManageTable, EditButton
 from widgets.base import TableCheckBox
 
 """ 用户管理相关 """
+class VarietyAuthDialog(QDialog):
+    def __init__(self, user_id, *args):
+        super(VarietyAuthDialog, self).__init__(*args)
+        self.user_id = user_id
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setWindowTitle("用户品种权限")
+        self.setWindowIcon(QIcon("media/logo.png"))
+        self.setFixedSize(1000, 600)
+        layout = QVBoxLayout()
+        layout.setParent(self)
+        self.user_info_label = QLabel(self)
+        layout.addWidget(self.user_info_label)
+        self.variety_table = QTableWidget(self)
+        self.variety_table.verticalHeader().hide()
+        self.variety_table.cellClicked.connect(self.clickedCell_variety_table)
+        layout.addWidget(self.variety_table)
+        self.setLayout(layout)
+
+    def get_varieties(self):
+        try:
+            r = requests.get(url=settings.SERVER_ADDR + 'variety/?way=group')
+            response = json.loads(r.content.decode('utf8'))
+        except Exception as e:
+            pass
+        else:
+            self.setVarietyContents(response['variety'])
+
+    def setVarietyContents(self, row_contents):
+        print(row_contents)
+        self.variety_table.clear()
+        table_headers = ['序号', '品种', '权限']
+        self.variety_table.setColumnCount(len(table_headers))
+        self.variety_table.setHorizontalHeaderLabels(table_headers)
+        self.variety_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.variety_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        current_row = 0
+        for row_item in row_contents:
+            self.variety_table.insertRow(current_row)
+            item0 = QTableWidgetItem(str(current_row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.variety_table.setItem(current_row, 0, item0)
+            item1 = QTableWidgetItem(row_item['name'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.variety_table.setItem(current_row, 1, item1)
+            for variety_item in row_item['subs']:
+                current_row += 1
+                self.variety_table.insertRow(current_row)
+                item0 = QTableWidgetItem(str(current_row + 1))
+                item0.setTextAlignment(Qt.AlignCenter)
+                item0.id = variety_item['id']
+                self.variety_table.setItem(current_row, 0, item0)
+                item1 = QTableWidgetItem(variety_item['name'])
+                item1.setTextAlignment(Qt.AlignCenter)
+                self.variety_table.setItem(current_row, 1, item1)
+                item2 = QTableWidgetItem("点击开启")
+                item2.setTextAlignment(Qt.AlignCenter)
+                item2.setForeground(QBrush(QColor(250,50,50)))
+                self.variety_table.setItem(current_row, 2, item2)
+            current_row += 1
+
+    def getCurrentUserAccessVariety(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'user/' + str(self.user_id) + '/variety/'
+            )
+            response = json.loads(r.content.decode('utf8'))
+        except Exception as e:
+            pass
+        else:
+            user_info = response['user_info']
+            userinfo_text = "用户名:" + user_info['username'] + '\t' + "手机:" + user_info['phone']
+            self.setWindowTitle("【"+user_info["username"]+"】品种权限")
+            self.user_info_label.setText(userinfo_text)
+            # 修改权限的状态
+            for variety_item in response['variety']:
+                for row in range(self.variety_table.rowCount()):
+                    row_vid = self.variety_table.item(row, 0).id
+                    if row_vid == variety_item['variety_id'] and variety_item['is_active']:
+                        item = self.variety_table.item(row, 2)
+                        if item:
+                            item.setText("点击关闭")
+                            item.setForeground(QBrush(QColor(50,250,50)))
+
+
+    def clickedCell_variety_table(self, row, col):
+        if col != 2:
+            return
+        current_item = self.variety_table.item(row, col)
+        if not current_item:
+            return
+        current_vid = self.variety_table.item(row, 0).id
+        current_text = current_item.text()
+        if current_text == "点击开启":
+            is_active = 1
+        else:
+            is_active = 0
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'user/' + str(self.user_id) + '/variety/',
+                headers={"Content-Type": "application/json;charset=utf8"},
+                data=json.dumps({
+                    "utoken": settings.app_dawn.value('AUTHORIZATION'),
+                    "is_active": is_active,
+                    "variety_id": current_vid,
+                })
+            )
+            response = json.loads(r.content.decode('utf8'))
+        except Exception as e:
+            pass
+        else:
+            current_item.setText("点击关闭" if is_active else "点击开启")
+
+
+
+
 
 
 # 显示用户表格
-class UsersTable(ManageTable):
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('username', '用户名/昵称'),
-        ('phone', '手机'),
-        ('email', '邮箱'),
-        ('role', '角色'),
-        ('last_login', '最近登录'),
-        ('note', '备注'),
-        ('is_active', '有效'),
-    ]
-    CHECK_COLUMNS = [7]
+class UsersTable(QTableWidget):
 
-    # 初始化表格
-    def resetTableMode(self, row_count):
-        super(UsersTable, self).resetTableMode(row_count)
+    def __init__(self, *args, **kwargs):
+        super(UsersTable, self).__init__(*args, **kwargs)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+
+    def setRowContents(self, row_contents):
+        self.clear()
+        table_headers = ["序号", "用户名","手机", "加入时间", "最近登录", "邮箱","角色"]
+        self.setColumnCount(len(table_headers))
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(self.columnCount() - 1, QHeaderView.ResizeToContents)
+        self.setRowCount(len(row_contents))
+        for row,row_item in enumerate(row_contents):
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['username'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['phone'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row,2, item2)
+            item3 = QTableWidgetItem(row_item['join_time'])
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
+            item4 = QTableWidgetItem(row_item['update_time'])
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 4, item4)
+            item5 = QTableWidgetItem(row_item['email'])
+            item5.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 5, item5)
+            item6 = QTableWidgetItem(row_item["role_text"])
+            item6.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 6, item6)
 
-    # 选择状态发生改变
-    def check_box_changed(self, check_box):
-        row, column = self.get_widget_index(check_box)
-        user_id = self.item(row, 0).id
-        print('改变id=%d的用户的为%s' % (user_id, '有效' if check_box.check_box.isChecked() else '无效'))
-        # 修改用户有效的请求
-        try:
-            r = requests.patch(
-                url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/baseInfo/?mc=' + settings.app_dawn.value('machine'),
-                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
-                data=json.dumps({'is_active': check_box.check_box.isChecked()})
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            self.network_result.emit(str(e))
-        else:
-            self.network_result.emit(response['message'])
+    def mousePressEvent(self, event):
+        if event.buttons() != Qt.RightButton:
+            return
+        index = self.indexAt(QPoint(event.x(), event.y()))
+        current_row = index.row()
+        self.setCurrentIndex(index)
+        if current_row < 0 :
+            return
+        menu = QMenu()
+        variety_auth_action = menu.addAction("品种权限")
+        variety_auth_action.triggered.connect(self.setUserVarietyAuth)
+        role_modify_action = menu.addAction("角色设置")
+        role_modify_action.triggered.connect(self.modifyUserRole)
+        menu.exec_(QCursor.pos())
+        super(UsersTable, self).mousePressEvent(event)
 
-    # 修改用户信息
-    def edit_button_clicked(self, edit_button):
-        row, column = self.get_widget_index(edit_button)
-        user_id = self.item(row, 0).id
-        # 弹窗设置当前用户信息
-        edit_popup = EditUserInformationPopup(user_id=user_id, parent=self)
-        if not edit_popup.exec_():
-            edit_popup.deleteLater()
-            del edit_popup
+    def setUserVarietyAuth(self):
+        current_row = self.currentRow()
+        user_id = self.item(current_row, 0).id
+        # 弹窗设置品种权限
+        popup = VarietyAuthDialog(user_id=user_id)
+        popup.get_varieties()
+        popup.getCurrentUserAccessVariety()
+        popup.exec_()
+
+    def modifyUserRole(self):
+        def commit():
+            role_num = role_combobox.currentData()
+            try:
+                r = requests.patch(
+                    url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/',
+                    headers={"Content-Type": "application/json;charset=utf8"},
+                    data=json.dumps({
+                        'utoken': settings.app_dawn.value("AUTHORIZATION"),
+                        'role_to': role_num
+                    })
+                )
+                response = json.loads(r.content.decode('utf8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                QMessageBox.information(popup, '错误', '修改错误{}'.format(e))
+            else:
+                QMessageBox.information(popup, '成功', "修改用户角色成功")
+                self.item(current_row, 6).setText(response['role_text'])
+            finally:
+                popup.close()
+        current_row = self.currentRow()
+        username = self.item(current_row, 1).text()
+        user_id = self.item(current_row, 0).id
+        role_text = self.item(current_row, 6).text()
+        popup = QDialog(parent=self)
+        popup.setFixedSize(250, 80)
+        popup.setAttribute(Qt.WA_DeleteOnClose)
+        mainlayout = QVBoxLayout()
+        layout = QHBoxLayout()
+        popup.setWindowTitle("【"+ username+"】角色设置")
+        layout.addStretch()
+        layout.addWidget(QLabel("角色:", popup))
+        role_combobox = QComboBox(popup)
+        role_combobox.setFixedWidth(150)
+        for role_item in [(1,"超级管理员"),(2,"运营管理员"),(3,"信息管理员"), (4,"研究员"),(5,"普通用户")]:
+            role_combobox.addItem(role_item[1], role_item[0])
+        role_combobox.setCurrentText(role_text)
+        layout.addWidget(role_combobox)
+        layout.addStretch()
+        commit_button = QPushButton("确定")
+        commit_button.clicked.connect(commit)
+        mainlayout.addLayout(layout)
+        mainlayout.addWidget(commit_button, alignment=Qt.AlignHCenter | Qt.AlignVCenter)
+        popup.setLayout(mainlayout)
+        popup.exec_()
 
 
 # 用户管理页面
@@ -83,7 +267,7 @@ class UserManagePage(QWidget):
         layout.addLayout(combo_message_layout)
         # 用户表显示
         self.users_table = UsersTable()
-        self.users_table.network_result.connect(self.network_message.setText)
+        # self.users_table.network_result.connect(self.network_message.setText)
         layout.addWidget(self.users_table)
         self.setLayout(layout)
         self._addRoleComboItems()
@@ -91,41 +275,29 @@ class UserManagePage(QWidget):
     # 填充选择下拉框
     def _addRoleComboItems(self):
         for combo_item in [
-            ('全部', 'all'),
-            ('运营管理员', 'is_operator'),  # 与后端对应
-            ('信息管理员', 'is_collector'),  # 与后端对应
-            ('研究员', 'is_researcher'),  # 与后端对应
-            ('普通用户', 'normal'),
+            ('全部', 0),
+            ('运营管理员', 2),  # 与后端对应
+            ('信息管理员', 3),  # 与后端对应
+            ('研究员', 4),  # 与后端对应
+            ('普通用户', 5),
         ]:
             self.role_combo.addItem(combo_item[0], combo_item[1])
 
     # 获取相关用户
     def getCurrentUsers(self):
         current_data = self.role_combo.currentData()
-        params = {}
-        if current_data == 'all':
-            pass
-        elif current_data == 'normal':
-            params['is_operator'] = False
-            params['is_collector'] = False
-            params['is_researcher'] = False
-        else:
-            params[current_data] = True
-        # 请求数据
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'user/?mc=' + settings.app_dawn.value('machine'),
-                headers={'AUTHORIZATION': settings.app_dawn.value("AUTHORIZATION")},
-                data=json.dumps(params)
+                url=settings.SERVER_ADDR + 'users/?role_num='+str(current_data)+'&utoken=' + settings.app_dawn.value("AUTHORIZATION"),
             )
-            response = json.loads(r.content.decode('utf-8'))
+            response = json.loads(r.content.decode('utf8'))
             if r.status_code != 200:
                 raise ValueError(response['message'])
         except Exception as e:
             self.network_message.setText(str(e))
         else:
-            self.users_table.setRowContents(response['data'])
             self.network_message.setText(response['message'])
+            self.users_table.setRowContents(response['users'])
 
 
 """ 客户端管理相关 """
@@ -251,7 +423,6 @@ class ModulesTable(QTableWidget):
     KEY_LABELS = [
         ('id', '序号'),
         ('name', '名称'),
-        ('is_active', '有效')
     ]
     CHECK_COLUMNS = [2]
 
@@ -267,35 +438,61 @@ class ModulesTable(QTableWidget):
     def setRowContents(self, row_list):
         self.module_data = row_list
         self.clear()
-        self.setRowCount(len(row_list))
-        self.setColumnCount(len(self.KEY_LABELS) + 2)
-        self.setHorizontalHeaderLabels([header[1] for header in self.KEY_LABELS] + ['排序', ''])
+        self.setRowCount(0)
+        header_labels = ['序号', '名称', '排序']
+        self.setColumnCount(len(header_labels))
+        self.setHorizontalHeaderLabels(header_labels)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        for row, user_item in enumerate(row_list):
-            for col, header in enumerate(self.KEY_LABELS):
-                if col == 0:
-                    table_item = QTableWidgetItem(str(row + 1))
-                    table_item.id = user_item[header[0]]
-                else:
-                    table_item = QTableWidgetItem(str(user_item[header[0]]))
-                if col in self.CHECK_COLUMNS:
-                    check_box = TableCheckBox(checked=user_item[header[0]])
-                    check_box.check_activated.connect(self.check_box_changed)
-                    self.setCellWidget(row, col, check_box)
-                table_item.setTextAlignment(Qt.AlignCenter)
-                self.setItem(row, col, table_item)
-                # 增加排序控制按钮
-                if col == len(self.KEY_LABELS) - 1:
-                    order_item = QTableWidgetItem('上移')
-                    order_item.setTextAlignment(Qt.AlignCenter)
-                    order_item.setForeground(QBrush(QColor(40, 100, 201)))
-                    self.setItem(row, col + 1, order_item)
-                # 增加【查看子块】按钮
-                if col == len(self.KEY_LABELS) - 1:
-                    show_subs_button = EditButton('子模块')
-                    show_subs_button.button_clicked.connect(self.show_subs_button_clicked)
-                    self.setCellWidget(row, col + 2, show_subs_button)
+        current_row = 0
+        for row, module_item in enumerate(self.module_data):
+            self.insertRow(current_row)
+            table_item0 = QTableWidgetItem(str(current_row + 1))
+            table_item0.id = module_item['id']
+            table_item0.setTextAlignment(Qt.AlignCenter)
+            table_item0.setBackground(QBrush(QColor(218,233,231)))
+            self.setItem(current_row, 0, table_item0)
+            table_item1 = QTableWidgetItem(module_item['name'])
+            table_item1.setTextAlignment(Qt.AlignCenter)
+            table_item1.setBackground(QBrush(QColor(218,233,231)))
+            self.setItem(current_row, 1, table_item1)
+            current_row += 1
+            for sub_module in module_item['subs']:
+                self.insertRow(current_row)
+                table_item0 = QTableWidgetItem(str(current_row + 1))
+                table_item0.setTextAlignment(Qt.AlignCenter)
+                table_item0.id = sub_module['id']
+                self.setItem(current_row, 0, table_item0)
+                table_item1 = QTableWidgetItem(sub_module['name'])
+                table_item1.setTextAlignment(Qt.AlignCenter)
+                self.setItem(current_row, 1, table_item1)
+                current_row += 1
+
+
+        # for row, user_item in enumerate(row_list):
+        #     for col, header in enumerate(self.KEY_LABELS):
+        #         if col == 0:
+        #             table_item = QTableWidgetItem(str(row + 1))
+        #             table_item.id = user_item[header[0]]
+        #         else:
+        #             table_item = QTableWidgetItem(str(user_item[header[0]]))
+        #         if col in self.CHECK_COLUMNS:
+        #             check_box = TableCheckBox(checked=user_item[header[0]])
+        #             check_box.check_activated.connect(self.check_box_changed)
+        #             self.setCellWidget(row, col, check_box)
+        #         table_item.setTextAlignment(Qt.AlignCenter)
+        #         self.setItem(row, col, table_item)
+        #         # 增加排序控制按钮
+        #         if col == len(self.KEY_LABELS) - 1:
+        #             order_item = QTableWidgetItem('上移')
+        #             order_item.setTextAlignment(Qt.AlignCenter)
+        #             order_item.setForeground(QBrush(QColor(40, 100, 201)))
+        #             self.setItem(row, col + 1, order_item)
+        #         # 增加【查看子块】按钮
+        #         if col == len(self.KEY_LABELS) - 1:
+        #             show_subs_button = EditButton('子模块')
+        #             show_subs_button.button_clicked.connect(self.show_subs_button_clicked)
+        #             self.setCellWidget(row, col + 2, show_subs_button)
 
     # 编辑模块的有效
     def check_box_changed(self, check_box):
@@ -444,6 +641,11 @@ class ModuleManagePage(QWidget):
         try:
             r = requests.get(
                 url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
+                headers={"Content-Type":"application/json;charset=utf8"},
+                data=json.dumps({
+                    'utoken':settings.app_dawn.value('AUTHORIZATION')
+                })
+
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -452,78 +654,127 @@ class ModuleManagePage(QWidget):
             self.network_message.setText(str(e))
         else:
             self.network_message.setText(response['message'])
-            self.module_table.setRowContents(response['data'])
+            self.module_table.setRowContents(response['modules'])
 
     # 新增系统模块
     def create_new_module(self):
         popup = CreateNewModulePopup(parent=self, module_combo=self.module_table.module_data)
         if not popup.exec_():
-            popup.deleteLater()
-            del popup
+            self.getCurrentModules()
 
 
 """ 品种管理相关 """
 
+class VarietiesTable(QTableWidget):
+    def __init__(self,*args, **kwargs):
+        super(VarietiesTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
-# 品种显示管理表格
-class VarietiesTable(ManageTable):
-
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '名称'),
-        ('name_en', '英文代码'),
-        ('group', '所属组'),
-        ('is_active', '有效'),
-    ]
-    CHECK_COLUMNS = [4]
-
-    def resetTableMode(self, row_count):
-        super(VarietiesTable, self).resetTableMode(row_count)
+    def setRowContents(self, row_list):
+        self.clear()
+        self.setRowCount(0)
+        header_labels = ['序号', '名称', '代码']
+        self.setColumnCount(len(header_labels))
+        self.setHorizontalHeaderLabels(header_labels)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+        current_row = 0
+        for row, variety_group in enumerate(row_list):
+            self.insertRow(current_row)
+            table_item0 = QTableWidgetItem(str(current_row + 1))
+            table_item0.id = variety_group['id']
+            table_item0.setTextAlignment(Qt.AlignCenter)
+            table_item0.setBackground(QBrush(QColor(218, 233, 231)))
+            self.setItem(current_row, 0, table_item0)
+            table_item1 = QTableWidgetItem(variety_group['name'])
+            table_item1.setTextAlignment(Qt.AlignCenter)
+            table_item1.setBackground(QBrush(QColor(218, 233, 231)))
+            self.setItem(current_row, 1, table_item1)
+            table_item2 = QTableWidgetItem('')
+            table_item2.setBackground(QBrush(QColor(218,233,231)))
+            self.setItem(current_row, 2, table_item2)
+            current_row += 1
+            for sub_item in variety_group['subs']:
+                self.insertRow(current_row)
+                table_item0 = QTableWidgetItem(str(current_row + 1))
+                table_item0.setTextAlignment(Qt.AlignCenter)
+                table_item0.id = sub_item['id']
+                self.setItem(current_row, 0, table_item0)
+                table_item1 = QTableWidgetItem(sub_item['name'])
+                table_item1.setTextAlignment(Qt.AlignCenter)
+                self.setItem(current_row, 1, table_item1)
+                table_item2 = QTableWidgetItem(sub_item['name_en'])
+                table_item2.setTextAlignment(Qt.AlignCenter)
+                self.setItem(current_row, 2, table_item2)
+                current_row += 1
 
-    def edit_button_clicked(self, edit_button):
-        current_row, current_col = self.get_widget_index(edit_button)
-        variety_id = self.item(current_row, 0).id
-        # print('修改品种', variety_id)
-        # 弹窗编辑信息
-        edit_popup = EditVarietyInformationPopup(variety_id=variety_id, parent=self)
-        edit_popup.getCurrentVariety()
-        if not edit_popup.exec_():
-            edit_popup.deleteLater()
-            del edit_popup
+        return
 
-    def check_box_changed(self, check_box):
-        current_row, current_col = self.get_widget_index(check_box)
-        variety_id = self.item(current_row, 0).id
-        try:
-            r = requests.put(
-                url=settings.SERVER_ADDR + 'variety/' + str(variety_id) + '/?mc=' + settings.app_dawn.value(
-                    'machine'),
-                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
-                data=json.dumps({'is_active': check_box.check_box.isChecked()})
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            self.network_result.emit(str(e))
-        else:
-            self.network_result.emit(response['message'])
+
+#
+# # 品种显示管理表格
+# class VarietiesTable1(ManageTable):
+#
+#     KEY_LABELS = [
+#         ('id', '序号'),
+#         ('name', '名称'),
+#         ('name_en', '英文代码'),
+#         ('group', '所属组'),
+#         ('is_active', '有效'),
+#     ]
+#     CHECK_COLUMNS = [4]
+#
+#     def resetTableMode(self, row_count):
+#         super(VarietiesTable, self).resetTableMode(row_count)
+#         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+#         self.horizontalHeader().setSectionResizeMode(len(self.KEY_LABELS), QHeaderView.ResizeToContents)
+#
+#     def edit_button_clicked(self, edit_button):
+#         current_row, current_col = self.get_widget_index(edit_button)
+#         variety_id = self.item(current_row, 0).id
+#         # print('修改品种', variety_id)
+#         # 弹窗编辑信息
+#         edit_popup = EditVarietyInformationPopup(variety_id=variety_id, parent=self)
+#         edit_popup.getCurrentVariety()
+#         if not edit_popup.exec_():
+#             edit_popup.deleteLater()
+#             del edit_popup
+#
+#     def check_box_changed(self, check_box):
+#         current_row, current_col = self.get_widget_index(check_box)
+#         variety_id = self.item(current_row, 0).id
+#         try:
+#             r = requests.put(
+#                 url=settings.SERVER_ADDR + 'variety/' + str(variety_id) + '/?mc=' + settings.app_dawn.value(
+#                     'machine'),
+#                 headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+#                 data=json.dumps({'is_active': check_box.check_box.isChecked()})
+#             )
+#             response = json.loads(r.content.decode('utf-8'))
+#             if r.status_code != 200:
+#                 raise ValueError(response['message'])
+#         except Exception as e:
+#             self.network_result.emit(str(e))
+#         else:
+#             self.network_result.emit(response['message'])
 
 
 
 # 品种管理页面
+
+
 class VarietyManagePage(QWidget):
     def __init__(self, *args, **kwargs):
         super(VarietyManagePage, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0)
-        # 上方品种大类选择和信息提示
+        # # 上方品种大类选择和信息提示
         combo_message_layout = QHBoxLayout()
-        self.select_combo = QComboBox(activated=self.getCurrentVarieties)
-        combo_message_layout.addWidget(self.select_combo)
-        self.network_message_label = QLabel()
-        combo_message_layout.addWidget(self.network_message_label)
+        # # self.select_combo = QComboBox(activated=self.getCurrentVarieties)
+        # # combo_message_layout.addWidget(self.select_combo)
+        # self.network_message_label = QLabel()
+        # combo_message_layout.addWidget(self.network_message_label)
         combo_message_layout.addStretch()
         # 新增品种按钮
         self.add_button = QPushButton('新增', clicked=self.create_new_variety)
@@ -533,32 +784,13 @@ class VarietyManagePage(QWidget):
         self.variety_table = VarietiesTable(parent=self)
         layout.addWidget(self.variety_table)
         self.setLayout(layout)
-
-    # 获取分组
-    def getVarietyGroup(self):
-        # 请求数据
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value('machine'),
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            self.network_message_label.setText(str(e))
-        else:
-            # 增加全部选项
-            self.select_combo.addItem('全部', 0)
-            for group_item in response['data']:
-                self.select_combo.addItem(group_item['name'], group_item['id'])
-            self.network_message_label.setText(response['message'])
+        self.all_varieties = []
 
     # 获取品种
     def getCurrentVarieties(self):
-        current_gid = self.select_combo.currentData()
         try:
             r = requests.get(
-                url=settings.SERVER_ADDR + 'group-varieties/' + str(current_gid) + '/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'variety/?way=group',
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -566,16 +798,14 @@ class VarietyManagePage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.variety_table.setRowContents(response['data'])
-            self.network_message_label.setText(response['message'])
+            self.all_varieties = response['variety']
+            self.variety_table.setRowContents(response['variety'])
 
     # 新增品种
     def create_new_variety(self):
-        popup = CreateNewVarietyPopup(parent=self)
-        popup.getGroupWithVarieties()
-        if not popup.exec_():
-            popup.deleteLater()
-            del popup
+        groups = [(group_item['id'], group_item['name']) for group_item in self.all_varieties]
+        popup = CreateNewVarietyPopup(parent=self, groups=groups)
+        popup.exec_()
 
 
 """ 运营数据分析相关 """
@@ -786,6 +1016,222 @@ class OperateManagePage(QWidget):
                 self.user_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
 
 
+""" 广告设置 """
+
+
+# 查看图片按钮
+class TableImageReadButton(QPushButton):
+    button_clicked = pyqtSignal(QPushButton)
+
+    def __init__(self, *args, **kwargs):
+        super(TableImageReadButton, self).__init__(*args, **kwargs)
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(lambda: self.button_clicked.emit(self))
+        self.setObjectName('tableDelete')
+        self.setStyleSheet("""
+        #tableDelete{
+            border: none;
+            padding: 1px 8px;
+            color: rgb(100,150,180);
+        }
+        #tableDelete:hover{
+            color: rgb(120,130,230)
+        }
+        """)
+
+
+# 广告展示表格
+class AdvertisementTable(QTableWidget):
+    network_result = pyqtSignal(str)
+
+    KEY_LABELS = [
+        ('id', '序号'),
+        ('name', '标题'),
+        ('create_time', '创建日期'),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(AdvertisementTable, self).__init__(*args, **kwargs)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.cellClicked.connect(self.clickedCellEvent)
+
+    def showRowContens(self, advertisement_list):
+        self.clear()
+        table_headers = ['序号', '创建日期','图片','内容']
+        self.setColumnCount(len(table_headers))
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(advertisement_list):
+            self.insertRow(row)
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['create_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem("查看")
+            item2.image_url = row_item['image_url']
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem("查看")
+            item3.file_url = row_item['file_url']
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
+
+
+    def clickedCellEvent(self, row, col):
+        if col == 2: # 查看图片
+            item = self.item(row, col)
+            image_url = item.image_url
+            popup = QDialog(parent=self)
+            popup.setFixedSize(660, 330)
+            popup.setWindowTitle('图片')
+            popup.setAttribute(Qt.WA_DeleteOnClose)
+            layout = QVBoxLayout(popup)
+            r = requests.get(url=settings.STATIC_PREFIX + image_url)
+            image_label = QLabel(popup)
+            image_label.setPixmap(QPixmap.fromImage(QImage.fromData(r.content)))
+            image_label.setScaledContents(True)
+            layout.addWidget(image_label)
+            popup.setLayout(layout)
+            popup.exec_()
+        elif col == 3: # 查看内容
+            item = self.item(row, col)
+            file_url = item.file_url
+            from widgets.base import PDFContentPopup
+            popup = PDFContentPopup(title='广告内容',file=settings.STATIC_PREFIX + file_url)
+            popup.exec_()
+        else:
+            pass
+
+    # 查看图片
+    def read_image_clicked(self, image_button):
+        image_url = image_button.image
+        popup = QDialog(parent=self)
+        popup.setWindowTitle('广告的图片')
+        layout = QVBoxLayout(margin=0)
+        image_label = QLabel()
+        r = requests.get(url=settings.STATIC_PREFIX + image_url)
+        img = QImage.fromData(r.content)
+        image_label.setPixmap(QPixmap.fromImage(img))
+        image_label.setScaledContents(True)
+        layout.addWidget(image_label)
+        popup.setLayout(layout)
+        self.network_result.emit('获取图片成功!')
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 查看内容
+    def read_button_clicked(self, read_button):
+        current_row, _ = self.get_widget_index(read_button)
+        ad_id = self.item(current_row, 0).id
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'home/advertise/' + str(ad_id) + '/',
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_result.emit(str(e))
+        else:
+            # 根据具体情况显示内容
+            ad_data = response['data']
+            self.network_result.emit(response['message'])
+            if ad_data['file']:
+                # 显示文件
+                file = settings.STATIC_PREFIX + ad_data['file']
+                popup = PDFContentPopup(title=ad_data['name'], file=file, parent=self)
+            else:
+                popup = TextContentPopup(title=ad_data['name'], content=ad_data['content'], parent=self)  # 显示内容
+            if not popup.exec_():
+                popup.deleteLater()
+                del popup
+
+    # 删除本条广告
+    def delete_button_clicked(self, delete_button):
+        def delete_row_advertisement():
+            current_row, _ = self.get_widget_index(delete_button)
+            ad_id = self.item(current_row, 0).id
+            # 发起删除公告请求
+            try:
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'home/advertise/' + str(ad_id) + '/?mc=' + settings.app_dawn.value(
+                        'machine'),
+                    headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')}
+                )
+                response = json.loads(r.content.decode('utf-8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                self.network_result.emit(str(e))
+            else:
+                self.network_result.emit(response['message'])
+                popup.close()
+                # 移除本行
+                self.removeRow(current_row)
+        # 警示框
+        popup = WarningPopup(parent=self)
+        popup.confirm_button.connect(delete_row_advertisement)
+        if not popup.exec_():
+            popup.deleteLater()
+            del popup
+
+    # 获取控件所在行和列
+    def get_widget_index(self, widget):
+        index = self.indexAt(QPoint(widget.frameGeometry().x(), widget.frameGeometry().y()))
+        return index.row(), index.column()
+
+
+
+# 广告设置
+class AdvertisementPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(AdvertisementPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(margin=0, spacing=2)
+        # 信息展示与新增按钮
+        message_button_layout = QHBoxLayout()
+        self.network_message_label = QLabel(self)
+        message_button_layout.addWidget(self.network_message_label)
+        message_button_layout.addWidget(QPushButton('新增', clicked=self.create_advertisement), alignment=Qt.AlignRight)
+        layout.addLayout(message_button_layout)
+        # 当前数据显示表格
+        self.advertisement_table = AdvertisementTable()
+        self.advertisement_table.network_result.connect(self.network_message_label.setText)
+        layout.addWidget(self.advertisement_table)
+        self.setLayout(layout)
+
+    # 新增广告
+    def create_advertisement(self):
+        popup = CreateAdvertisementPopup(parent=self)
+        popup.exec_()
+
+
+    # 获取广告数据
+    def getAdvertisements(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'ad/',
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            self.network_message_label.setText(str(e))
+        else:
+            print(response)
+            self.advertisement_table.showRowContens(response['adments'])
+            self.network_message_label.setText(response['message'])
+
+
+
+
+
 """ 运营管理主页 """
 
 
@@ -807,26 +1253,29 @@ class OperatorMaintain(QWidget):
 
     # 加入运营管理菜单
     def addListItem(self):
-        self.operate_list.addItems([u'运营数据', u'用户管理', u'客户端管理', u'模块管理', u'品种管理'])
+        # u'运营数据', u'用户管理', u'客户端管理',
+        self.operate_list.addItems([u'用户管理', u'功能管理', u'品种管理', u'广告管理'])
 
     # 点击左侧管理菜单
     def operate_list_clicked(self):
         text = self.operate_list.currentItem().text()
-        if text == u'运营数据':
-            tab = OperateManagePage(parent=self)
-        elif text == u'用户管理':
+        # if text == u'运营数据':
+        #     tab = OperateManagePage(parent=self)
+        if text == u'用户管理':
             tab = UserManagePage(parent=self)
             tab.getCurrentUsers()
-        elif text == u'客户端管理':
-            tab = ClientManagePage(parent=self)
-            tab.getCurrentClients()
-        elif text == u'模块管理':
+        # elif text == u'客户端管理':
+        #     tab = ClientManagePage(parent=self)
+        #     tab.getCurrentClients()
+        elif text == u'功能管理':
             tab = ModuleManagePage(parent=self)
             tab.getCurrentModules()
         elif text == u'品种管理':
             tab = VarietyManagePage(parent=self)
-            tab.getVarietyGroup()
             tab.getCurrentVarieties()
+        elif text == u'广告管理':
+            tab = AdvertisementPage(parent=self)
+            tab.getAdvertisements()
         else:
             tab = QLabel(parent=self,
                          styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
