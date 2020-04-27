@@ -279,19 +279,18 @@ class TrendPage(QWidget):
     # 获取所有品种组和品种
     def getGroupVarieties(self):
         try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'group-varieties/?mc=' + settings.app_dawn.value('machine')
-            )
+            r = requests.get(url=settings.SERVER_ADDR + 'variety/?way=group')
             if r.status_code != 200:
                 raise ValueError('获取失败!')
             response = json.loads(r.content.decode('utf-8'))
         except Exception:
             pass
         else:
-            for group_item in response['data']:
+            print(response)
+            for group_item in response['variety']:
                 head = self.variety_folded.addHead(group_item['name'])
                 body = self.variety_folded.addBody(head=head)
-                body.addButtons([variety_item for variety_item in group_item['varieties'] if variety_item['is_active']])
+                body.addButtons([variety_item for variety_item in group_item['subs']])
             self.variety_folded.container.layout().addStretch()
 
     # 获取主页的图表

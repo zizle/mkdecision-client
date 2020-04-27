@@ -3,9 +3,11 @@
 import re
 import json
 import requests
+from PIL import Image
+from urllib3 import encode_multipart_formdata
 from PyQt5.QtWidgets import QWidget, QDialog, QGridLayout, QHBoxLayout, QVBoxLayout, QLineEdit, QPushButton, QLabel,\
     QComboBox, QTabWidget, QTableWidget, QTableWidgetItem, QDateEdit, QHeaderView, QTreeWidget, QTreeWidgetItem, QMenu,\
-    QAction, QAbstractItemView, QListView
+    QAction, QAbstractItemView, QListView, QMessageBox, QFileDialog
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QDate
 from PyQt5.QtGui import QCursor
 import settings
@@ -902,6 +904,8 @@ class CreateNewModulePopup(QDialog):
     def __init__(self, module_combo, *args, **kwargs):
         super(CreateNewModulePopup, self).__init__(*args, **kwargs)
         self.setWindowTitle('新增模块')
+        self.setMaximumSize(300,150)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         layout = QGridLayout()
         layout.addWidget(QLabel('名称:'), 0, 0)
         self.name_edit = QLineEdit()
@@ -930,9 +934,13 @@ class CreateNewModulePopup(QDialog):
         print(parent)
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'module/?mc=' + settings.app_dawn.value('machine'),
-                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
-                data=json.dumps({'name': name, 'parent': parent})
+                url=settings.SERVER_ADDR + 'module/',
+                headers={'Content-Type': 'application/json;charset=utf8'},
+                data=json.dumps({
+                    'module_name': name,
+                    'parent_id': parent,
+                    'utoken': settings.app_dawn.value('AUTHORIZATION')
+                })
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 200:
@@ -1029,87 +1037,124 @@ class VarietyGroupTree(QTreeWidget):
 
 # 弹窗新增品种主页
 class CreateNewVarietyPopup(QDialog):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, groups, *args, **kwargs):
         super(CreateNewVarietyPopup, self).__init__(*args, **kwargs)
-        layout = QHBoxLayout()
-        # 左侧上下布局
-        llayout = QVBoxLayout()
-        # 左侧分组树
-        self.group_tree = VarietyGroupTree(clicked=self.group_tree_clicked, objectName='groupTree')
-
-        self.group_tree.header().hide()
-        self.group_tree.setFixedWidth(200)
-        llayout.addWidget(self.group_tree)
-        llayout.addWidget(QPushButton('新建组别', clicked=self.create_new_group), alignment=Qt.AlignLeft)
-        # 右侧显示新建页
-        rlayout = QVBoxLayout()
-        new_variety_layout = QGridLayout()
-        # 所属分组
-        new_variety_layout.addWidget(QLabel('所属分组:'), 0, 0)
-        self.attach_group = QLabel()
-        self.attach_group.gid = None  # 绑定所属组，便于提交时分辨
-        new_variety_layout.addWidget(self.attach_group, 0, 1)
-        new_variety_layout.addWidget(QLabel(parent=self, objectName='groupNameError'), 1, 0, 1, 2)
-        # 品种名称
-        new_variety_layout.addWidget(QLabel('品种名称:'), 2, 0)
-        self.variety_edit = QLineEdit()
-        new_variety_layout.addWidget(self.variety_edit, 2, 1)
-        new_variety_layout.addWidget(QLabel(parent=self, objectName='varietyEditError'), 3, 0, 1, 2)
-        # 品种英文代码
-        new_variety_layout.addWidget(QLabel('英文代码:'), 4, 0)
-        self.variety_en_edit = QLineEdit()
-        new_variety_layout.addWidget(self.variety_en_edit, 4, 1)
-        new_variety_layout.addWidget(QLabel(parent=self, objectName='varietyEnEditError'), 5, 0, 1, 2)
-        # 品种所属的交易所
-        new_variety_layout.addWidget(QLabel("交易所:"), 6, 0)
-        self.exchange_combo = QComboBox(objectName='exchangeCombo')
-        # 增加选项
+        self.setFixedSize(300, 200)
+        self.setWindowTitle("新增品种")
+        layout = QGridLayout()
+        layout.setParent(self)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        # 填写名称
+        layout.addWidget(QLabel('名称:',self), 0, 0)
+        self.name_edit = QLineEdit(self)
+        layout.addWidget(self.name_edit, 0, 1)
+        # 填写英文代码
+        layout.addWidget(QLabel('代码:',self), 1, 0)
+        self.name_en_edit = QLineEdit(self)
+        layout.addWidget(self.name_en_edit, 1, 1)
+        # 选择分组
+        layout.addWidget(QLabel('分组:', self), 2,0)
+        self.group_combobox = QComboBox(self)
+        for group_item in groups:
+            self.group_combobox.addItem(group_item[1], group_item[0])
+        layout.addWidget(self.group_combobox, 2, 1)
+        # 交易所
+        layout.addWidget(QLabel('交易所:', self), 3, 0)
+        self.exchange_combobox = QComboBox(self)
         for exchange_item in [
             (1, "郑州商品交易所"), (2, '上海期货交易所'),
             (3, '大连商品交易所'), (4, '中国金融期货交易所'),
             (5, '上海国际能源交易中心')
         ]:
-            self.exchange_combo.addItem(exchange_item[1], exchange_item[0])
-        new_variety_layout.addWidget(self.exchange_combo, 6, 1)
-        # 占位
-        new_variety_layout.addWidget(QLabel(' '), 7, 0)
-        # 提交按钮
-        self.commit_button = QPushButton('确认提交', clicked=self.commit_new_variety)
-        new_variety_layout.addWidget(self.commit_button, 8, 1)
-        rlayout.addLayout(new_variety_layout)
-        # 说明
-        rlayout.addWidget(QLabel(
-            text='\n1.左侧选择要在哪个组下创建品种。\n\n2.键入新增品种信息-提交。\n\n3.如需新建大组,请点击左侧【新建组别】',
-            styleSheet='color:rgb(100,160,120);font-size:15px'
-        ))
-        rlayout.addStretch()
+            self.exchange_combobox.addItem(exchange_item[1], exchange_item[0])
+        layout.addWidget(self.exchange_combobox, 3,1)
 
-        layout.addLayout(llayout)
-        layout.addLayout(rlayout)
+        self.commit_button = QPushButton("提交", self)
+        self.commit_button.clicked.connect(self.commit_new_variety)
+        layout.addWidget(self.commit_button, 4, 0, 1, 2)
         self.setLayout(layout)
-        self.setWindowTitle('新增品种')
-        self.setFixedSize(600, 405)
-        self.setStyleSheet("""
-        #groupTree::item{
-            height:20px;
-        }
-        #exchangeCombo{
-            border: 1px solid rgb(240, 240, 240);
-            color: rgb(7,99,109);
-        }
-        #exchangeCombo QAbstractItemView::item{
-            height:20px;
-        }
-        #exchangeCombo::drop-down{
-            border: 0px;
-        }
-        #exchangeCombo::down-arrow{
-            image:url("media/more.png");
-            width: 15px;
-            height:15px;
-        }
-        """)
-        self.exchange_combo.setView(QListView())
+
+
+
+        # layout = QHBoxLayout()
+        # # 左侧上下布局
+        # llayout = QVBoxLayout()
+        # # 左侧分组树
+        # self.group_tree = VarietyGroupTree(clicked=self.group_tree_clicked, objectName='groupTree')
+        #
+        # self.group_tree.header().hide()
+        # self.group_tree.setFixedWidth(200)
+        # llayout.addWidget(self.group_tree)
+        # llayout.addWidget(QPushButton('新建组别', clicked=self.create_new_group), alignment=Qt.AlignLeft)
+        # # 右侧显示新建页
+        # rlayout = QVBoxLayout()
+        # new_variety_layout = QGridLayout()
+        # # 所属分组
+        # new_variety_layout.addWidget(QLabel('所属分组:'), 0, 0)
+        # self.attach_group = QLabel()
+        # self.attach_group.gid = None  # 绑定所属组，便于提交时分辨
+        # new_variety_layout.addWidget(self.attach_group, 0, 1)
+        # new_variety_layout.addWidget(QLabel(parent=self, objectName='groupNameError'), 1, 0, 1, 2)
+        # # 品种名称
+        # new_variety_layout.addWidget(QLabel('品种名称:'), 2, 0)
+        # self.variety_edit = QLineEdit()
+        # new_variety_layout.addWidget(self.variety_edit, 2, 1)
+        # new_variety_layout.addWidget(QLabel(parent=self, objectName='varietyEditError'), 3, 0, 1, 2)
+        # # 品种英文代码
+        # new_variety_layout.addWidget(QLabel('英文代码:'), 4, 0)
+        # self.variety_en_edit = QLineEdit()
+        # new_variety_layout.addWidget(self.variety_en_edit, 4, 1)
+        # new_variety_layout.addWidget(QLabel(parent=self, objectName='varietyEnEditError'), 5, 0, 1, 2)
+        # # 品种所属的交易所
+        # new_variety_layout.addWidget(QLabel("交易所:"), 6, 0)
+        # self.exchange_combo = QComboBox(objectName='exchangeCombo')
+        # # 增加选项
+        # for exchange_item in [
+        #     (1, "郑州商品交易所"), (2, '上海期货交易所'),
+        #     (3, '大连商品交易所'), (4, '中国金融期货交易所'),
+        #     (5, '上海国际能源交易中心')
+        # ]:
+        #     self.exchange_combo.addItem(exchange_item[1], exchange_item[0])
+        # new_variety_layout.addWidget(self.exchange_combo, 6, 1)
+        # # 占位
+        # new_variety_layout.addWidget(QLabel(' '), 7, 0)
+        # # 提交按钮
+        # self.commit_button = QPushButton('确认提交', clicked=self.commit_new_variety)
+        # new_variety_layout.addWidget(self.commit_button, 8, 1)
+        # rlayout.addLayout(new_variety_layout)
+        # # 说明
+        # rlayout.addWidget(QLabel(
+        #     text='\n1.左侧选择要在哪个组下创建品种。\n\n2.键入新增品种信息-提交。\n\n3.如需新建大组,请点击左侧【新建组别】',
+        #     styleSheet='color:rgb(100,160,120);font-size:15px'
+        # ))
+        # rlayout.addStretch()
+        #
+        # layout.addLayout(llayout)
+        # layout.addLayout(rlayout)
+        # self.setLayout(layout)
+        # self.setWindowTitle('新增品种')
+        # self.setFixedSize(600, 405)
+        # self.setStyleSheet("""
+        # #groupTree::item{
+        #     height:20px;
+        # }
+        # #exchangeCombo{
+        #     border: 1px solid rgb(240, 240, 240);
+        #     color: rgb(7,99,109);
+        # }
+        # #exchangeCombo QAbstractItemView::item{
+        #     height:20px;
+        # }
+        # #exchangeCombo::drop-down{
+        #     border: 0px;
+        # }
+        # #exchangeCombo::down-arrow{
+        #     image:url("media/more.png");
+        #     width: 15px;
+        #     height:15px;
+        # }
+        # """)
+        # self.exchange_combo.setView(QListView())
 
     # 获取分组和每个分组下的品种
     def getGroupWithVarieties(self):
@@ -1159,40 +1204,66 @@ class CreateNewVarietyPopup(QDialog):
 
     # 新增品种
     def commit_new_variety(self):
-        if not self.attach_group.gid:
-            self.findChild(QLabel, 'groupNameError').setText('请选择新品种所属的分组!')
-            return
-        name = re.sub(r'\s+', '', self.variety_edit.text())
-        if not name:
-            self.findChild(QLabel, 'varietyEditError').setText('请输入正确的品种名称!')
-            return
-
-        name_en = re.match(r'[a-zA-Z0-9]+', self.variety_en_edit.text())
-        if not name_en:
-            self.findChild(QLabel, 'varietyEnEditError').setText('请输入正确的品种英文代码!')
-            return
-        name_en = name_en.group()
-        # 所属交易所
-        exchange_lib_id = self.exchange_combo.currentData()
-        # 提交
+        new_name = self.name_edit.text().strip()
+        new_name_en = self.name_en_edit.text().strip()
+        group_id = self.group_combobox.currentData()
+        exchange = self.exchange_combobox.currentData()
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'group-varieties/'+str(self.attach_group.gid)+'/?mc=' + settings.app_dawn.value('machine'),
-                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                url=settings.SERVER_ADDR + 'variety/',
+                headers={'Content-Type': 'application/json;charset=utf8'},
                 data=json.dumps({
-                    'name': name,
-                    'name_en': name_en,
-                    'exchange_lib': exchange_lib_id
+                    'variety_name': new_name,
+                    "variety_name_en": new_name_en,
+                    "parent_num": group_id,
+                    "exchange_num": exchange,
+                    "utoken": settings.app_dawn.value('AUTHORIZATION')
                 })
             )
-            response = json.loads(r.content.decode('utf-8'))
+            response = json.loads(r.content.decode('utf8'))
             if r.status_code != 201:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.findChild(QLabel, 'varietyEnEditError').setText(str(e))
+            QMessageBox.information(self, "错误", "新增品种错误!")
         else:
-            self.findChild(QLabel, 'varietyEnEditError').setText(response['message'])
-            self.getGroupWithVarieties()
+            QMessageBox.information(self, "成功", response['message'])
+            self.close()
+
+    #
+    # if not self.attach_group.gid:
+    #         self.findChild(QLabel, 'groupNameError').setText('请选择新品种所属的分组!')
+    #         return
+    #     name = re.sub(r'\s+', '', self.variety_edit.text())
+    #     if not name:
+    #         self.findChild(QLabel, 'varietyEditError').setText('请输入正确的品种名称!')
+    #         return
+    #
+    #     name_en = re.match(r'[a-zA-Z0-9]+', self.variety_en_edit.text())
+    #     if not name_en:
+    #         self.findChild(QLabel, 'varietyEnEditError').setText('请输入正确的品种英文代码!')
+    #         return
+    #     name_en = name_en.group()
+    #     # 所属交易所
+    #     exchange_lib_id = self.exchange_combo.currentData()
+    #     # 提交
+    #     try:
+    #         r = requests.post(
+    #             url=settings.SERVER_ADDR + 'group-varieties/'+str(self.attach_group.gid)+'/?mc=' + settings.app_dawn.value('machine'),
+    #             headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+    #             data=json.dumps({
+    #                 'name': name,
+    #                 'name_en': name_en,
+    #                 'exchange_lib': exchange_lib_id
+    #             })
+    #         )
+    #         response = json.loads(r.content.decode('utf-8'))
+    #         if r.status_code != 201:
+    #             raise ValueError(response['message'])
+    #     except Exception as e:
+    #         self.findChild(QLabel, 'varietyEnEditError').setText(str(e))
+    #     else:
+    #         self.findChild(QLabel, 'varietyEnEditError').setText(response['message'])
+    #         self.getGroupWithVarieties()
 
 
 
@@ -1205,6 +1276,153 @@ class CreateNewVarietyPopup(QDialog):
             del popup
             # 刷新分组
             self.getGroupWithVarieties()
+
+
+"""广告设置相关"""
+
+
+class FilePathLineEdit(QLineEdit):
+    def __init__(self,*args):
+        super(FilePathLineEdit, self).__init__(*args)
+        self.setReadOnly(True)
+
+    def mousePressEvent(self, event):
+        file_path, _ = QFileDialog.getOpenFileName(self, '选择文件', '', "PDF files(*.pdf)")
+        self.setText(file_path)
+
+
+class ImagePathLineEdit(QLineEdit):
+    def __init__(self,*args):
+        super(ImagePathLineEdit, self).__init__(*args)
+        self.setReadOnly(True)
+
+    def mousePressEvent(self, event):
+        image_path, _ = QFileDialog.getOpenFileName(self, '选择图片', '', "image PNG(*.png)")
+        if image_path:
+            # 对文件的大小进行限制
+            img = Image.open(image_path)
+            if 520 <= img.size[0] <= 660 and 260 <= img.size[1] <= 330:
+                self.setText(image_path)
+            else:
+                QMessageBox.information(self, "提示", '图片像素大小范围:520~660;高:260~330')
+
+
+# 新增广告
+class CreateAdvertisementPopup(QDialog):
+    def __init__(self, *args, **kwargs):
+        super(CreateAdvertisementPopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setFixedSize(350, 200)
+        self.setWindowTitle("新建广告")
+        layout = QGridLayout()
+        layout.setParent(self)
+        layout.addWidget(QLabel("标题:", self), 0, 0)
+        self.title_edit = QLineEdit(self)
+        layout.addWidget(self.title_edit, 0, 1)
+        layout.addWidget(QLabel("图片:", self), 1, 0)
+        self.image_path_edit = ImagePathLineEdit(self)
+        layout.addWidget(self.image_path_edit, 1, 1)
+        layout.addWidget(QLabel('文件:', self), 2, 0)
+        self.file_path_edit = FilePathLineEdit(self)
+        layout.addWidget(self.file_path_edit, 2, 1)
+        self.commit_button = QPushButton("提交", self)
+        self.commit_button.clicked.connect(self.commit_new_advertisement)
+        layout.addWidget(self.commit_button, 3, 0, 1, 2)
+        self.setLayout(layout)
+
+    def commit_new_advertisement(self):
+        self.commit_button.setEnabled(False)
+        # 获取上传的类型
+        title = re.sub(r'\s+', '', self.title_edit.text())
+        if not title:
+            QMessageBox.information(self, "错误", "标题不能为空!")
+            return
+        if not all([self.file_path_edit.text(), self.image_path_edit.text()]):
+            QMessageBox.information(self, "错误", "请设置广告图片和内容文件")
+            return
+        data = dict()
+        data['ad_title'] = title  # 标题
+        data['utoken'] = settings.app_dawn.value('AUTHORIZATION')
+        image = open(self.image_path_edit.text(), 'rb')
+        image_content = image.read()
+        image.close()
+        data['ad_image'] = ("ad_image.png", image_content)
+        file = open(self.file_path_edit.text(), "rb")  # 获取文件
+        file_content = file.read()
+        file.close()
+        # 文件内容字段
+        data["ad_file"] = ("ad_file.pdf", file_content)
+        encode_data = encode_multipart_formdata(data)
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'ad/',
+                headers={
+                    'Content-Type': encode_data[1]
+                },
+                data=encode_data[0]
+            )
+            response = json.loads(r.content.decode('utf-8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            QMessageBox.information(self, "失败", '上传新广告信息失败!')
+        else:
+            QMessageBox.information(self, "成功", '上传新广告信息成功!')
+        finally:
+            self.commit_button.setEnabled(True)
+            self.close()
+
+        #
+        #
+        # layout = QVBoxLayout()
+        # category_select_layout = QHBoxLayout()
+        # category_select_layout.addWidget(QLabel('显示类型:'), alignment=Qt.AlignLeft)
+        # self.category_combo = QComboBox(currentIndexChanged=self.category_combo_selected)
+        # category_select_layout.addWidget(self.category_combo)
+        # # 错误提示
+        # self.error_message_label = QLabel()
+        # category_select_layout.addWidget(self.error_message_label)
+        # category_select_layout.addStretch()
+        # layout.addLayout(category_select_layout)
+        # # 广告名称
+        # title_layout = QHBoxLayout()
+        # title_layout.addWidget(QLabel('广告名称:'))
+        # self.advertisement_name_edit = QLineEdit()
+        # title_layout.addWidget(self.advertisement_name_edit)
+        # layout.addLayout(title_layout)
+        # # 广告图片
+        # image_layout = QHBoxLayout()
+        # image_layout.addWidget(QLabel('广告图片:'))
+        # self.advertisement_image_edit = QLineEdit()
+        # self.advertisement_image_edit.setEnabled(False)
+        # image_layout.addWidget(self.advertisement_image_edit)
+        # image_layout.addWidget(QPushButton('浏览', clicked=self.browser_image))
+        # layout.addLayout(image_layout)
+        # # 文件选择
+        # self.file_widget = QWidget(parent=self)
+        # file_widget_layout = QHBoxLayout(margin=0)
+        # self.file_path_edit = QLineEdit()
+        # self.file_path_edit.setEnabled(False)
+        # file_widget_layout.addWidget(QLabel('广告文件:'), alignment=Qt.AlignLeft)
+        # file_widget_layout.addWidget(self.file_path_edit)
+        # file_widget_layout.addWidget(QPushButton('浏览', clicked=self.browser_file))
+        # self.file_widget.setLayout(file_widget_layout)
+        # layout.addWidget(self.file_widget)
+        # # 文字输入
+        # self.text_widget = QWidget(parent=self)
+        # text_widget_layout = QHBoxLayout(margin=0)
+        # self.text_edit = QTextEdit()
+        # text_widget_layout.addWidget(QLabel('广告内容:'), alignment=Qt.AlignLeft)
+        # text_widget_layout.addWidget(self.text_edit)
+        # self.text_widget.setLayout(text_widget_layout)
+        # layout.addWidget(self.text_widget)
+        # # 提交按钮
+        # self.commit_button = QPushButton('确认提交', clicked=self.commit_advertisement)
+        # layout.addWidget(self.commit_button)
+        # layout.addStretch()
+        # self.setWindowTitle('新增广告')
+        # self.setLayout(layout)
+        # self._addCategoryCombo()
 
 
 """ 运营管理-【编辑】品种信息 """

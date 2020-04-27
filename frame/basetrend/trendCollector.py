@@ -1,10 +1,12 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
+import xlrd
 import json
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QComboBox, QTableWidget, \
-    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem
+    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
+from PyQt5.QtGui import QCursor
 import settings
 from widgets.base import LoadedPage, TableRowReadButton, TableRowDeleteButton, TableCheckBox
 from popup.trendCollector import CreateNewTrendTablePopup, ShowTableDetailPopup, EditTableDetailPopup, CreateNewVarietyChartPopup, \
@@ -467,6 +469,232 @@ class VarietyChartsManagePage(QWidget):
             del popup
 
 
+class ReviewTable(QTableWidget):
+    def __init__(self, *args, **kwargs):
+        super(ReviewTable, self).__init__(*args, **kwargs)
+        # self.setColumnCount(1)
+        # self.setRowCount(1)
+        self.setHorizontalHeaderLabels(['列头1'])
+        # self.horizontalHeader().setEditTriggers(QAbstractItemView.SelectedClicked)
+        self.horizontalHeader().sectionDoubleClicked.connect(self.horizontalHeaderClicked)
+        # self.setItem(0, 0, QTableWidgetItem("测试"))
+
+    def horizontalHeaderClicked(self, header_column):
+        if header_column == -1:
+            return
+        print(header_column)
+        def set_header_text():
+            text = edit.text().strip()
+            if text:
+                header_item.setText(text)
+            popup.close()
+        header_item = self.horizontalHeaderItem(header_column)
+        if not header_item:
+            return
+        popup = QDialog(self)
+        popup.setWindowTitle("新列名")
+        popup.setAttribute(Qt.WA_DeleteOnClose)
+        layout = QVBoxLayout(popup)
+        edit = QLineEdit(header_item.text(),popup)
+        edit.setFocus()
+        layout.addWidget(edit)
+        layout.addWidget(QPushButton('确定', popup, clicked=set_header_text))
+        popup.exec_()
+
+    def insert_new_row(self):
+        self.insertRow(self.rowCount())
+
+    def insert_new_column(self):
+        headers = []
+        for col in range(self.columnCount()):
+            headers.append(self.horizontalHeaderItem(col).text())
+        headers.append("列头" + str(self.columnCount() + 1))
+        self.insertColumn(self.columnCount())
+        self.setHorizontalHeaderLabels(headers)
+
+    def set_horizon_header_labels(self, labels):
+        self.clear()
+        self.setColumnCount(len(labels))
+        self.setHorizontalHeaderLabels(labels)
+
+    def add_row_content(self, row, content):
+        self.insertRow(row)
+        for col,item in enumerate(content):
+            self.setItem(row,col, QTableWidgetItem(str(item)))
+
+    def values(self):
+        headers = list()
+        contents = list()
+        for header_col in range(self.columnCount()):
+            headers.append(self.horizontalHeaderItem(header_col).text())
+        for row in range(self.rowCount()):
+            row_content = list()
+            for col in range(self.columnCount()):
+                print(row, col)
+                item = self.item(row, col)
+                text = item.text() if item else ''
+                row_content.append(text)
+            if row_content:
+                print("整行没数据:===============", row)
+                contents.append(row_content)
+        return {
+            'headers': headers,
+            'contents': contents
+        }
+
+
+class NewTrendTablePage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(NewTrendTablePage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        options_layout = QHBoxLayout()
+        options_layout.addWidget(QLabel("品种:", self))
+        self.variety_combobox = QComboBox(self)
+
+        options_layout.addWidget(self.variety_combobox)
+        options_layout.addWidget(QLabel("数据组:", self))
+        self.vtable_group = QComboBox(self)
+        options_layout.addWidget(self.vtable_group)
+        # 新增数据组
+        self.add_new_tgroup = QPushButton("新建组?",self, clicked=self.create_new_group)
+        options_layout.addWidget(self.add_new_tgroup)
+        options_layout.addStretch()
+        options_layout.addWidget(QPushButton("文件", self, clicked=self.review_file_data))
+        layout.addLayout(options_layout)
+        self.review_table = ReviewTable(self)
+
+        layout.addWidget(self.review_table)
+        table_option_layout = QHBoxLayout()
+        table_option_layout.addWidget(QPushButton("增加一行", self, clicked=self.review_table.insert_new_row))
+        table_option_layout.addWidget(QPushButton("增加一列", self, clicked=self.review_table.insert_new_column))
+        self.status_label = QLabel(self)
+        table_option_layout.addWidget(self.status_label)
+        table_option_layout.addStretch()
+        self.commit_button = QPushButton("确定增加", self, clicked=self.commit_new_datasheet)
+        table_option_layout.addWidget(self.commit_button)
+        layout.addLayout(table_option_layout)
+        self.setLayout(layout)
+        self._get_varieties()
+        self._get_trend_group()
+        self.variety_combobox.currentTextChanged.connect(self._get_trend_group)
+
+    def _get_varieties(self):
+        try:
+            r = requests.get(settings.SERVER_ADDR + 'variety/?way=group')
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError("请求品种数据错误")
+        except Exception as e:
+            self.variety_combobox.clear()
+        else:
+            for variety_group in response['variety']:
+                for variety_item in variety_group['subs']:
+                    self.variety_combobox.addItem(variety_item['name'], variety_item['id'])
+
+    def _get_trend_group(self):
+        current_variety_id = self.variety_combobox.currentData()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/group/?variety=' + str(current_variety_id),
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            QMessageBox.information(self, "错误", str(e))
+        else:
+            self.vtable_group.clear()
+            for group_item in response['groups']:
+                self.vtable_group.addItem(group_item['name'], group_item['id'])
+
+    def create_new_group(self):
+        current_variety_name = self.variety_combobox.currentText()
+        current_variety_id = self.variety_combobox.currentData()
+        def commit_group_name():
+            try:
+                r = requests.post(
+                    url=settings.SERVER_ADDR + 'trend/group/',
+                    headers={"Content-Type":"application/json;charset=utf8"},
+                    data=json.dumps({
+                        'utoken':settings.app_dawn.value("AUTHORIZATION"),
+                        'variety_id':current_variety_id,
+                        'name': name_edit.text().strip()
+                    })
+                )
+                response = json.loads(r.content.decode('utf8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                QMessageBox.information(popup, "错误", str(e))
+            else:
+                QMessageBox.information(popup, "成功", "成功添加数据组")
+                popup.close()
+        if not current_variety_name or not current_variety_id:
+            QMessageBox.information(self, "未选择品种", "请选择品种")
+            return
+
+        popup = QDialog(self)
+        popup.setAttribute(Qt.WA_DeleteOnClose)
+        popup.setWindowTitle("增加【" + current_variety_name + "】数据组")
+        popup.setFixedSize(250, 80)
+        layout = QVBoxLayout(popup)
+        name_layout = QHBoxLayout(popup)
+        name_layout.addWidget(QLabel("名称:", popup))
+        name_edit = QLineEdit(popup)
+        name_layout.addWidget(name_edit)
+        layout.addLayout(name_layout)
+        commit_btn = QPushButton("确定", popup)
+        commit_btn.clicked.connect(commit_group_name)
+        layout.addWidget(commit_btn, alignment=Qt.AlignRight)
+        popup.setLayout(layout)
+        popup.exec_()
+
+    def review_file_data(self):
+        self.status_label.setText("正在处理预览数据...")
+        file_path, _ = QFileDialog.getOpenFileName(self, '打开表格', '', "Excel file(*.xls *xlsx)")
+        if file_path:
+            work_book = xlrd.open_workbook(file_path)
+            sheet = work_book.sheet_by_index(0)
+            if work_book.sheet_loaded(0):
+                self.review_table.set_horizon_header_labels(sheet.row_values(0))   # 表头
+                for row in range(1, sheet.nrows):
+                    self.review_table.add_row_content(row-1, sheet.row_values(row))
+            self.status_label.setText("数据预览完成!")
+
+    def commit_new_datasheet(self):
+        self.commit_button.setEnabled(False)
+        self.status_label.setText("正在处理数据...")
+        data_values = self.review_table.values()
+        current_variety_id = self.variety_combobox.currentData()
+        current_group_id = self.vtable_group.currentData()
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'trend/table/',
+                headers={"Content-Type":"application/json;charset=utf8"},
+                data=json.dumps({
+                    'utoken': settings.app_dawn.value("AUTHORIZATION"),
+                    'variety_id':current_variety_id,
+                    'group_id': current_group_id,
+                    'table_values': data_values
+                })
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.status_label.setText(str(e))
+        else:
+            self.status_label.setText("成功提交!")
+        finally:
+            self.commit_button.setEnabled(True)
+
+
+
+
+
+
 # 数据分析管理主页
 class TrendPageCollector(QWidget):
     def __init__(self, *args, **kwargs):
@@ -490,11 +718,21 @@ class TrendPageCollector(QWidget):
     def _addLeftListMenu(self):
         for item in [u'数据表管理', '图表管理']:
             self.left_list.addItem(QListWidgetItem(item))
+        for item in [u'新建数据表', u'更新数据表']:
+            self.left_list.addItem(QListWidgetItem(item))
 
     # 点击左侧菜单列表
     def left_list_clicked(self):
         text = self.left_list.currentItem().text()
-        if text == u'数据表管理':
+        if text == u'新建数据表':
+            try:
+                frame_page = NewTrendTablePage(parent=self.frame_loaded)
+            except Exception as e:
+                print(e)
+
+
+
+        elif text == u'数据表管理':
             frame_page = TrendTableManagePage(parent=self.frame_loaded)
             frame_page.getGroups()  # 获取当前分组（连带品种,可填充第一个组的品种）
             frame_page.getCurrentTrendGroup()  # 获取当前品种下的数据组

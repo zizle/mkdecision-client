@@ -4,7 +4,7 @@ import re
 import json
 import requests
 from urllib3 import encode_multipart_formdata
-from PyQt5.QtWidgets import QDialog, QDateEdit, QTimeEdit, QVBoxLayout, QTextEdit, QHBoxLayout,QGridLayout, QLabel, \
+from PyQt5.QtWidgets import QDialog, QDateEdit, QTimeEdit,QMessageBox, QVBoxLayout, QTextEdit, QHBoxLayout,QGridLayout, QLabel, \
     QPushButton, QLineEdit, QFileDialog
 from PyQt5.QtCore import Qt, QDate, QTime
 import settings
@@ -47,23 +47,21 @@ class ModifyVarietyIntroPopup(QDialog):
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
         # # 增加其他字段
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
         # data_file['name'] = name
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["variety_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/variety-intro/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'train/varietyintro/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -71,9 +69,10 @@ class ModifyVarietyIntroPopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '成功', response['message'])
+            self.close()
 
 
 
@@ -84,6 +83,7 @@ class ModifyVarietyIntroPopup(QDialog):
 class CreateNewHedgePlanPopup(QDialog):
     def __init__(self, *args, **kwargs):
         super(CreateNewHedgePlanPopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         layout = QGridLayout()
         layout.addWidget(QLabel('名称:'), 0, 0)
         self.name_edit = QLineEdit()
@@ -119,23 +119,21 @@ class CreateNewHedgePlanPopup(QDialog):
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
         # 增加其他字段
-        data_file['name'] = name
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
+        data_file['title'] = name
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["hedge_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/hedge-plan/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'strategy/hedgeplan/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -143,9 +141,10 @@ class CreateNewHedgePlanPopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '成功', response['message'])
+            self.close()
 
 
 """ 策略服务-投资方案 """
@@ -155,6 +154,7 @@ class CreateNewHedgePlanPopup(QDialog):
 class CreateNewInvestPlanPopup(QDialog):
     def __init__(self, *args, **kwargs):
         super(CreateNewInvestPlanPopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         layout = QGridLayout()
         layout.addWidget(QLabel('名称:'), 0, 0)
         self.name_edit = QLineEdit()
@@ -190,23 +190,21 @@ class CreateNewInvestPlanPopup(QDialog):
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
         # 增加其他字段
-        data_file['name'] = name
+        data_file['title'] = name
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["invest_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/invest-plan/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'strategy/investmentplan/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -214,9 +212,10 @@ class CreateNewInvestPlanPopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '成功', response['message'])
+            self.close()
 
 
 """ 策略服务-交易策略 """
@@ -345,6 +344,7 @@ class EditTradePolicy(QDialog):
 class ModifyInstExaminePopup(QDialog):
     def __init__(self, *args, **kwargs):
         super(ModifyInstExaminePopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         layout = QGridLayout()
         # layout.addWidget(QLabel('名称:'), 0, 0)
         # self.name_edit = QLineEdit()
@@ -380,23 +380,21 @@ class ModifyInstExaminePopup(QDialog):
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
         # # 增加其他字段
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
         # data_file['name'] = name
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["rxm_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/inst-examine/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'consult/rulexamine/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -404,9 +402,10 @@ class ModifyInstExaminePopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '错误', response['message'])
+            self.close()
 
 
 """ 顾问服务-部门组建相关 """
@@ -416,6 +415,7 @@ class ModifyInstExaminePopup(QDialog):
 class ModifyDeptBuildPopup(QDialog):
     def __init__(self, *args, **kwargs):
         super(ModifyDeptBuildPopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         layout = QGridLayout()
         # layout.addWidget(QLabel('名称:'), 0, 0)
         # self.name_edit = QLineEdit()
@@ -450,24 +450,19 @@ class ModifyDeptBuildPopup(QDialog):
         file_path = self.file_edit.text()
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
-        # # 增加其他字段
-        # data_file['name'] = name
-        # 读取文件
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["depb_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/dept-build/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'consult/deptbuild/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -475,9 +470,10 @@ class ModifyDeptBuildPopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '错误', response['message'])
+            self.close()
 
 
 """ 顾问服务-人才培养相关 """
@@ -515,41 +511,35 @@ class ModifyPersonnelTrainPopup(QDialog):
 
     # 修改人才培养显示文件内容
     def commit_upload(self):
-        # name = re.sub(r'\s+', '', self.name_edit.text())
-        # if not name:
-        #     self.findChild(QLabel, 'nameError').setText('请输入名称!')
-        #     return
         file_path = self.file_edit.text()
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
-        # # 增加其他字段
+        # 增加其他字段
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
         # data_file['name'] = name
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["pt_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/person-train/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'consult/persontrain/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
             if r.status_code != 201:
                 raise ValueError(response['message'])
-
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '成功', response['message'])
+            self.close()
 
 
 """ 专题研究相关 """
@@ -572,8 +562,9 @@ class CreateNewTopicSearchPopup(QDialog):
         layout.addWidget(QLabel(objectName='fileError'), 3, 0, 1, 3)
         layout.addWidget(QPushButton('确定', clicked=self.commit_upload), 4, 1, 1, 2)
         self.setMinimumWidth(400)
-        self.setWindowTitle('新增报告')
+        self.setWindowTitle('新增文件')
         self.setLayout(layout)
+        self.setAttribute(Qt.WA_DeleteOnClose)
 
     # 选择文件
     def select_file(self):
@@ -594,23 +585,21 @@ class CreateNewTopicSearchPopup(QDialog):
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
         # 增加其他字段
-        data_file['name'] = name
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
+        data_file['title'] = name
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["topic_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/topic-search/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'advise/topicsearch/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -618,9 +607,10 @@ class CreateNewTopicSearchPopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '成功', '上传成功!')
+            self.close()
 
 
 """ 调研报告相关 """
@@ -630,6 +620,7 @@ class CreateNewTopicSearchPopup(QDialog):
 class CreateNewSearchReportPopup(QDialog):
     def __init__(self, *args, **kwargs):
         super(CreateNewSearchReportPopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         layout = QGridLayout()
         layout.addWidget(QLabel('名称:'), 0, 0)
         self.name_edit = QLineEdit()
@@ -665,23 +656,21 @@ class CreateNewSearchReportPopup(QDialog):
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
         # 增加其他字段
-        data_file['name'] = name
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
+        data_file['title'] = name
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["sreport_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/search-report/?mc=' + settings.app_dawn.value('machine'),
-                headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
-                    'Content-Type': encode_data[1]
-                },
+                url=settings.SERVER_ADDR + 'advise/searchreport/',
+                headers={'Content-Type': encode_data[1]},
                 data=data_file
             )
             response = json.loads(r.content.decode('utf-8'))
@@ -689,9 +678,10 @@ class CreateNewSearchReportPopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '成功', response['message'])
+            self.close()
 
 
 """ 市场分析相关 """
@@ -701,6 +691,7 @@ class CreateNewSearchReportPopup(QDialog):
 class CreateNewMarketAnalysisPopup(QDialog):
     def __init__(self, *args, **kwargs):
         super(CreateNewMarketAnalysisPopup, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         layout = QGridLayout()
         layout.addWidget(QLabel('名称:'), 0, 0)
         self.name_edit = QLineEdit()
@@ -735,22 +726,22 @@ class CreateNewMarketAnalysisPopup(QDialog):
         file_path = self.file_edit.text()
         file_name = file_path.rsplit('/', 1)[1]
         data_file = dict()
+        data_file['utoken'] = settings.app_dawn.value('AUTHORIZATION')
         # 增加其他字段
-        data_file['name'] = name
+        data_file['title'] = name
         # 读取文件
         file = open(file_path, "rb")
         file_content = file.read()
         file.close()
         # 文件内容字段
-        data_file["file"] = (file_name, file_content)
+        data_file["market_file"] = (file_name, file_content)
         encode_data = encode_multipart_formdata(data_file)
         data_file = encode_data[0]
         # 发起上传请求
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/market-analysis/?mc=' + settings.app_dawn.value('machine'),
+                url=settings.SERVER_ADDR + 'advise/marketanalysis/',
                 headers={
-                    'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION'),
                     'Content-Type': encode_data[1]
                 },
                 data=data_file
@@ -760,9 +751,10 @@ class CreateNewMarketAnalysisPopup(QDialog):
                 raise ValueError(response['message'])
 
         except Exception as e:
-            self.findChild(QLabel, 'fileError').setText(str(e))
+            QMessageBox.information(self, '错误', '失败:{}'.format(e))
         else:
-            self.findChild(QLabel, 'fileError').setText(response['message'])
+            QMessageBox.information(self, '成功', '添加数据成功.')
+            self.close()
 
 
 """ 短信通相关 """
@@ -772,7 +764,8 @@ class CreateNewMarketAnalysisPopup(QDialog):
 class CreateNewSMSLink(QDialog):
     def __init__(self, *args, **kwargs):
         super(CreateNewSMSLink, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        layout = QVBoxLayout()
         # 时间布局
         date_time_layout = QHBoxLayout()
         self.date_edit = QDateEdit(QDate.currentDate())
@@ -786,32 +779,28 @@ class CreateNewSMSLink(QDialog):
         date_time_layout.addWidget(self.time_edit)
         date_time_layout.addStretch()
         layout.addLayout(date_time_layout)
-        self.text_edit = QTextEdit(textChanged=self.set_show_tips_null)
+        self.text_edit = QTextEdit()
         layout.addWidget(self.text_edit)
-        self.show_tips = QLabel()
-        layout.addWidget(self.show_tips)
         layout.addWidget(QPushButton('确定', clicked=self.commit_sms), alignment=Qt.AlignRight)
         self.setLayout(layout)
-        self.resize(400, 200)
+        self.setFixedSize(400, 200)
         self.setWindowTitle('新建短信通')
 
-    def set_show_tips_null(self):
-        self.show_tips.setText('')
 
     # 确定增加
     def commit_sms(self):
-        text = self.text_edit.toPlainText().strip(' ')
+        text = self.text_edit.toPlainText().strip()
         if not text:
-            self.show_tips.setText('请输入内容。')
+            QMessageBox.information(self,'错误', '请输入内容。')
             return
         # 提交
         try:
             r = requests.post(
-                url=settings.SERVER_ADDR + 'info/sms/?mc=' + settings.app_dawn.value('machine'),
-                headers={'AUTHORIZATION': settings.app_dawn.value('AUTHORIZATION')},
+                url=settings.SERVER_ADDR + 'advise/shortmessage/',
+                headers={'Content-Type': 'application/json;charset=utf8'},
                 data=json.dumps({
-                    'date': self.date_edit.text(),
-                    'time': self.time_edit.text(),
+                    'utoken':settings.app_dawn.value('AUTHORIZATION'),
+                    'custom_time': self.date_edit.text() + ' ' + self.time_edit.text(),
                     'content': text
                 })
             )
@@ -819,9 +808,10 @@ class CreateNewSMSLink(QDialog):
             if r.status_code != 201:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.show_tips.setText(str(e))
+            QMessageBox.information(self,'错误', str(e))
         else:
-            self.show_tips.setText(response['message'])
+            QMessageBox.information(self,'成功', "新增成功")
+            self.close()
 
 
 # 修改短信通弹窗
@@ -878,8 +868,9 @@ class EditSMSLink(QDialog):
             if r.status_code != 201:
                 raise ValueError(response['message'])
         except Exception as e:
-            self.show_tips.setText(str(e))
+            QMessageBox.information(self, '错误', str(e))
         else:
-            self.show_tips.setText(response['message'])
+            QMessageBox.information(self,'成功', '修改成功!')
+            self.close()
 
 
