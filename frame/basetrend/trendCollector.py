@@ -2,7 +2,9 @@
 # __Author__： zizle
 import xlrd
 import json
+import datetime
 import requests
+from xlrd import xldate_as_tuple
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QComboBox, QTableWidget, \
     QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
@@ -514,6 +516,7 @@ class ReviewTable(QTableWidget):
 
     def set_horizon_header_labels(self, labels):
         self.clear()
+        self.setRowCount(0)
         self.setColumnCount(len(labels))
         self.setHorizontalHeaderLabels(labels)
 
@@ -530,12 +533,10 @@ class ReviewTable(QTableWidget):
         for row in range(self.rowCount()):
             row_content = list()
             for col in range(self.columnCount()):
-                print(row, col)
                 item = self.item(row, col)
                 text = item.text() if item else ''
                 row_content.append(text)
             if row_content:
-                print("整行没数据:===============", row)
                 contents.append(row_content)
         return {
             'headers': headers,
@@ -559,10 +560,24 @@ class NewTrendTablePage(QWidget):
         self.add_new_tgroup = QPushButton("新建组?",self, clicked=self.create_new_group)
         options_layout.addWidget(self.add_new_tgroup)
         options_layout.addStretch()
+        options_layout.addWidget(QLabel("数据时间基准:", self))
+        self.date_standard = QComboBox(self)
+        self.date_standard.addItem("yyyy-mm-dd", 0)
+        self.date_standard.addItem("yyyy-mm", 1)
+        self.date_standard.addItem("yyyy", 2)
+        options_layout.addWidget(self.date_standard)
         options_layout.addWidget(QPushButton("文件", self, clicked=self.review_file_data))
+        info_layout = QHBoxLayout()
+        info_layout.addWidget(QLabel("标题:", self))
+        self.title_edit = QLineEdit(self)
+        info_layout.addWidget(self.title_edit)
+        info_layout.addWidget(QLabel("数据来源:", self))
+        self.origin_edit = QLineEdit(self)
+        info_layout.addWidget(self.origin_edit)
+        info_layout.addStretch()
         layout.addLayout(options_layout)
+        layout.addLayout(info_layout)
         self.review_table = ReviewTable(self)
-
         layout.addWidget(self.review_table)
         table_option_layout = QHBoxLayout()
         table_option_layout.addWidget(QPushButton("增加一行", self, clicked=self.review_table.insert_new_row))
@@ -610,6 +625,7 @@ class NewTrendTablePage(QWidget):
     def create_new_group(self):
         current_variety_name = self.variety_combobox.currentText()
         current_variety_id = self.variety_combobox.currentData()
+
         def commit_group_name():
             try:
                 r = requests.post(
@@ -650,7 +666,14 @@ class NewTrendTablePage(QWidget):
         popup.exec_()
 
     def review_file_data(self):
+        self.review_table.clear()
         self.status_label.setText("正在处理预览数据...")
+        date_standards = {
+            0: "%Y-%m-%d",
+            1: "%Y-%m",
+            2: "%Y",
+        }
+        current_date_format = date_standards.get(self.date_standard.currentData())
         file_path, _ = QFileDialog.getOpenFileName(self, '打开表格', '', "Excel file(*.xls *xlsx)")
         if file_path:
             work_book = xlrd.open_workbook(file_path)
@@ -658,12 +681,21 @@ class NewTrendTablePage(QWidget):
             if work_book.sheet_loaded(0):
                 self.review_table.set_horizon_header_labels(sheet.row_values(0))   # 表头
                 for row in range(1, sheet.nrows):
-                    self.review_table.add_row_content(row-1, sheet.row_values(row))
+                    row_content = list()
+                    # 读取的数据类型ctype： 0 empty,1 string, 2 number, 3 date, 4 boolean, 5 error
+                    for col in range(sheet.ncols):
+                        value_type = sheet.cell(row, col).ctype
+                        value = sheet.cell_value(row, col)
+                        if value_type == 3:
+                            value = datetime.datetime(*xlrd.xldate_as_tuple(value, 0))
+                            value = value.strftime(current_date_format)
+                        row_content.append(value)
+                    self.review_table.add_row_content(row-1, row_content)
             self.status_label.setText("数据预览完成!")
 
     def commit_new_datasheet(self):
         self.commit_button.setEnabled(False)
-        self.status_label.setText("正在处理数据...")
+        self.status_label.setText("正在提交处理数据...")
         data_values = self.review_table.values()
         current_variety_id = self.variety_combobox.currentData()
         current_group_id = self.vtable_group.currentData()
@@ -675,24 +707,20 @@ class NewTrendTablePage(QWidget):
                     'utoken': settings.app_dawn.value("AUTHORIZATION"),
                     'variety_id':current_variety_id,
                     'group_id': current_group_id,
-                    'table_values': data_values
+                    'table_values': data_values,
+                    'title': self.title_edit.text().strip(),
+                    'origin': self.origin_edit.text().strip()
                 })
             )
             response = json.loads(r.content.decode('utf8'))
             if r.status_code != 201:
                 raise ValueError(response['message'])
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             self.status_label.setText(str(e))
         else:
             self.status_label.setText("成功提交!")
         finally:
             self.commit_button.setEnabled(True)
-
-
-
-
 
 
 # 数据分析管理主页

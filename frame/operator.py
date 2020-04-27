@@ -94,7 +94,6 @@ class VarietyAuthDialog(QDialog):
             for variety_item in response['variety']:
                 for row in range(self.variety_table.rowCount()):
                     row_vid = self.variety_table.item(row, 0).id
-                    print(row_vid)
                     if row_vid == variety_item['variety_id'] and variety_item['is_active']:
                         item = self.variety_table.item(row, 2)
                         if item:
@@ -110,7 +109,7 @@ class VarietyAuthDialog(QDialog):
             return
         current_vid = self.variety_table.item(row, 0).id
         current_text = current_item.text()
-        if current_text == "开启":
+        if current_text == "点击开启":
             is_active = 1
         else:
             is_active = 0
@@ -128,7 +127,7 @@ class VarietyAuthDialog(QDialog):
         except Exception as e:
             pass
         else:
-            current_item.setText("关闭" if is_active else "开启")
+            current_item.setText("点击关闭" if is_active else "点击开启")
 
 
 
@@ -205,7 +204,6 @@ class UsersTable(QTableWidget):
 
     def modifyUserRole(self):
         def commit():
-            print("提交", user_id)
             role_num = role_combobox.currentData()
             try:
                 r = requests.patch(
