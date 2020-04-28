@@ -1,13 +1,16 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
+import re
 import xlrd
 import json
 import datetime
 import requests
-from xlrd import xldate_as_tuple
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QComboBox, QTableWidget, \
-    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint
+import pickle
+from copy import deepcopy
+from PyQt5.QtWidgets import QApplication,QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QComboBox, QTableWidget, \
+    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog,QMenu, QGroupBox, QCheckBox
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QUrl
 from PyQt5.QtGui import QCursor
 import settings
 from widgets.base import LoadedPage, TableRowReadButton, TableRowDeleteButton, TableCheckBox
@@ -474,17 +477,13 @@ class VarietyChartsManagePage(QWidget):
 class ReviewTable(QTableWidget):
     def __init__(self, *args, **kwargs):
         super(ReviewTable, self).__init__(*args, **kwargs)
-        # self.setColumnCount(1)
-        # self.setRowCount(1)
         self.setHorizontalHeaderLabels(['列头1'])
-        # self.horizontalHeader().setEditTriggers(QAbstractItemView.SelectedClicked)
         self.horizontalHeader().sectionDoubleClicked.connect(self.horizontalHeaderClicked)
-        # self.setItem(0, 0, QTableWidgetItem("测试"))
 
     def horizontalHeaderClicked(self, header_column):
         if header_column == -1:
             return
-        print(header_column)
+
         def set_header_text():
             text = edit.text().strip()
             if text:
@@ -547,7 +546,7 @@ class ReviewTable(QTableWidget):
 class NewTrendTablePage(QWidget):
     def __init__(self, *args, **kwargs):
         super(NewTrendTablePage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(margin=0)
         options_layout = QHBoxLayout()
         options_layout.addWidget(QLabel("品种:", self))
         self.variety_combobox = QComboBox(self)
@@ -562,9 +561,9 @@ class NewTrendTablePage(QWidget):
         options_layout.addStretch()
         options_layout.addWidget(QLabel("数据时间基准:", self))
         self.date_standard = QComboBox(self)
-        self.date_standard.addItem("yyyy-mm-dd", 0)
-        self.date_standard.addItem("yyyy-mm", 1)
-        self.date_standard.addItem("yyyy", 2)
+        self.date_standard.addItem("年-月-日", 0)
+        self.date_standard.addItem("年-月", 1)
+        self.date_standard.addItem("年", 2)
         options_layout.addWidget(self.date_standard)
         options_layout.addWidget(QPushButton("文件", self, clicked=self.review_file_data))
         info_layout = QHBoxLayout()
@@ -700,8 +699,9 @@ class NewTrendTablePage(QWidget):
         current_variety_id = self.variety_combobox.currentData()
         current_group_id = self.vtable_group.currentData()
         try:
+            user_id = int(pickle.loads(settings.app_dawn.value("UKEY")))
             r = requests.post(
-                url=settings.SERVER_ADDR + 'trend/table/',
+                url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/table/',
                 headers={"Content-Type":"application/json;charset=utf8"},
                 data=json.dumps({
                     'utoken': settings.app_dawn.value("AUTHORIZATION"),
@@ -719,8 +719,487 @@ class NewTrendTablePage(QWidget):
             self.status_label.setText(str(e))
         else:
             self.status_label.setText("成功提交!")
+            self.review_table.clear()
         finally:
             self.commit_button.setEnabled(True)
+
+
+class ColumnCheckBox(QCheckBox):
+    state_reverse = pyqtSignal(int, str, bool)
+
+    def __init__(self, col, group, *args):
+        super(ColumnCheckBox, self).__init__(*args)
+        self.col = col
+        self.group = group
+        self.stateChanged.connect(self.emit_change_state)
+
+    def emit_change_state(self):
+        self.state_reverse.emit(self.col, self.group, self.isChecked())
+
+
+class DrawChartsDialog(QDialog):
+    X_BOTTOMS = []
+    Y_LEFT = []
+    Y_RIGHT = []
+
+    def __init__(self, table_id, *args,**kwargs):
+        super(DrawChartsDialog, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.table_id = table_id
+        self.resize(1200, 660)
+        layout = QHBoxLayout()
+        left_opts_layout = QVBoxLayout()
+        right_show_layout = QVBoxLayout()
+        layout.addLayout(left_opts_layout)
+        layout.addLayout(right_show_layout)
+        title_layout = QHBoxLayout()
+        title_layout.addWidget(QLabel('标题', self), alignment=Qt.AlignLeft)
+        self.title_edit = QLineEdit(self)
+        title_layout.addWidget(self.title_edit)
+        left_opts_layout.addLayout(title_layout)
+        # x轴选择
+        x_axis_layout = QVBoxLayout()
+        self.x_axis_group = QGroupBox("X轴")
+        self.x_axis_group.setLayout(x_axis_layout)
+        left_opts_layout.addWidget(self.x_axis_group)
+        # 左y轴选择
+        left_y_axis_layout = QVBoxLayout()
+        self.left_y_axis_group = QGroupBox('Y左轴')
+        self.left_y_axis_group.setLayout(left_y_axis_layout)
+        left_opts_layout.addWidget(self.left_y_axis_group)
+        # 右y轴选择
+        right_y_axis_layout = QVBoxLayout()
+        self.right_y_axis_group = QGroupBox('Y右轴')
+        self.right_y_axis_group.setLayout(right_y_axis_layout)
+        left_opts_layout.addWidget(self.right_y_axis_group)
+        # 数据范围
+        arange_layout = QVBoxLayout()
+        self.auto_range = QCheckBox()
+        self.auto_range.setText("自动")
+        start_layout = QHBoxLayout()
+        start_layout.addWidget(QLabel("起始:"))
+        self.start_edit = QLineEdit(self)
+        start_layout.addWidget(self.start_edit)
+        end_layout = QHBoxLayout()
+        end_layout.addWidget(QLabel("结束:"))
+        self.end_edit = QLineEdit(self)
+        end_layout.addWidget(self.end_edit)
+        arange_layout.addLayout(start_layout)
+        arange_layout.addLayout(end_layout)
+        self.arange_group = QGroupBox('数据范围')
+        self.arange_group.setLayout(arange_layout)
+        left_opts_layout.addWidget(self.arange_group)
+        # 显示窗口
+        self.show_web = QWebEngineView()
+        self.show_web.setParent(self)
+        right_show_layout.addWidget(self.show_web)
+        self.setLayout(layout)
+        self.commit_draw = QPushButton("确认绘图")
+        self.commit_draw.clicked.connect(self.commit_draw_charts)
+        left_opts_layout.addWidget(self.commit_draw, alignment=Qt.AlignRight)
+        self._get_detail_table_data()
+
+    def _get_detail_table_data(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(self.table_id) + '/'
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            pass
+        else:
+            # headers = response['headers']
+            records = response['records']
+            for col, header_text in enumerate(response['headers']):
+                check_box1 = ColumnCheckBox(col, 'x_bottom')
+                check_box1.setText(header_text)
+                check_box1.state_reverse.connect(self.opts_changed)
+                self.x_axis_group.layout().addWidget(check_box1)
+                check_box2 = ColumnCheckBox(col, 'y_left')
+                check_box2.setText(header_text)
+                check_box2.state_reverse.connect(self.opts_changed)
+                self.left_y_axis_group.layout().addWidget(check_box2)
+                check_box3 = ColumnCheckBox(col, 'y_right')
+                check_box3.setText(header_text)
+                check_box3.state_reverse.connect(self.opts_changed)
+                self.right_y_axis_group.layout().addWidget(check_box3)
+            self.start_edit.setText("0")
+            self.end_edit.setText(str(len(records)))
+
+
+    def opts_changed(self, col, group, checked):
+        print(col, group, checked)
+        if group == 'x_bottom':
+            if checked and col not in self.X_BOTTOMS:
+                self.X_BOTTOMS.append(col)
+            elif checked and col in self.X_BOTTOMS:
+                pass
+            elif not checked and col in self.X_BOTTOMS:
+                self.X_BOTTOMS.remove(col)
+            else:
+                pass
+        elif group == 'y_left':
+            if checked and col not in self.Y_LEFT:
+                self.Y_LEFT.append(col)
+            elif checked and col in self.Y_LEFT:
+                pass
+            elif not checked and col in self.Y_LEFT:
+                self.Y_LEFT.remove(col)
+            else:
+                pass
+        elif group == 'y_right':
+            if checked and col not in self.Y_RIGHT:
+                self.Y_RIGHT.append(col)
+            elif checked and col in self.Y_RIGHT:
+                pass
+            elif not checked and col in self.Y_RIGHT:
+                self.Y_RIGHT.remove(col)
+            else:
+                pass
+        else:
+            pass
+
+    def commit_draw_charts(self):
+        print('标题:\n', self.title_edit.text())
+        print("x轴:\n", self.X_BOTTOMS)
+        print("y左轴:\n", self.Y_LEFT)
+        print("y右轴:\n", self.Y_RIGHT)
+        print("范围:\n", self.start_edit.text(), self.end_edit.text())
+        print('窗口宽:', self.show_web.width(), '窗口高:', self.show_web.height())
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'trend/' + str(self.table_id) + '/chart/',
+                headers={'Content-Type': 'application/json;charset=utf8'},
+                data=json.dumps({
+                    'title': self.title_edit.text(),
+                    'x_bottoms':self.X_BOTTOMS,
+                    'y_left': self.Y_LEFT,
+                    'y_right': self.Y_RIGHT,
+                    'arange': [self.start_edit.text(), self.end_edit.text()]
+                })
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            QMessageBox.information(self, '出错', response['message'])
+        else:
+            QMessageBox.information(self, '成功', response['message'])
+            print(response)
+            file_url = settings.STATIC_PREFIX + response['file_url']
+            print(file_url)
+            self.show_web.load(QUrl(file_url))
+
+
+
+
+
+
+
+
+class TableDetailRecordOpts(QDialog):
+    def __init__(self, table_id, option, *args, **kwargs):
+        super(TableDetailRecordOpts, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.resize(1000, 630)
+        self.table_id = table_id
+        self.option = option
+        layout = QVBoxLayout(self)
+        self.tips_label = QLabel("双击单元格修改数据后,点击对应行【修改】按钮进行修改.", self)
+        layout.addWidget(self.tips_label)
+        self.paste_button = QPushButton("粘贴", self)
+        self.paste_button.clicked.connect(self.paste_new_data)
+        layout.addWidget(self.paste_button, alignment=Qt.AlignLeft)
+        self.table = QTableWidget(self)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.table.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.table.cellClicked.connect(self.table_cell_clicked)
+        layout.addWidget(self.table)
+        self.commit_button = QPushButton("确定增加", self)
+        self.commit_button.clicked.connect(self.commit_new_contents)
+        layout.addWidget(self.commit_button, alignment=Qt.AlignRight)
+        self.setLayout(layout)
+        if option == 'modify':
+            self.tips_label.show()
+            self.paste_button.hide()
+            self.commit_button.hide()
+        else:
+            self.tips_label.hide()
+            self.paste_button.show()
+            self.commit_button.show()
+        self._get_detail_table_data()
+
+    def _get_detail_table_data(self):
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(self.table_id) + '/'
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            pass
+        else:
+            if self.option == 'modify':
+                self._set_row_contents(response['headers'], response['records'])
+            else:
+                self._set_table_headers(response['headers'])
+
+    def _set_row_contents(self, headers, contents):
+        headers.append('')
+        columns = len(headers)
+        self.table.setColumnCount(columns)
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.setRowCount(len(contents))
+        for row, row_item in enumerate(contents):
+            for col in range(columns):
+                if col == columns - 1:
+                    item = QTableWidgetItem("修改这行")
+                else:
+                    key = 'column_{}'.format(col)
+                    item = QTableWidgetItem(row_item[key])
+                    if col == 0:
+                        item.id = row_item['id']
+                item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(row, col, item)
+
+    def _set_table_headers(self, headers):
+        self.table.setColumnCount(len(headers))
+        self.table.setHorizontalHeaderLabels(headers)
+
+    def table_cell_clicked(self, row, col):
+        if self.option != 'modify':
+            return
+        if col != self.table.columnCount() - 1:
+            return
+        record_id = self.table.item(row, 0).id
+        record_content = list()
+        for col_index in range(self.table.columnCount() - 1):
+            record_content.append(self.table.item(row, col_index).text())
+        # 发起修改请求
+        try:
+            r = requests.put(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(self.table_id) + '/',
+                headers={'Content-Type':'application/json;charset=utf8'},
+                data=json.dumps({
+                    'utoken': settings.app_dawn.value("AUTHORIZATION"),
+                    'record_id':record_id,
+                    'record_content':record_content
+                })
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            QMessageBox.information(self, '失败', response['message'])
+        else:
+            QMessageBox.information(self, '成功', response['message'])
+
+    def paste_new_data(self):
+        clipboard = QApplication.clipboard()  # 获取当前剪贴板的内容
+        contents = re.split(r'\n', clipboard.text())  # 处理数据
+        for row, row_item in enumerate(contents):
+            row_content = re.split('\t', row_item)
+            if not row_content[0]:
+                continue
+            self.table.insertRow(self.table.rowCount())
+            for col, item_text in enumerate(row_content):
+                if col > self.table.columnCount() - 1:
+                    continue
+                item = QTableWidgetItem(item_text)
+                item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(row, col, item)
+
+    def _table_values(self):
+        headers = list()
+        contents = list()
+        for col in range(self.table.columnCount()):
+            headers.append(self.table.horizontalHeaderItem(col).text())
+        for row in range(self.table.rowCount()):
+            row_content = list()
+            for col in range(self.table.columnCount()):
+                row_content.append(self.table.item(row, col).text())
+            if not row_content:
+                continue
+            contents.append(row_content)
+        return {
+            'headers': headers,
+            'contents': contents
+        }
+
+    def commit_new_contents(self):
+        self.commit_button.setEnabled(False)
+        values = self._table_values()
+        try:
+            r = requests.post(
+                url=settings.SERVER_ADDR + 'trend/table/' + str(self.table_id) + '/',
+                headers={'Content-Type':'application/json;charset=utf8'},
+                data=json.dumps({
+                    'utoken': settings.app_dawn.value('AUTHORIZATION'),
+                    'new_header': values['headers'],
+                    'new_contents': values['contents']
+                })
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 201:
+                raise ValueError(response['message'])
+        except Exception as e:
+            QMessageBox.information(self, '失败', str(e))
+        else:
+            self.table.clear()
+            QMessageBox.information(self, '成功', response['message'])
+        finally:
+            self.commit_button.setEnabled(True)
+
+
+class InformationTable(QTableWidget):
+    def __init__(self, *args):
+        super(InformationTable, self).__init__(*args)
+        self.verticalHeader().hide()
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
+        self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.setStyleSheet("""
+        font-size: 13px;
+        selection-color: rgb(250,250,250);
+        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        """)
+
+    def mousePressEvent(self, event):
+        if event.buttons() == Qt.RightButton:
+            index = self.indexAt(QPoint(event.x(), event.y()))
+            current_row = index.row()
+            self.setCurrentIndex(index)
+            if current_row < 0:
+                return
+            menu = QMenu()
+            charts_action = menu.addAction("进入绘图")
+            charts_action.triggered.connect(self.enter_draw_charts)
+            modify_action = menu.addAction("修改记录")
+            modify_action.triggered.connect(self.modify_record)
+            add_action = menu.addAction("增加记录")
+            add_action.triggered.connect(self.add_new_records)
+            menu.exec_(QCursor.pos())
+        else:
+            super(InformationTable, self).mousePressEvent(event)
+
+    def modify_record(self):
+        current_row = self.currentRow()
+        table_id = self.item(current_row, 0).id
+        table_name = self.item(current_row, 1).text()
+        popup = TableDetailRecordOpts(table_id=table_id,option='modify', parent=self.parent())
+        popup.setWindowTitle("修改【" + table_name + "】")
+        popup.exec_()
+
+    def add_new_records(self):
+        current_row = self.currentRow()
+        table_id = self.item(current_row, 0).id
+        table_name = self.item(current_row, 1).text()
+        popup = TableDetailRecordOpts(table_id=table_id, option='add', parent=self.parent())
+        popup.setWindowTitle("新增【" + table_name + "】")
+        popup.exec_()
+
+    def enter_draw_charts(self):
+        current_row = self.currentRow()
+        table_id = self.item(current_row, 0).id
+        table_name = self.item(current_row, 1).text()
+        popup = DrawChartsDialog(table_id=table_id, parent=self.parent())
+        popup.setWindowTitle("【" + table_name + "】绘图")
+        popup.exec_()
+
+    def show_contents(self, row_contents):
+        self.clear()
+        table_headers = ["序号", '标题', '创建日期', '最近更新']
+        self.setColumnCount(len(table_headers))
+        self.setRowCount(len(row_contents))
+        self.setHorizontalHeaderLabels(table_headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for row, row_item in enumerate(row_contents):
+            item0 = QTableWidgetItem(str(row + 1))
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['title'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['create_time'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem(row_item['update_time'])
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
+
+
+class UpdateTrendTablePage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(UpdateTrendTablePage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout()
+        opts_layout = QHBoxLayout()
+        opts_layout.addWidget(QLabel("品种:", self))
+        self.variety_combobox = QComboBox(self)
+        opts_layout.addWidget(self.variety_combobox)
+        opts_layout.addWidget(QLabel("数据组:", self))
+        self.group_combobox = QComboBox(self)
+        self.group_combobox.currentTextChanged.connect(self._get_current_tables)
+        opts_layout.addWidget(self.group_combobox)
+        opts_layout.addStretch()
+        layout.addLayout(opts_layout)
+        self.trend_table = InformationTable(self)
+        layout.addWidget(self.trend_table)
+        self.setLayout(layout)
+        self._get_varieties()
+        self._get_trend_group()
+        self.variety_combobox.currentTextChanged.connect(self._get_trend_group)
+
+    def _get_varieties(self):
+        try:
+            r = requests.get(settings.SERVER_ADDR + 'variety/?way=group')
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError("请求品种数据错误")
+        except Exception as e:
+            self.variety_combobox.clear()
+        else:
+            for variety_group in response['variety']:
+                for variety_item in variety_group['subs']:
+                    self.variety_combobox.addItem(variety_item['name'], variety_item['id'])
+
+    def _get_trend_group(self):
+        current_variety_id = self.variety_combobox.currentData()
+        try:
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'trend/group/?variety=' + str(current_variety_id),
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            QMessageBox.information(self, "错误", str(e))
+        else:
+            self.group_combobox.clear()
+            self.group_combobox.addItem("全部", 0)
+            for group_item in response['groups']:
+                self.group_combobox.addItem(group_item['name'], group_item['id'])
+
+    def _get_current_tables(self):
+        current_group_id = self.group_combobox.currentData()
+        try:
+            user_id = int(pickle.loads(settings.app_dawn.value('UKEY')))
+            r = requests.get(
+                url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/table/?group=' + str(current_group_id)
+            )
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            pass
+        else:
+            print(response)
+            self.trend_table.show_contents(response['tables'])
 
 
 # 数据分析管理主页
@@ -753,10 +1232,10 @@ class TrendPageCollector(QWidget):
     def left_list_clicked(self):
         text = self.left_list.currentItem().text()
         if text == u'新建数据表':
-            try:
-                frame_page = NewTrendTablePage(parent=self.frame_loaded)
-            except Exception as e:
-                print(e)
+            frame_page = NewTrendTablePage(parent=self)
+        elif text == u'更新数据表':
+            frame_page = UpdateTrendTablePage(parent=self)
+
 
 
 

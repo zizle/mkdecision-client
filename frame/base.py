@@ -5,7 +5,7 @@ import json
 import time
 import pickle
 import requests
-from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen
+from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen, QStatusBar
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWebChannel import QWebChannel
