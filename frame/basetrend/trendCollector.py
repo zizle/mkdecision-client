@@ -1,14 +1,17 @@
 # _*_ coding:utf-8 _*_
 # __Author__： zizle
+import os
 import re
 import xlrd
 import json
 import datetime
 import requests
 import pickle
-from copy import deepcopy
+import pandas as pd
+import pyecharts.options as opts
+from pyecharts.charts import Line, Bar, Page
 from PyQt5.QtWidgets import QApplication,QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QComboBox, QTableWidget, \
-    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog,QMenu, QGroupBox, QCheckBox
+    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog,QMenu, QGroupBox, QCheckBox, QScrollArea, QGridLayout
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QUrl
 from PyQt5.QtGui import QCursor
@@ -16,6 +19,7 @@ import settings
 from widgets.base import LoadedPage, TableRowReadButton, TableRowDeleteButton, TableCheckBox
 from popup.trendCollector import CreateNewTrendTablePopup, ShowTableDetailPopup, EditTableDetailPopup, CreateNewVarietyChartPopup, \
     ShowChartPopup
+from settings import BASE_DIR
 
 
 """ 数据表管理相关 """
@@ -737,66 +741,98 @@ class ColumnCheckBox(QCheckBox):
         self.state_reverse.emit(self.col, self.group, self.isChecked())
 
 
+class ChartAxisOptionButton(QPushButton):
+    add_axis_target = pyqtSignal(str, str)
+
+    def __init__(self, axis_name, axis_type, *args, **kwargs):
+        super(ChartAxisOptionButton, self).__init__(*args, **kwargs)
+        self.axis_name = axis_name
+        self.axis_type = axis_type
+        self.clicked.connect(self.emit_info)
+
+    def emit_info(self):
+        self.add_axis_target.emit(self.axis_name, self.axis_type)
+
+
 class DrawChartsDialog(QDialog):
-    X_BOTTOMS = []
-    Y_LEFT = []
-    Y_RIGHT = []
+    CHARTS = {
+        'line': '线形图',
+        'bar': '柱状图'
+    }   # 支持的图形
 
     def __init__(self, table_id, *args,**kwargs):
         super(DrawChartsDialog, self).__init__(*args, **kwargs)
-        self.setAttribute(Qt.WA_DeleteOnClose)
         self.table_id = table_id
         self.resize(1200, 660)
-        layout = QHBoxLayout()
-        left_opts_layout = QVBoxLayout()
-        right_show_layout = QVBoxLayout()
-        layout.addLayout(left_opts_layout)
-        layout.addLayout(right_show_layout)
-        title_layout = QHBoxLayout()
-        title_layout.addWidget(QLabel('标题', self), alignment=Qt.AlignLeft)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.BOTTOM_AXIS = None
+        self.LEFT_AXIS = {}
+        self.RIGHT_AXIS = {}
+        self.table_headers = []
+        self.table_sources = None
+
+        layout = QHBoxLayout(self)
+        left_layout = QVBoxLayout(self)
+        right_layout = QVBoxLayout(self)
+
+        self.target_widget = QWidget(self)
+        self.target_widget.setFixedWidth(250)
+        target_layout = QVBoxLayout(self)
+
+        title_layout = QHBoxLayout(self)
+        title_layout.addWidget(QLabel('标题:',self))
         self.title_edit = QLineEdit(self)
         title_layout.addWidget(self.title_edit)
-        left_opts_layout.addLayout(title_layout)
-        # x轴选择
-        x_axis_layout = QVBoxLayout()
-        self.x_axis_group = QGroupBox("X轴")
-        self.x_axis_group.setLayout(x_axis_layout)
-        left_opts_layout.addWidget(self.x_axis_group)
-        # 左y轴选择
-        left_y_axis_layout = QVBoxLayout()
-        self.left_y_axis_group = QGroupBox('Y左轴')
-        self.left_y_axis_group.setLayout(left_y_axis_layout)
-        left_opts_layout.addWidget(self.left_y_axis_group)
-        # 右y轴选择
-        right_y_axis_layout = QVBoxLayout()
-        self.right_y_axis_group = QGroupBox('Y右轴')
-        self.right_y_axis_group.setLayout(right_y_axis_layout)
-        left_opts_layout.addWidget(self.right_y_axis_group)
-        # 数据范围
-        arange_layout = QVBoxLayout()
-        self.auto_range = QCheckBox()
-        self.auto_range.setText("自动")
-        start_layout = QHBoxLayout()
-        start_layout.addWidget(QLabel("起始:"))
-        self.start_edit = QLineEdit(self)
-        start_layout.addWidget(self.start_edit)
-        end_layout = QHBoxLayout()
-        end_layout.addWidget(QLabel("结束:"))
-        self.end_edit = QLineEdit(self)
-        end_layout.addWidget(self.end_edit)
-        arange_layout.addLayout(start_layout)
-        arange_layout.addLayout(end_layout)
-        self.arange_group = QGroupBox('数据范围')
-        self.arange_group.setLayout(arange_layout)
-        left_opts_layout.addWidget(self.arange_group)
-        # 显示窗口
-        self.show_web = QWebEngineView()
-        self.show_web.setParent(self)
-        right_show_layout.addWidget(self.show_web)
+        target_layout.addLayout(title_layout)
+
+        x_axis_layout = QHBoxLayout(self)
+        x_axis_layout.addWidget(QLabel('横轴:', self))
+        self.x_axis_combobox = QComboBox(self)
+        self.x_axis_combobox.currentIndexChanged.connect(self.x_axis_changed)
+        x_axis_layout.addWidget(self.x_axis_combobox)
+        x_axis_layout.addStretch()
+        target_layout.addLayout(x_axis_layout)
+
+        add_target = QGroupBox("添加指标", self)
+        add_target_layout = QVBoxLayout()
+        self.target_list = QListWidget(self)
+        add_target_layout.addWidget(self.target_list)
+        options_layout = QGridLayout(self)
+        self.button1 = ChartAxisOptionButton(axis_name='left',axis_type='line',text='左轴线形', parent=self)
+        self.button1.add_axis_target.connect(self.add_target_index)
+        self.button2 = ChartAxisOptionButton(axis_name='left',axis_type='bar',text='左轴柱状', parent=self)
+        self.button2.add_axis_target.connect(self.add_target_index)
+        self.button3 = ChartAxisOptionButton(axis_name='right',axis_type='line',text='右轴线形', parent=self)
+        self.button3.add_axis_target.connect(self.add_target_index)
+        self.button4 = ChartAxisOptionButton(axis_name='right',axis_type='bar',text='右轴柱状', parent=self)
+        self.button4.add_axis_target.connect(self.add_target_index)
+        options_layout.addWidget(self.button1, 0, 0)
+        options_layout.addWidget(self.button2, 1, 0)
+        options_layout.addWidget(self.button3, 0, 1)
+        options_layout.addWidget(self.button4, 1, 1)
+        add_target_layout.addLayout(options_layout)
+        add_target.setLayout(add_target_layout)
+        target_layout.addWidget(add_target)
+
+        self.target_widget.setLayout(target_layout)
+        target_layout.addStretch()
+        left_layout.addWidget(self.target_widget)
+        self.confirm_to_draw = QPushButton('确认绘制', self)
+        self.confirm_to_draw.clicked.connect(self.draw_chart)
+        left_layout.addWidget(self.confirm_to_draw)
+
+        # 右侧显示图形和数据表格
+
+        self.chart_widget = QWebEngineView()
+        self.chart_widget.setParent(self)
+        self.table_widget = QTableWidget(self)
+        self.table_widget.setMinimumHeight(250)
+        right_layout.addWidget(self.chart_widget)
+        right_layout.addWidget(self.table_widget)
+
+        layout.addLayout(left_layout)
+        layout.addLayout(right_layout)
         self.setLayout(layout)
-        self.commit_draw = QPushButton("确认绘图")
-        self.commit_draw.clicked.connect(self.commit_draw_charts)
-        left_opts_layout.addWidget(self.commit_draw, alignment=Qt.AlignRight)
         self._get_detail_table_data()
 
     def _get_detail_table_data(self):
@@ -810,87 +846,192 @@ class DrawChartsDialog(QDialog):
         except Exception as e:
             pass
         else:
-            # headers = response['headers']
-            records = response['records']
-            for col, header_text in enumerate(response['headers']):
-                check_box1 = ColumnCheckBox(col, 'x_bottom')
-                check_box1.setText(header_text)
-                check_box1.state_reverse.connect(self.opts_changed)
-                self.x_axis_group.layout().addWidget(check_box1)
-                check_box2 = ColumnCheckBox(col, 'y_left')
-                check_box2.setText(header_text)
-                check_box2.state_reverse.connect(self.opts_changed)
-                self.left_y_axis_group.layout().addWidget(check_box2)
-                check_box3 = ColumnCheckBox(col, 'y_right')
-                check_box3.setText(header_text)
-                check_box3.state_reverse.connect(self.opts_changed)
-                self.right_y_axis_group.layout().addWidget(check_box3)
-            self.start_edit.setText("0")
-            self.end_edit.setText(str(len(records)))
 
+            for index, header_text in enumerate(response['headers']):
+                self.x_axis_combobox.addItem(header_text, "column_{}".format(index))
+                item = QListWidgetItem(header_text)
+                item.index = "column_{}".format(index)
+                self.target_list.addItem(item)
+            # 表格展示数据
+            self.table_show_data(response['headers'], response['records'])
+            self.table_headers = response['headers']
+            self.table_sources = response['records']
 
-    def opts_changed(self, col, group, checked):
-        print(col, group, checked)
-        if group == 'x_bottom':
-            if checked and col not in self.X_BOTTOMS:
-                self.X_BOTTOMS.append(col)
-            elif checked and col in self.X_BOTTOMS:
-                pass
-            elif not checked and col in self.X_BOTTOMS:
-                self.X_BOTTOMS.remove(col)
-            else:
-                pass
-        elif group == 'y_left':
-            if checked and col not in self.Y_LEFT:
-                self.Y_LEFT.append(col)
-            elif checked and col in self.Y_LEFT:
-                pass
-            elif not checked and col in self.Y_LEFT:
-                self.Y_LEFT.remove(col)
-            else:
-                pass
-        elif group == 'y_right':
-            if checked and col not in self.Y_RIGHT:
-                self.Y_RIGHT.append(col)
-            elif checked and col in self.Y_RIGHT:
-                pass
-            elif not checked and col in self.Y_RIGHT:
-                self.Y_RIGHT.remove(col)
-            else:
-                pass
+    def table_show_data(self, headers, records):
+        self.table_widget.setColumnCount(len(headers))
+        self.table_widget.setRowCount(len(records))
+        self.table_widget.setHorizontalHeaderLabels(headers)
+        for row, row_item in enumerate(records):
+            for col in range(self.table_widget.columnCount()):
+                key = "column_{}".format(col)
+                item = QTableWidgetItem(row_item[key])
+                self.table_widget.setItem(row, col, item)
+
+    def add_target_index(self, axis_name, axis_type):
+        current_index_item = self.target_list.currentItem()
+        if not current_index_item:
+            QMessageBox.information(self, '错误', '先选择一个数据指标')
+            return
+        col_index = current_index_item.index
+        if axis_name == 'left':
+            self.LEFT_AXIS[col_index] = axis_type
+        elif axis_name == 'right':
+            self.RIGHT_AXIS[col_index] = axis_type
         else:
-            pass
+            QMessageBox.information(self, '错误', '内部发生一个未知错误')
 
-    def commit_draw_charts(self):
-        print('标题:\n', self.title_edit.text())
-        print("x轴:\n", self.X_BOTTOMS)
-        print("y左轴:\n", self.Y_LEFT)
-        print("y右轴:\n", self.Y_RIGHT)
-        print("范围:\n", self.start_edit.text(), self.end_edit.text())
-        print('窗口宽:', self.show_web.width(), '窗口高:', self.show_web.height())
+    def x_axis_changed(self):
+        self.BOTTOM_AXIS = self.x_axis_combobox.currentData()
+
+    def draw_chart(self):
+        title = self.title_edit.text()
+        if not all([self.BOTTOM_AXIS, self.LEFT_AXIS]) and not all([self.BOTTOM_AXIS, self.RIGHT_AXIS]):
+            QMessageBox.information(self, '错误', '请设置指标再进行绘制')
+            return
+        print('标题:\n', title)
+        print('左轴参数:\n', self.LEFT_AXIS)
+        print('右轴参数:\n', self.RIGHT_AXIS)
+        print('横轴参数:\n', self.BOTTOM_AXIS)
+        source_df = pd.DataFrame(self.table_sources)
+        # 对x轴进行排序
+        sort_df = source_df.sort_values(by=self.BOTTOM_AXIS)
+        # print('排序前:\n', source_df)
+        # print('排序后:\n', sort_df)
+        print("显示图形的空间:", self.chart_widget.width(), self.chart_widget.height())
         try:
-            r = requests.post(
-                url=settings.SERVER_ADDR + 'trend/' + str(self.table_id) + '/chart/',
-                headers={'Content-Type': 'application/json;charset=utf8'},
-                data=json.dumps({
-                    'title': self.title_edit.text(),
-                    'x_bottoms':self.X_BOTTOMS,
-                    'y_left': self.Y_LEFT,
-                    'y_right': self.Y_RIGHT,
-                    'arange': [self.start_edit.text(), self.end_edit.text()]
-                })
+            # 进行画图
+            x_axis_data = sort_df[self.BOTTOM_AXIS].values.tolist()
+            # 去除一个y轴参数后移除该参数
+            first_key = list(self.LEFT_AXIS.keys())[0]
+            first_datacol,first_type = first_key, self.LEFT_AXIS[first_key]
+            del self.LEFT_AXIS[first_key]  # 取出后删除
+            init_opts = opts.InitOpts(
+                width=str(self.chart_widget.width() - 20) + 'px',
+                height=str(self.chart_widget.height() - 25) + 'px'
             )
-            response = json.loads(r.content.decode('utf8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception as e:
-            QMessageBox.information(self, '出错', response['message'])
-        else:
-            QMessageBox.information(self, '成功', response['message'])
-            print(response)
-            file_url = settings.STATIC_PREFIX + response['file_url']
+            if first_type == 'line':
+                chart = Line(
+                    init_opts=init_opts
+                )
+                chart.add_xaxis(xaxis_data=x_axis_data)
+                chart.add_yaxis(
+                    series_name=self.table_headers[int(first_key[-1])],
+                    y_axis=sort_df[first_key].values.tolist(),
+                    label_opts=opts.LabelOpts(is_show=False),
+                    # symbol='circle',
+                    z_level=9,
+                    is_smooth=True
+                )
+            elif first_type == 'bar':
+                chart = Bar(
+                    init_opts=init_opts
+                )
+                chart.add_xaxis(xaxis_data=x_axis_data)
+                chart.add_yaxis(
+                    series_name=self.table_headers[int(first_key[-1])],
+                    yaxis_data=sort_df[first_key].values.tolist(),
+                    label_opts = opts.LabelOpts(is_show=False),
+                )
+            else:
+                return
+
+            # 根据参数画图
+            for col_name, chart_type in self.LEFT_AXIS.items():
+                if chart_type == 'line':
+                    extra_c = (
+                        Line()
+                        .add_xaxis(xaxis_data=x_axis_data)
+                        .add_yaxis(
+                            series_name=self.table_headers[int(col_name[-1])],
+                            y_axis=sort_df[col_name].values.tolist(),
+                            label_opts=opts.LabelOpts(is_show=False),
+                            z_level=9,
+                            is_smooth=True
+                        )
+                    )
+                elif chart_type == 'bar':
+                    extra_c = (
+                        Bar()
+                        .add_xaxis(xaxis_data=x_axis_data)
+                        .add_yaxis(
+                            series_name=self.table_headers[int(col_name[-1])],
+                            yaxis_data=sort_df[col_name].values.tolist(),
+                            label_opts=opts.LabelOpts(is_show=False),
+                        )
+                    )
+                else:
+                    continue
+                chart.overlap(extra_c)
+            # 根据参数画图
+            for col_name, chart_type in self.RIGHT_AXIS.items():
+                if chart_type == 'line':
+                    extra_c = (
+                        Line()
+                            .add_xaxis(xaxis_data=x_axis_data)
+                            .add_yaxis(
+                            series_name=self.table_headers[int(col_name[-1])],
+                            y_axis=sort_df[col_name].values.tolist(),
+                            yaxis_index=1
+                        )
+                    )
+                elif chart_type == 'bar':
+                    extra_c = (
+                        Bar()
+                            .add_xaxis(xaxis_data=x_axis_data)
+                            .add_yaxis(
+                            series_name=self.table_headers[int(col_name[-1])],
+                            yaxis_data=sort_df[col_name].values.tolist(),
+                            yaxis_index=1
+                        )
+                    )
+                else:
+                    continue
+                chart.overlap(extra_c)
+
+            chart.set_global_opts(
+                title_opts=opts.TitleOpts(
+                    title=title,
+                    pos_left='center',
+                ),
+                tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type='cross'),
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    # axislabel_opts=opts.LabelOpts(rotate=-135),
+                 ),
+                yaxis_opts=opts.AxisOpts(type_="value"),
+                legend_opts=opts.LegendOpts(
+                    type_='scroll',
+                    pos_bottom=0,
+                    item_gap=25,
+                    item_width=30,
+                    align='left',
+                ),
+            )
+            # chart.add_xaxis(xaxis_data=x_axis_data)
+            # # 根据参数画图
+            # for col_name, chart_type in self.LEFT_AXIS.items():
+            #     chart.add_yaxis(
+            #         series_name=self.table_headers[int(col_name[-1])],
+            #         y_axis=sort_df[col_name],
+            #     )
+
+            file_folder = os.path.join(BASE_DIR, 'cache/')
+            file_path = os.path.join(file_folder, 'temperature_change_line_chart.html')
+
+            page = Page(layout=Page.SimplePageLayout)
+            page.add(
+                chart,
+            )
+            file_url = page.render(file_path)
             print(file_url)
-            self.show_web.load(QUrl(file_url))
+            self.chart_widget.page().load(QUrl("file:///cache/temperature_change_line_chart.html"))
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+
+
+
+
 
 
 
@@ -1108,7 +1249,9 @@ class InformationTable(QTableWidget):
         table_name = self.item(current_row, 1).text()
         popup = DrawChartsDialog(table_id=table_id, parent=self.parent())
         popup.setWindowTitle("【" + table_name + "】绘图")
-        popup.exec_()
+        popup.show()
+
+
 
     def show_contents(self, row_contents):
         self.clear()
@@ -1198,7 +1341,6 @@ class UpdateTrendTablePage(QWidget):
         except Exception as e:
             pass
         else:
-            print(response)
             self.trend_table.show_contents(response['tables'])
 
 
@@ -1225,7 +1367,7 @@ class TrendPageCollector(QWidget):
     def _addLeftListMenu(self):
         for item in [u'数据表管理', '图表管理']:
             self.left_list.addItem(QListWidgetItem(item))
-        for item in [u'新建数据表', u'更新数据表']:
+        for item in [u'新建数据表', u'我的数据表']:
             self.left_list.addItem(QListWidgetItem(item))
 
     # 点击左侧菜单列表
@@ -1233,7 +1375,7 @@ class TrendPageCollector(QWidget):
         text = self.left_list.currentItem().text()
         if text == u'新建数据表':
             frame_page = NewTrendTablePage(parent=self)
-        elif text == u'更新数据表':
+        elif text == u'我的数据表':
             frame_page = UpdateTrendTablePage(parent=self)
 
 
