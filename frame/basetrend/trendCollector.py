@@ -765,11 +765,9 @@ class DrawChartsDialog(QDialog):
         self.table_id = table_id
         self.resize(1200, 660)
         self.setAttribute(Qt.WA_DeleteOnClose)
-        self.BOTTOM_AXIS = None
-        self.LEFT_AXIS = {}
-        self.RIGHT_AXIS = {}
         self.table_headers = []
         self.table_sources = None
+        self.has_left_axis = False
 
         layout = QHBoxLayout(self)
         left_layout = QVBoxLayout(self)
@@ -813,6 +811,15 @@ class DrawChartsDialog(QDialog):
         add_target_layout.addLayout(options_layout)
         add_target.setLayout(add_target_layout)
         target_layout.addWidget(add_target)
+
+        show_params_layout = QVBoxLayout()
+        self.show_params = QGroupBox("已选指标", self)
+        self.params_list = QListWidget(self)
+        self.params_list.doubleClicked.connect(self.remove_target_index)
+        show_params_layout.addWidget(self.params_list)
+        self.show_params.setLayout(show_params_layout)
+
+        target_layout.addWidget(self.show_params)
 
         self.target_widget.setLayout(target_layout)
         target_layout.addStretch()
@@ -873,25 +880,54 @@ class DrawChartsDialog(QDialog):
             QMessageBox.information(self, '错误', '先选择一个数据指标')
             return
         col_index = current_index_item.index
+        text = current_index_item.text()
         if axis_name == 'left':
-            self.LEFT_AXIS[col_index] = axis_type
+            item = QListWidgetItem("左轴" + self.CHARTS[axis_type] + " = " + text)
+            item.axis_pos = 'left'
+            item.column_index = col_index
+            item.chart_type = axis_type
+            self.has_left_axis = True
         elif axis_name == 'right':
-            self.RIGHT_AXIS[col_index] = axis_type
+            if not self.has_left_axis:
+                QMessageBox.information(self, '错误', '请先添加一个左轴数据列')
+                return
+            item = QListWidgetItem("右轴" + self.CHARTS[axis_type] + " = " + text)
+            item.axis_pos = 'right'
+            item.column_index = col_index
+            item.chart_type = axis_type
         else:
             QMessageBox.information(self, '错误', '内部发生一个未知错误')
+            return
+        self.params_list.addItem(item)
+
+    def remove_target_index(self, index):
+        self.params_list.takeItem(self.params_list.currentRow())
+        # self.params_list.setCurrentIndex(index)
+        # self.params_list.removeItemWidget(self.params_list.currentItem())
 
     def x_axis_changed(self):
         self.BOTTOM_AXIS = self.x_axis_combobox.currentData()
 
     def draw_chart(self):
         title = self.title_edit.text()
-        if not all([self.BOTTOM_AXIS, self.LEFT_AXIS]) and not all([self.BOTTOM_AXIS, self.RIGHT_AXIS]):
-            QMessageBox.information(self, '错误', '请设置指标再进行绘制')
+        bottom = self.x_axis_combobox.currentData()  # 横轴数据列名
+        left_axis = {}
+        right_axis = {}
+
+        for index in range(self.params_list.count()):
+            item = self.params_list.item(index)
+            if item.axis_pos == 'left':
+                left_axis[item.column_index] = item.chart_type
+            else:
+                right_axis[item.column_index] = item.chart_type
+
+        if not all([bottom, left_axis]):
+            QMessageBox.information(self, '错误', '请至少设置一个左轴指标再进行绘制')
             return
         print('标题:\n', title)
-        print('左轴参数:\n', self.LEFT_AXIS)
-        print('右轴参数:\n', self.RIGHT_AXIS)
-        print('横轴参数:\n', self.BOTTOM_AXIS)
+        print('左轴参数:\n', left_axis)
+        print('右轴参数:\n', right_axis)
+        print('横轴参数:\n', bottom)
         source_df = pd.DataFrame(self.table_sources)
         # 对x轴进行排序
         sort_df = source_df.sort_values(by=self.BOTTOM_AXIS)
@@ -901,14 +937,17 @@ class DrawChartsDialog(QDialog):
         try:
             # 进行画图
             x_axis_data = sort_df[self.BOTTOM_AXIS].values.tolist()
-            # 去除一个y轴参数后移除该参数
-            first_key = list(self.LEFT_AXIS.keys())[0]
-            first_datacol,first_type = first_key, self.LEFT_AXIS[first_key]
-            del self.LEFT_AXIS[first_key]  # 取出后删除
+            # 由于pyecharts改变了overlap方法,读取左轴第一个数据类型进行绘制
+            left_axis_copy = {key: val for key, val in left_axis.items()}
+            print("复制后的左轴参数:", left_axis_copy)
+            first_key = list(left_axis_copy.keys())[0]
+            first_datacol, first_type = first_key, left_axis_copy[first_key]
+            del left_axis_copy[first_key]
             init_opts = opts.InitOpts(
                 width=str(self.chart_widget.width() - 20) + 'px',
                 height=str(self.chart_widget.height() - 25) + 'px'
             )
+
             if first_type == 'line':
                 chart = Line(
                     init_opts=init_opts
@@ -930,18 +969,18 @@ class DrawChartsDialog(QDialog):
                 chart.add_yaxis(
                     series_name=self.table_headers[int(first_key[-1])],
                     yaxis_data=sort_df[first_key].values.tolist(),
-                    label_opts = opts.LabelOpts(is_show=False),
+                    label_opts=opts.LabelOpts(is_show=False),
                 )
             else:
                 return
-
+            # 1 绘制其他左轴数据
             # 根据参数画图
-            for col_name, chart_type in self.LEFT_AXIS.items():
+            for col_name, chart_type in left_axis_copy.items():
                 if chart_type == 'line':
                     extra_c = (
                         Line()
-                        .add_xaxis(xaxis_data=x_axis_data)
-                        .add_yaxis(
+                            .add_xaxis(xaxis_data=x_axis_data)
+                            .add_yaxis(
                             series_name=self.table_headers[int(col_name[-1])],
                             y_axis=sort_df[col_name].values.tolist(),
                             label_opts=opts.LabelOpts(is_show=False),
@@ -952,8 +991,8 @@ class DrawChartsDialog(QDialog):
                 elif chart_type == 'bar':
                     extra_c = (
                         Bar()
-                        .add_xaxis(xaxis_data=x_axis_data)
-                        .add_yaxis(
+                            .add_xaxis(xaxis_data=x_axis_data)
+                            .add_yaxis(
                             series_name=self.table_headers[int(col_name[-1])],
                             yaxis_data=sort_df[col_name].values.tolist(),
                             label_opts=opts.LabelOpts(is_show=False),
@@ -962,8 +1001,12 @@ class DrawChartsDialog(QDialog):
                 else:
                     continue
                 chart.overlap(extra_c)
-            # 根据参数画图
-            for col_name, chart_type in self.RIGHT_AXIS.items():
+            # 绘制其他右轴数据
+            if right_axis:
+                chart.extend_axis(
+                    yaxis=opts.AxisOpts()
+                )
+            for col_name, chart_type in right_axis.items():
                 if chart_type == 'line':
                     extra_c = (
                         Line()
@@ -971,6 +1014,9 @@ class DrawChartsDialog(QDialog):
                             .add_yaxis(
                             series_name=self.table_headers[int(col_name[-1])],
                             y_axis=sort_df[col_name].values.tolist(),
+                            label_opts=opts.LabelOpts(is_show=False),
+                            z_level=9,
+                            is_smooth=True,
                             yaxis_index=1
                         )
                     )
@@ -981,6 +1027,7 @@ class DrawChartsDialog(QDialog):
                             .add_yaxis(
                             series_name=self.table_headers[int(col_name[-1])],
                             yaxis_data=sort_df[col_name].values.tolist(),
+                            label_opts=opts.LabelOpts(is_show=False),
                             yaxis_index=1
                         )
                     )
@@ -1007,14 +1054,6 @@ class DrawChartsDialog(QDialog):
                     align='left',
                 ),
             )
-            # chart.add_xaxis(xaxis_data=x_axis_data)
-            # # 根据参数画图
-            # for col_name, chart_type in self.LEFT_AXIS.items():
-            #     chart.add_yaxis(
-            #         series_name=self.table_headers[int(col_name[-1])],
-            #         y_axis=sort_df[col_name],
-            #     )
-
             file_folder = os.path.join(BASE_DIR, 'cache/')
             file_path = os.path.join(file_folder, 'temperature_change_line_chart.html')
 
@@ -1026,18 +1065,7 @@ class DrawChartsDialog(QDialog):
             print(file_url)
             self.chart_widget.page().load(QUrl("file:///cache/temperature_change_line_chart.html"))
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-
-
-
-
-
-
-
-
-
-
+            pass
 
 
 class TableDetailRecordOpts(QDialog):
