@@ -4,16 +4,19 @@ import os
 import re
 import xlrd
 import json
+import time
 import datetime
 import requests
 import pickle
+import sqlite3
 import pandas as pd
 import pyecharts.options as opts
 from pyecharts.charts import Line, Bar, Page
 from PyQt5.QtWidgets import QApplication,QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QComboBox, QTableWidget, \
-    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog,QMenu, QGroupBox, QCheckBox, QScrollArea, QGridLayout
+    QPushButton, QAbstractItemView, QHeaderView, QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QFileDialog,QMenu,\
+    QGroupBox, QCheckBox, QTextEdit, QGridLayout, QTabWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QUrl
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QUrl, QThread, QTimer
 from PyQt5.QtGui import QCursor
 import settings
 from widgets.base import LoadedPage, TableRowReadButton, TableRowDeleteButton, TableCheckBox
@@ -21,6 +24,12 @@ from popup.trendCollector import CreateNewTrendTablePopup, ShowTableDetailPopup,
     ShowChartPopup
 from settings import BASE_DIR
 
+# sqlite3查询结果转为字典
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
 
 """ 数据表管理相关 """
 
@@ -791,6 +800,15 @@ class DrawChartsDialog(QDialog):
         x_axis_layout.addStretch()
         target_layout.addLayout(x_axis_layout)
 
+        x_format_layout = QHBoxLayout(self)
+        x_format_layout.addWidget(QLabel('格式:', self))
+        self.date_format = QComboBox(self)
+        self.date_format.addItem('年-月-日', '%Y-%m-%d')
+        self.date_format.addItem('年-月', '%Y-%m')
+        self.date_format.addItem('年', '%Y')
+        x_format_layout.addWidget(self.date_format)
+        target_layout.addLayout(x_format_layout)
+
         add_target = QGroupBox("添加指标", self)
         add_target_layout = QVBoxLayout()
         self.target_list = QListWidget(self)
@@ -821,9 +839,21 @@ class DrawChartsDialog(QDialog):
 
         target_layout.addWidget(self.show_params)
 
+        graphic_layout = QHBoxLayout(self)
+        graphic_layout.setSpacing(1)
+        self.has_graphic = QCheckBox(self)
+        self.has_graphic.setText("添加水印")
+        self.water_graphic = QLineEdit(self)
+        self.water_graphic.setText("瑞达期货研究院")
+        graphic_layout.addWidget(self.has_graphic)
+        graphic_layout.addWidget(self.water_graphic)
+        graphic_layout.addStretch()
+        target_layout.addLayout(graphic_layout)
+
         self.target_widget.setLayout(target_layout)
         target_layout.addStretch()
         left_layout.addWidget(self.target_widget)
+
         self.confirm_to_draw = QPushButton('确认绘制', self)
         self.confirm_to_draw.clicked.connect(self.draw_chart)
         left_layout.addWidget(self.confirm_to_draw)
@@ -833,14 +863,94 @@ class DrawChartsDialog(QDialog):
         self.chart_widget = QWebEngineView()
         self.chart_widget.setParent(self)
         self.table_widget = QTableWidget(self)
-        self.table_widget.setMinimumHeight(250)
+        self.table_widget.setMinimumHeight(220)
         right_layout.addWidget(self.chart_widget)
+
+        self.save_config = QPushButton('保存配置',self)
+        self.save_config.clicked.connect(self.save_charts_config_to_server)
+        right_layout.addWidget(self.save_config, alignment=Qt.AlignRight)
         right_layout.addWidget(self.table_widget)
 
         layout.addLayout(left_layout)
         layout.addLayout(right_layout)
         self.setLayout(layout)
         self._get_detail_table_data()
+
+    def save_charts_config_to_server(self):
+        def upload_configs():
+            decipherment = text_edit.toPlainText()
+            # 水印
+            has_graphic = self.has_graphic.isChecked()
+            graphic_text = self.water_graphic.text()
+            print("解读:", decipherment)
+            print("标题:", title)
+            print("水印:", has_graphic, graphic_text)
+            print('左轴参数:', left_axis)
+            print('右轴参数:', right_axis)
+            print('横轴参数:', bottom)
+            print('数据表:', self.table_id)
+            # 整理参数提交
+            try:
+                user_id = pickle.loads(settings.app_dawn.value('UKEY'))
+                r = requests.post(
+                    url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/chart/',
+                    headers={'Content-Type':'application/json;charset=utf8'},
+                    data=json.dumps({
+                        'table_id': self.table_id,
+                        'title': title,
+                        'bottom_axis': str(bottom),
+                        'left_axis': str(left_axis),
+                        'right_axis': str(right_axis),
+                        'is_watermark': has_graphic,
+                        'watermark': graphic_text,
+                        'decipherment': decipherment
+                    })
+                )
+                response = json.loads(r.content.decode('utf8'))
+                if r.status_code != 201:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                QMessageBox.information(self, '错误', str(e))
+            else:
+                QMessageBox.information(self, '成功', '保存图表成功')
+                chart_decipher.close()
+
+
+        # 图表解读
+        chart_decipher = QDialog(self)
+        chart_decipher.setWindowTitle("解读")
+        layout = QVBoxLayout(chart_decipher)
+        chart_decipher.setAttribute(Qt.WA_DeleteOnClose)
+        text_edit = QTextEdit(self)
+        layout.addWidget(QLabel("图形解读:"), alignment=Qt.AlignLeft)
+        layout.addWidget(text_edit)
+        to_saved = QPushButton("确定", chart_decipher)
+        to_saved.clicked.connect(upload_configs)
+        layout.addWidget(to_saved, alignment=Qt.AlignRight)
+
+        # 标题
+        title = self.title_edit.text()
+        x_axis = self.x_axis_combobox.currentData()
+        if x_axis == 'column_0':
+            bottom = {x_axis: self.date_format.currentData()}
+        else:
+            # 横轴
+            bottom = {x_axis: ''}
+        # 左轴
+        left_axis = {}
+        # 右轴
+        right_axis = {}
+        for index in range(self.params_list.count()):
+            item = self.params_list.item(index)
+            if item.axis_pos == 'left':
+                left_axis[item.column_index] = item.chart_type
+            else:
+                right_axis[item.column_index] = item.chart_type
+
+        if not all([title,bottom, left_axis]):
+            QMessageBox.information(self, '错误', '请至少设置标题和一个左轴指标再进行保存')
+            return
+        chart_decipher.exec_()
 
     def _get_detail_table_data(self):
         try:
@@ -853,16 +963,21 @@ class DrawChartsDialog(QDialog):
         except Exception as e:
             pass
         else:
-
-            for index, header_text in enumerate(response['headers']):
+            table_records = response['records']
+            table_headers = table_records.pop(0)
+            del table_headers['id']
+            del table_headers['create_time']
+            del table_headers['update_time']
+            table_headers = [header for header in table_headers.values()]
+            for index, header_text in enumerate(table_headers):
                 self.x_axis_combobox.addItem(header_text, "column_{}".format(index))
                 item = QListWidgetItem(header_text)
                 item.index = "column_{}".format(index)
                 self.target_list.addItem(item)
             # 表格展示数据
-            self.table_show_data(response['headers'], response['records'])
-            self.table_headers = response['headers']
-            self.table_sources = response['records']
+            self.table_show_data(table_headers, table_records)
+            self.table_headers = table_headers
+            self.table_sources = table_records
 
     def table_show_data(self, headers, records):
         self.table_widget.setColumnCount(len(headers))
@@ -929,14 +1044,17 @@ class DrawChartsDialog(QDialog):
         print('右轴参数:\n', right_axis)
         print('横轴参数:\n', bottom)
         source_df = pd.DataFrame(self.table_sources)
+        if bottom == 'column_0':
+            source_df[bottom] = pd.to_datetime(source_df[bottom], format='%Y-%m-%d')
+            source_df[bottom] = source_df[bottom].apply(lambda x: x.strftime(self.date_format.currentData()))
         # 对x轴进行排序
-        sort_df = source_df.sort_values(by=self.BOTTOM_AXIS)
+        sort_df = source_df.sort_values(by=bottom)
         # print('排序前:\n', source_df)
         # print('排序后:\n', sort_df)
         print("显示图形的空间:", self.chart_widget.width(), self.chart_widget.height())
         try:
             # 进行画图
-            x_axis_data = sort_df[self.BOTTOM_AXIS].values.tolist()
+            x_axis_data = sort_df[bottom].values.tolist()
             # 由于pyecharts改变了overlap方法,读取左轴第一个数据类型进行绘制
             left_axis_copy = {key: val for key, val in left_axis.items()}
             print("复制后的左轴参数:", left_axis_copy)
@@ -1034,6 +1152,46 @@ class DrawChartsDialog(QDialog):
                 else:
                     continue
                 chart.overlap(extra_c)
+            image_path = os.path.join(BASE_DIR, 'media/logo.png')
+            if self.has_graphic.isChecked():
+                water_graphic_opts = opts.GraphicGroup(
+                    graphic_item=opts.GraphicItem(
+                        width=200,
+                        left=self.chart_widget.width() / 2 - 150,
+                        top='center',
+                        bounding='raw',
+                        z=-1,
+                    ),
+                    children=[
+                        opts.GraphicImage(
+                            graphic_item=opts.GraphicItem(
+                                left=0,
+                                top='center',
+                            ),
+                            graphic_imagestyle_opts=opts.GraphicImageStyleOpts(
+                                image=image_path,
+                                width=40,
+                                height=40,
+                                opacity=0.3
+                            ),
+                        ),
+                        opts.GraphicText(
+                            graphic_item=opts.GraphicItem(
+                                left=42, top="center", z=-1
+                            ),
+                            graphic_textstyle_opts=opts.GraphicTextStyleOpts(
+                                # 要显示的文本
+                                text=self.water_graphic.text(),
+                                font="bold 35px Microsoft YaHei",
+                                graphic_basicstyle_opts=opts.GraphicBasicStyleOpts(
+                                    fill="rgba(200,200,200,0.5)"
+                                ),
+                            )
+                        )
+                    ]
+                )
+            else:
+                water_graphic_opts = None
 
             chart.set_global_opts(
                 title_opts=opts.TitleOpts(
@@ -1053,17 +1211,27 @@ class DrawChartsDialog(QDialog):
                     item_width=30,
                     align='left',
                 ),
+                toolbox_opts=opts.ToolboxOpts(
+                    is_show=True,
+                    feature=opts.ToolBoxFeatureOpts(
+                        save_as_image=opts.ToolBoxFeatureSaveAsImageOpts(is_show=False),
+                        data_zoom=opts.ToolBoxFeatureDataZoomOpts(is_show=True),
+                        magic_type=opts.ToolBoxFeatureMagicTypeOpts(type_=['line','bar']),
+                        brush=opts.ToolBoxFeatureBrushOpts(type_='clear'),
+                    )
+                ),
+                graphic_opts=water_graphic_opts,
             )
             file_folder = os.path.join(BASE_DIR, 'cache/')
-            file_path = os.path.join(file_folder, 'temperature_change_line_chart.html')
+            file_path = os.path.join(file_folder, 'chars_stacked_drawer.html')
 
             page = Page(layout=Page.SimplePageLayout)
             page.add(
                 chart,
             )
             file_url = page.render(file_path)
-            print(file_url)
-            self.chart_widget.page().load(QUrl("file:///cache/temperature_change_line_chart.html"))
+            # print(file_url)
+            self.chart_widget.page().load(QUrl("file:///cache/chars_stacked_drawer.html"))
         except Exception as e:
             pass
 
@@ -1111,10 +1279,16 @@ class TableDetailRecordOpts(QDialog):
         except Exception as e:
             pass
         else:
+            table_records = response['records']
+            table_headers = table_records.pop(0)
+            del table_headers['id']
+            del table_headers['create_time']
+            del table_headers['update_time']
+            table_headers = [header for header in table_headers.values()]
             if self.option == 'modify':
-                self._set_row_contents(response['headers'], response['records'])
+                self._set_row_contents(table_headers, table_records)
             else:
-                self._set_table_headers(response['headers'])
+                self._set_table_headers(table_headers)
 
     def _set_row_contents(self, headers, contents):
         headers.append('')
@@ -1279,8 +1453,6 @@ class InformationTable(QTableWidget):
         popup.setWindowTitle("【" + table_name + "】绘图")
         popup.show()
 
-
-
     def show_contents(self, row_contents):
         self.clear()
         table_headers = ["序号", '标题', '创建日期', '最近更新']
@@ -1358,10 +1530,13 @@ class UpdateTrendTablePage(QWidget):
 
     def _get_current_tables(self):
         current_group_id = self.group_combobox.currentData()
+        current_variety_id = self.variety_combobox.currentData()
+        if current_group_id is None or current_variety_id is None:
+            return
         try:
             user_id = int(pickle.loads(settings.app_dawn.value('UKEY')))
             r = requests.get(
-                url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/table/?group=' + str(current_group_id)
+                url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/table/?variety='+str(current_variety_id)+'&group=' + str(current_group_id)
             )
             response = json.loads(r.content.decode('utf8'))
             if r.status_code != 200:
@@ -1370,6 +1545,447 @@ class UpdateTrendTablePage(QWidget):
             pass
         else:
             self.trend_table.show_contents(response['tables'])
+
+
+# 更新数据组的线程
+class UpdateVarietyTableGroupThread(QThread):
+    process_finished = pyqtSignal(bool)
+    updating = pyqtSignal(int)
+
+    def __init__(self, variety_id,group_id,file_folder, *args,**kwargs):
+        super(UpdateVarietyTableGroupThread, self).__init__(*args, **kwargs)
+        self.variety_id = variety_id
+        self.group_id = group_id
+        self.file_folder = file_folder
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.time_out)
+        self.index = -1
+
+    def time_out(self):
+        if self.index < 3:
+            self.index += 1
+        else:
+            self.index = 0
+        self.updating.emit(self.index)
+
+    def run(self):
+        # 读取文件夹内所有文件
+        file_path_list = list()
+        for file_path in os.listdir(self.file_folder):
+            if os.path.splitext(file_path)[1] == '.xlsx':
+                file_path_list.append(os.path.join(self.file_folder, file_path))
+        # 遍历将每个文件和文件内的sheet，读取，发起更新或创建，提交后发出一个信号
+        for file_path in file_path_list:
+            file = xlrd.open_workbook(file_path)
+            for sheet_name in file.sheet_names():
+                time.sleep(0.3)
+                sheet = file.sheet_by_name(sheet_name)
+                if not file.sheet_loaded(sheet_name) or sheet.nrows < 2:  # 读取失败就继续，或是空数据表
+                    continue
+                headers = sheet.row_values(1)  # 第一行读取，即表格中第二行
+                if len(headers) <= 0:  # 无读到表头，跳过这个sheet
+                    continue
+                contents = [headers]
+                for row in range(2, sheet.nrows):  # 读取表格数据
+                    row_content = []
+                    if sheet.cell(row, 0).ctype == 3 and sheet.cell_value(row, 0) == 0:  # 如果这行是1900年，跳过
+                        continue
+                    for col in range(sheet.ncols):
+                        cell_type = sheet.cell(row, col).ctype
+                        if col == 0 and cell_type != 3:  # 第一列不是时间类型的，忽略本行数据（非时间行跳过）
+                            break
+                        cell_value = sheet.cell_value(row, col)
+                        if cell_type == 3:  # 时间列数据转为时间格式
+                            cell_value = datetime.datetime(*xlrd.xldate_as_tuple(cell_value, 0)).strftime("%Y-%m-%d")
+                        row_content.append(cell_value)
+                    if len(row_content) == len(headers):  # 与表头同样大小
+                        contents.append(row_content)
+                # 发起请求向服务器增加或更新数据
+                try:
+                    # print('上传或更新数据:',file_path, sheet_name)
+                    self.send_data_to_server(
+                        variety_id=self.variety_id,
+                        group_id=self.group_id,
+                        title=sheet_name,
+                        table_values=contents
+                    )
+                except Exception:
+                    pass
+            file.release_resources()  # 释放资源
+            del file
+        # 全部完成执行完成后，发出完成的信号True
+        # self.timer.stop()
+        self.process_finished.emit(True)
+
+    def send_data_to_server(self, variety_id, group_id, title, table_values):
+        try:
+            user_id = pickle.loads(settings.app_dawn.value('UKEY'))
+            requests.post(
+                url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/table/',
+                headers={'Content-type': 'application/json;charset=utf8'},
+                data=json.dumps({
+                    'utoken': settings.app_dawn.value('AUTHORIZATION'),
+                    'variety_id': variety_id,
+                    'group_id': group_id,
+                    'title': title,
+                    'table_values':table_values
+                })
+            )
+        except Exception:
+            pass
+
+
+# 配置数据源、更新数据的窗口
+class UpdateTableConfigPage(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(UpdateTableConfigPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(self)
+        opts_layout = QHBoxLayout(self)
+        opts_layout.addWidget(QLabel('当前配置', self))
+        opts_layout.addStretch()
+        self.new_config_button = QPushButton('配置', self)
+        self.new_config_button.clicked.connect(self.add_new_update_config)
+        opts_layout.addWidget(self.new_config_button)
+        layout.addLayout(opts_layout)
+        self.config_table = QTableWidget(self)
+        self.config_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.config_table.cellClicked.connect(self.config_table_cell_clicked)
+        layout.addWidget(self.config_table)
+        self.setLayout(layout)
+        self._read_configs()
+
+    # 读取当前的配置
+    def _read_configs(self):
+        self.config_table.clear()
+        self.config_table.setColumnCount(5)
+        self.config_table.setHorizontalHeaderLabels(['品种', '数据组', '数据文件夹', '上次更新',''])
+        self.config_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.config_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+
+        db_path = os.path.join(BASE_DIR, 'dawn/tupdate.db')
+        connection = sqlite3.connect(db_path)
+        connection.row_factory = dict_factory
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM `table_update_config`;")
+        fetch_all = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        self.config_table.setRowCount(len(fetch_all))
+        for row,item in enumerate(fetch_all):
+            item0 = QTableWidgetItem(item['variety_name'])
+            item0.variety_id = item['variety_id']
+            item0.setTextAlignment(Qt.AlignCenter)
+            self.config_table.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(item['group_name'])
+            item1.group_id = item['group_id']
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.config_table.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(item['file_folder'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.config_table.setItem(row, 2, item2)
+            item3 = QTableWidgetItem()
+            if item['update_time']:
+                item3.setText(item['update_time'])
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.config_table.setItem(row, 3, item3)
+            item4 = QTableWidgetItem('点击更新')
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.config_table.setItem(row, 4, item4)
+
+    def add_new_update_config(self):
+        def choose_file_folder():  # 选择文件夹
+            folder = QFileDialog.getExistingDirectory()
+            if not folder:
+                return
+            folder_path.setText(folder + '/')
+
+        def add_new_config():
+            current_vid = variety_combobox.currentData()
+            current_vname = variety_combobox.currentText()
+            current_gname = group_combobox.currentText()
+            current_gid = group_combobox.currentData()
+            current_folder = folder_path.text()
+            if not current_folder:
+                return
+            new_config = [current_vname, current_vid,current_gname, current_gid, current_folder]
+            db_path = os.path.join(BASE_DIR, 'dawn/tupdate.db')
+            connection = sqlite3.connect(db_path)
+            connection.row_factory = dict_factory
+            cursor = connection.cursor()
+            # 查询当前品种是否配置了
+            exist_record = "SELECT `id` FROM `table_update_config` WHERE `variety_id`=? AND `group_id`=?;"
+            cursor.execute(exist_record, (current_vid, current_gid))
+            fetch_ret = cursor.fetchone()
+            if fetch_ret:  # 更新
+                update_record = "UPDATE `table_update_config` SET `file_folder`=? " \
+                                "WHERE `variety_id`=? AND `group_id`=?;"
+                cursor.execute(update_record, (current_folder, current_vid, current_gid))
+                connection.commit()
+            else:  # 添加
+                insert_statement = "INSERT INTO `table_update_config` " \
+                                   "(`variety_name`,`variety_id`,`group_name`,`group_id`, `file_folder`) " \
+                                   "VALUES (?,?,?,?,?);"
+                cursor.execute(insert_statement, new_config)
+                connection.commit()
+            cursor.close()
+            connection.close()
+            QMessageBox.information(popup, '成功', '配置成功.')
+            popup.close()
+
+        def get_current_trend_group():
+            # 获取当前品种数据组
+            try:
+                current_vid = variety_combobox.currentData()
+                r = requests.get(url=settings.SERVER_ADDR + 'trend/group/?variety=' + str(current_vid))
+                response = json.loads(r.content.decode('utf8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception:
+                pass
+            else:
+                group_combobox.clear()
+                for group_item in response['groups']:
+                    group_combobox.addItem(group_item['name'], group_item['id'])
+
+        # 获取所有品种
+        try:
+            user_id = pickle.loads(settings.app_dawn.value('UKEY'))
+            r = requests.get(url=settings.SERVER_ADDR + 'user/'+str(user_id) + '/variety/')
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            pass
+        else:
+            popup = QDialog(self.parent())
+            popup.setWindowTitle("配置路径")
+            popup.setAttribute(Qt.WA_DeleteOnClose)
+            popup.setFixedSize(320, 160)
+            layout = QGridLayout(popup)
+            layout.addWidget(QLabel("品种:", popup), 0, 0)
+            variety_combobox = QComboBox(popup)
+            variety_combobox.currentTextChanged.connect(get_current_trend_group)
+
+            layout.addWidget(variety_combobox, 0, 1, 1, 2)
+            group_combobox = QComboBox(popup)
+            layout.addWidget(QLabel('数据组'), 1, 0)
+            layout.addWidget(group_combobox, 1, 1,1,2)
+            for variety_item in response['variety']:
+                if variety_item['is_active']:
+                    variety_combobox.addItem(variety_item['name'], variety_item['variety_id'])
+            layout.addWidget(QLabel('路径:', popup), 2, 0)
+            folder_path = QLineEdit(popup)
+            layout.addWidget(folder_path, 2, 1)
+            button = QPushButton('选择', popup)
+            button.clicked.connect(choose_file_folder)
+            layout.addWidget(button, 2, 2)
+            add_config = QPushButton('确定添加',popup)
+            add_config.clicked.connect(add_new_config)
+            layout.addWidget(add_config, 3, 0, 1, 3)
+            popup.setLayout(layout)
+            if not popup.exec_():
+                self._read_configs()
+
+    def config_table_cell_clicked(self, row, col):
+        updating_text = ['正在更新 ', '在更新 正', '更新 正在', '新 正在更']
+        current_text = self.config_table.item(row, 4).text()
+        if col != 4 or current_text != '点击更新':
+            return
+
+        def process_finished(ret):  # 更新结束
+            self.update_thread.timer.stop()
+            self.config_table.item(row, 4).setText('更新完成')
+            self.update_thread.deleteLater()
+            del self.update_thread
+            # 更新时间修改
+            db_path = os.path.join(BASE_DIR, 'dawn/tupdate.db')
+            connection = sqlite3.connect(db_path)
+            connection.row_factory = dict_factory
+            cursor = connection.cursor()
+            today = datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+            update_statement = "UPDATE `table_update_config` SET " \
+                               "`update_time`=? WHERE `variety_id`=? AND `group_id`=?;"
+            cursor.execute(update_statement, (today, variety_id, group_id))
+            connection.commit()
+            cursor.close()
+            connection.close()
+
+        def updating_show(index):  # 提示正在更新
+            self.config_table.item(row, 4).setText(updating_text[index])
+        variety_id = self.config_table.item(row, 0).variety_id
+        group_id = self.config_table.item(row, 1).group_id
+        file_folder = self.config_table.item(row, 2).text()
+        # 开启线程更新数据
+        self.update_thread = UpdateVarietyTableGroupThread(variety_id,group_id,file_folder)
+        self.update_thread.updating.connect(updating_show)
+        self.update_thread.process_finished.connect(process_finished)
+        self.update_thread.timer.start(700)  # 开启提示
+        self.update_thread.start()
+
+
+class MyTrendChartTableManage(QTableWidget):
+    def __init__(self, *args, **kwargs):
+        super(MyTrendChartTableManage, self).__init__(*args)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.cellClicked.connect(self.click_table_cell)
+
+    def click_table_cell(self,row, col):
+        chart_id = self.item(row, 0).id
+        if col == 3:
+            print('编辑解说')
+            decipherment = self.item(row, 3).text()
+            self.edit_decipherment(decipherment=decipherment, chart_id=chart_id)
+        elif col == 4:
+            print('删除')
+            self.delete_chart(row=row, chart_id=chart_id)
+        else:
+            return
+
+    def edit_decipherment(self, decipherment, chart_id):
+        print(decipherment)
+
+        def upload_decipherment():
+            text = text_edit.toPlainText()
+            try:
+                utoken = settings.app_dawn.value('AUTHORIZATION')
+                r = requests.patch(
+                    url=settings.SERVER_ADDR + 'trend/chart/' + str(chart_id) + '/?utoken=' + utoken,
+                    headers={'Content-Type': 'application/json;charset=utf8'},
+                    data=json.dumps({'decipherment': text})
+                )
+                response = json.loads(r.content.decode('utf8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                QMessageBox.information(self, '失败', str(e))
+            else:
+                QMessageBox.information(self, '成功', '修改成功')
+                popup.close()
+        popup = QDialog(self)
+        popup.setWindowTitle("编辑图形解说")
+        popup.resize(400, 200)
+        popup.setAttribute(Qt.WA_DeleteOnClose)
+        layout = QVBoxLayout(popup)
+        text_edit = QTextEdit(decipherment, popup)
+        layout.addWidget(text_edit)
+        confirm = QPushButton('确定',popup)
+        confirm.clicked.connect(upload_decipherment)
+        layout.addWidget(confirm, alignment=Qt.AlignRight)
+        popup.setLayout(layout)
+        popup.show()
+
+    def delete_chart(self, row, chart_id):
+        if QMessageBox.Yes == QMessageBox.warning(self, '提醒', '删除将无法恢复?', QMessageBox.Yes|QMessageBox.No):
+            try:
+                utoken = settings.app_dawn.value('AUTHORIZATION')
+                r = requests.delete(
+                    url=settings.SERVER_ADDR + 'trend/chart/' + str(chart_id) + '/?utoken=' + utoken
+                )
+                response = json.loads(r.content.decode('utf8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception as e:
+                QMessageBox.information(self, '失败', str(e))
+            else:
+                QMessageBox.information(self, '成功', '删除成功')
+                self.removeRow(row)
+
+    def show_charts_info(self, contents):
+        table_headers = ['标题','创建时间', '更新时间', '图形解说', '']
+        self.setColumnCount(5)
+        self.setHorizontalHeaderLabels(table_headers)
+        self.setRowCount(len(contents))
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        for row, row_item in enumerate(contents):
+            item0 = QTableWidgetItem(row_item['title'])
+            item0.setTextAlignment(Qt.AlignCenter)
+            item0.id = row_item['id']
+            self.setItem(row, 0, item0)
+            item1 = QTableWidgetItem(row_item['create_time'])
+            item1.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 1, item1)
+            item2 = QTableWidgetItem(row_item['update_time'])
+            item2.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 2, item2)
+            item3 = QTableWidgetItem(row_item['decipherment'])
+            item3.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 3, item3)
+            item4 = QTableWidgetItem("删除")
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 4, item4)
+
+
+class MyTrendTableChartPage(QTabWidget):
+    def __init__(self, *args, **kwargs):
+        super(MyTrendTableChartPage, self).__init__(*args, **kwargs)
+        layout = QVBoxLayout(self)
+        opts_layout = QHBoxLayout(self)
+        opts_layout.addWidget(QLabel('品种:', self))
+        self.variety_combobox = QComboBox(self)
+        self.variety_combobox.currentTextChanged.connect(self.get_current_charts_info)
+        opts_layout.addWidget(self.variety_combobox)
+        self.switchover = QPushButton("图形管理", self)
+        self.switchover.clicked.connect(self.switch_show_widget)
+        opts_layout.addWidget(self.switchover)
+        opts_layout.addStretch()
+        layout.addLayout(opts_layout)
+        self.show_charts = QWebEngineView(self)
+        layout.addWidget(self.show_charts)
+
+        self.manage_table = MyTrendChartTableManage(self)
+        layout.addWidget(self.manage_table)
+        self.manage_table.hide()
+        self.setLayout(layout)
+
+        self._get_accessed_variety()
+
+    def _get_accessed_variety(self):
+        # 获取有权限的品种信息
+        try:
+            user_id = pickle.loads(settings.app_dawn.value('UKEY'))
+            r = requests.get(settings.SERVER_ADDR + 'user/' + str(user_id) + '/variety/')
+            response = json.loads(r.content.decode('utf8'))
+            if r.status_code != 200:
+                raise ValueError(response['message'])
+        except Exception as e:
+            pass
+        else:
+            self.variety_combobox.clear()
+            self.variety_combobox.addItem('全部', 0)
+            accessed_variety = response['variety']
+            for variety_item in accessed_variety:
+                self.variety_combobox.addItem(variety_item['name'], variety_item['variety_id'])
+
+    def switch_show_widget(self):
+        if self.manage_table.isHidden():
+            self.show_charts.hide()
+            self.manage_table.show()
+            self.switchover.setText('图形总览')
+        else:
+            self.show_charts.show()
+            self.manage_table.hide()
+            self.switchover.setText('图形管理')
+        self.get_current_charts_info()
+
+    def get_current_charts_info(self):
+        current_variety = self.variety_combobox.currentData()
+        user_id = pickle.loads(settings.app_dawn.value('UKEY'))
+        if self.manage_table.isHidden():
+            self.show_charts.load(QUrl(settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/chart/?variety=' + str(current_variety) + '&is_render=1'))
+        else:
+            # 请求当前用户的所有表信息
+            try:
+                r = requests.get(
+                    url=settings.SERVER_ADDR + 'user/' + str(user_id) + '/trend/chart/?variety=' + str(current_variety)
+                )
+                response = json.loads(r.content.decode('utf8'))
+                if r.status_code != 200:
+                    raise ValueError(response['message'])
+            except Exception:
+                pass
+            else:
+                self.manage_table.show_charts_info(response['charts_info'])
 
 
 # 数据分析管理主页
@@ -1393,9 +2009,9 @@ class TrendPageCollector(QWidget):
 
     # 添加左侧管理菜单
     def _addLeftListMenu(self):
-        for item in [u'数据表管理', '图表管理']:
-            self.left_list.addItem(QListWidgetItem(item))
-        for item in [u'新建数据表', u'我的数据表']:
+        # for item in [u'数据表管理', '图表管理']:
+        #     self.left_list.addItem(QListWidgetItem(item))
+        for item in [u'数据源配置',u'新建数据表', u'我的数据表', u'我的数据图']:
             self.left_list.addItem(QListWidgetItem(item))
 
     # 点击左侧菜单列表
@@ -1405,7 +2021,10 @@ class TrendPageCollector(QWidget):
             frame_page = NewTrendTablePage(parent=self)
         elif text == u'我的数据表':
             frame_page = UpdateTrendTablePage(parent=self)
-
+        elif text == u'数据源配置':
+            frame_page = UpdateTableConfigPage(parent=self)
+        elif text == u'我的数据图':
+            frame_page = MyTrendTableChartPage(parent=self)
 
 
 
@@ -1422,5 +2041,3 @@ class TrendPageCollector(QWidget):
             frame_page = QLabel('【' + text + '】正在加紧开发中...')
         self.frame_loaded.clear()
         self.frame_loaded.addWidget(frame_page)
-
-
