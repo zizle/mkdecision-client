@@ -6,7 +6,7 @@ import requests
 from math import floor
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QPushButton, QCheckBox, QGridLayout, QScrollArea,\
     QVBoxLayout, QStackedWidget, QDialog, QTextBrowser, QLineEdit, QFileDialog
-from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage
+from PyQt5.QtGui import QPixmap, QFont, QIcon, QImage, QPen, QPainter, QColor, QBrush
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from widgets.CAvatar import CAvatar
 import settings
@@ -236,7 +236,7 @@ class ModuleBar(QWidget):
             color: #FFFFFF
         }
         QPushButton:hover {
-            background-color: #CD3333;
+            background-color: rgb(34,132,200);
         }
         """)
         self.set_default_menu()
@@ -276,7 +276,7 @@ class ModuleBar(QWidget):
                     if sub_module['name'] == "数据管理":
                         sub_module_menu = DropdownMenu()
                         # sub_module_menu.triggered.connect(self.module_action_selected)
-                        for sub_action in ["首页管理", "产品服务", '基本分析','交割服务']:
+                        for sub_action in ["首页管理", "产品服务", '基本分析']:
                             sub_action = sub_module_menu.addAction(sub_action)
                             sub_action.aid = -9
                         drop_action.setMenu(sub_module_menu)
@@ -483,12 +483,27 @@ class LoadedPage(QStackedWidget):
         super(LoadedPage, self).__init__(*args, **kwargs)
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
         self.setMouseTracking(True)
-        # self.setObjectName('pageContainer')
+        self.setObjectName('pageContainer')
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
+        self.setStyleSheet("""
+        #pageContainer{
+            border: 1px solid rgb(130, 130, 130);
+            border-top:none;
+            background-color:rgb(240, 240, 240);
+        }
+        """)
 
     # 鼠标移动事件
     def mouseMoveEvent(self, event, *args, **kwargs):
         event.accept()  # 接受事件,不传递到父控件
+
+    def remove_borders(self):
+        self.setStyleSheet("""
+        #pageContainer{
+            background-color:rgb(240, 240, 240);
+            border: none;
+        }
+        """)
 
     # 清除所有控件
     def clear(self):
@@ -543,7 +558,6 @@ class FoldedBodyButton(QPushButton):
         # print(self.bid)
         name_en = self.name_en if self.name_en else ""
         self.mouse_clicked.emit(self.bid, name_en)
-
 
 
 # FoldedHead(), FoldedBody()
@@ -623,24 +637,24 @@ class FoldedBody(QWidget):
         self.setAutoFillBackground(True)  # 受父窗口影响(父窗口已设置透明)会透明,填充默认颜色
         self.setAttribute(Qt.WA_StyledBackground, True)  # 支持qss设置背景颜色(受父窗口透明影响qss会透明)
 
-    def addButton(self, id, name,name_en=None):
-        button = FoldedBodyButton(text=name,bid=id,name_en=name_en,parent=self)
+    def addButton(self, id, name, name_en=None):
+        button = FoldedBodyButton(text=name,bid=id, name_en=name_en, parent=self)
         button.mouse_clicked.connect(self.body_button_clicked)
         self.button_list.append(button)
 
-    # 添加按钮
-    def addButtons(self, button_list, horizontal_count=3):
-        self.button_list.clear()
-
-        for button_item in button_list:
-            button = FoldedBodyButton(
-                text=button_item['name'],
-                bid=button_item['id'],
-                name_en=button_item.get('name_en', None),
-                parent=self
-            )
-            button.mouse_clicked.connect(self.body_button_clicked)
-            self.button_list.append(button)
+    # # 添加按钮
+    # def addButtons(self, button_list, horizontal_count=3):
+    #     self.button_list.clear()
+    #
+    #     for button_item in button_list:
+    #         button = FoldedBodyButton(
+    #             text=button_item['name'],
+    #             bid=button_item['id'],
+    #             name_en=button_item.get('name_en', None),
+    #             parent=self
+    #         )
+    #         button.mouse_clicked.connect(self.body_button_clicked)
+    #         self.button_list.append(button)
 
     # 按钮被点击
     def body_button_clicked(self, bid, name_en):
@@ -680,29 +694,18 @@ class ScrollFoldedBox(QScrollArea):
         super(ScrollFoldedBox, self).__init__(*args, **kwargs)
         layout = QVBoxLayout(margin=0, spacing=0)
         self.container = QWidget(parent=self)
+        self.container.setObjectName('foldedBox')
         self.container.setLayout(layout)
         self.setWidgetResizable(True)
         self.setWidget(self.container)
-        # 样式
-        self.setObjectName('foldedBox')
         # 设置样式
         self.setMinimumWidth(240)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.head_list = list()
 
     def setFoldedStyleSheet(self, stylesheet):
         self.setStyleSheet(stylesheet)
-
-    # 鼠标进入显示竖直滚动条
-    def enterEvent(self, *args, **kwargs):
-        super(ScrollFoldedBox, self).enterEvent(*args, **kwargs)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-    # 鼠标离开不显示滚动条
-    def leaveEvent(self, *args, **kwargs):
-        super(ScrollFoldedBox, self).leaveEvent(*args, **kwargs)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
     # 添加头部
     def addHead(self, text):
