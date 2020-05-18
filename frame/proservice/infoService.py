@@ -4,10 +4,10 @@ import json
 import chardet
 import requests
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QTableWidget, QTextBrowser, \
-    QAbstractItemView, QHeaderView, QTableWidgetItem, QPushButton, QTextEdit
+    QAbstractItemView, QHeaderView, QTableWidgetItem, QPushButton, QFrame
 from PyQt5.QtGui import QFont, QBrush,QColor
-from widgets.base import ScrollFoldedBox, LoadedPage, Paginator, TableRowReadButton, PDFContentPopup, PDFContentShower
-from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal, QPoint
+from widgets.base import ScrollFoldedBox, LoadedPage, Paginator, PDFContentPopup, PDFContentShower
+from PyQt5.QtCore import Qt, QDate, QTime, pyqtSignal, QPoint, QMargins
 import settings
 
 
@@ -80,14 +80,23 @@ class HedgePlanTable(QTableWidget):
 class HedgePlanPage(QWidget):
     def __init__(self, *args, **kwargs):
         super(HedgePlanPage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(QMargins(0, 0, 0, 5))
+        layout.setSpacing(5)
+
+        self.table = InvestPlanTable()
+        layout.addWidget(self.table)
+
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无套保方案数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+
         # 页码控制布局
         self.paginator = Paginator()
         self.paginator.setMargins(0, 10, 3, 0)
         self.paginator.clicked.connect(self.getCurrentPlanContents)
-        layout.addWidget(self.paginator, alignment=Qt.AlignRight)
-        self.table = InvestPlanTable()
-        layout.addWidget(self.table)
+        layout.addWidget(self.paginator, alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
     # 请求数据
@@ -102,8 +111,17 @@ class HedgePlanPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['total_page'])
-            self.table.showRowContents(response['records'])
+            if response['records']:
+                self.paginator.setTotalPages(response['total_page'])
+                self.table.showRowContents(response['records'])
+                self.table.show()
+                self.paginator.show()
+                self.no_data_label.hide()
+            else:
+                self.no_data_label.show()
+                self.table.hide()
+                self.paginator.hide()
+
 
 
 """ 策略服务-投资方案相关 """
@@ -120,13 +138,37 @@ class InvestPlanTable(QTableWidget):
         self.setFocusPolicy(Qt.NoFocus)
         self.setMouseTracking(True)
         self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setShowGrid(False)
+        self.setFrameShape(QFrame.NoFrame)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
         self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
         self.cellClicked.connect(self.mouseClickedCell)
+        self.horizontalHeader().setStyleSheet("""
+        QHeaderView::section,
+        QTableCornerButton::section {
+            min-height: 25px;
+            padding: 1px;border: none;
+            border-right: 1px solid rgb(201,202,202);
+            border-bottom: 1px solid rgb(201,202,202);
+            background-color:rgb(243,245,248);
+            font-weight: bold;
+            font-size: 13px;
+            min-width:26px;
+        }""")
+
         self.setStyleSheet("""
-        font-size: 14px;
-        selection-color: red;
-        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        QTableWidget{
+            font-size: 14px;
+            alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+            background-color: rgb(240,240, 240)
+        }
+        QTableWidget::item{
+            border-bottom: 1px solid rgb(201,202,202);
+            border-right: 1px solid rgb(201,202,202);
+        }
+        QTableWidget::item:selected{
+            background-color: rgb(215, 215, 215);
+        }
         """)
 
     def mouseMoveEvent(self, event):
@@ -171,18 +213,26 @@ class InvestPlanTable(QTableWidget):
             item3.file_url = row_item['file_url']
             self.setItem(row, 3, item3)
 
+
 # 投资方案主页
 class InvestPlanPage(QWidget):
     def __init__(self, *args, **kwargs):
         super(InvestPlanPage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(QMargins(0, 0, 0, 5))
+        layout.setSpacing(2)
+        self.table = InvestPlanTable()
+        layout.addWidget(self.table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无投资方案数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+
         # 页码控制布局
         self.paginator = Paginator()
         self.paginator.setMargins(0, 10, 3, 0)
         self.paginator.clicked.connect(self.getCurrentPlanContents)
-        layout.addWidget(self.paginator, alignment=Qt.AlignRight)
-        self.table = InvestPlanTable()
-        layout.addWidget(self.table)
+        layout.addWidget(self.paginator, alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
     # 请求数据
@@ -197,8 +247,16 @@ class InvestPlanPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['total_page'])
-            self.table.showRowContents(response['records'])
+            if response['records']:
+                self.paginator.setTotalPages(response['total_page'])
+                self.table.showRowContents(response['records'])
+                self.table.show()
+                self.no_data_label.hide()
+                self.paginator.show()
+            else:
+                self.no_data_label.show()
+                self.paginator.hide()
+                self.table.hide()
 
 
 
@@ -329,14 +387,22 @@ class SearchReportTable(QTableWidget):
 class SearchReportPage(QWidget):
     def __init__(self, *args, **kwargs):
         super(SearchReportPage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(QMargins(0, 0, 0, 5))
+        layout.setSpacing(5)
+
+        self.table = TopicSearchTable()
+        layout.addWidget(self.table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无调研报告数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+
         # 页码控制布局
         self.paginator = Paginator()
         self.paginator.setMargins(0, 10, 3, 0)
         self.paginator.clicked.connect(self.getCurrentReportContents)
-        layout.addWidget(self.paginator, alignment=Qt.AlignRight)
-        self.table = TopicSearchTable()
-        layout.addWidget(self.table)
+        layout.addWidget(self.paginator, alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
     # 请求数据
@@ -351,8 +417,16 @@ class SearchReportPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['total_page'])
-            self.table.showRowContents(response['records'])
+            if response['records']:
+                self.paginator.setTotalPages(response['total_page'])
+                self.table.showRowContents(response['records'])
+                self.table.show()
+                self.paginator.show()
+                self.no_data_label.hide()
+            else:
+                self.no_data_label.show()
+                self.table.hide()
+                self.paginator.hide()
 
 
 """ 专题研究 """
@@ -369,13 +443,37 @@ class TopicSearchTable(QTableWidget):
         self.setFocusPolicy(Qt.NoFocus)
         self.setMouseTracking(True)
         self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setShowGrid(False)
+        self.setFrameShape(QFrame.NoFrame)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
         self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
         self.cellClicked.connect(self.mouseClickedCell)
+        self.horizontalHeader().setStyleSheet("""
+        QHeaderView::section,
+        QTableCornerButton::section {
+            min-height: 25px;
+            padding: 1px;border: none;
+            border-right: 1px solid rgb(201,202,202);
+            border-bottom: 1px solid rgb(201,202,202);
+            background-color:rgb(243,245,248);
+            font-weight: bold;
+            font-size: 13px;
+            min-width:26px;
+        }""")
+
         self.setStyleSheet("""
-        font-size: 14px;
-        selection-color: red;
-        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        QTableWidget{
+            font-size: 14px;
+            alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+            background-color: rgb(240,240, 240)
+        }
+        QTableWidget::item{
+            border-bottom: 1px solid rgb(201,202,202);
+            border-right: 1px solid rgb(201,202,202);
+        }
+        QTableWidget::item:selected{
+            background-color: rgb(215, 215, 215);
+        }
         """)
 
     def mouseMoveEvent(self, event):
@@ -425,14 +523,21 @@ class TopicSearchTable(QTableWidget):
 class TopicSearchPage(QWidget):
     def __init__(self, *args, **kwargs):
         super(TopicSearchPage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
+        layout = QVBoxLayout()
+        layout.setSpacing(2)
+        layout.setContentsMargins(QMargins(0,0,0,5))
+        self.table = TopicSearchTable()
+        layout.addWidget(self.table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无专题研究数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+
         # 页码控制布局
         self.paginator = Paginator()
         self.paginator.setMargins(0, 10, 3, 0)
         self.paginator.clicked.connect(self.getCurrentTopicContents)
-        layout.addWidget(self.paginator, alignment=Qt.AlignRight)
-        self.table = TopicSearchTable()
-        layout.addWidget(self.table)
+        layout.addWidget(self.paginator, alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
     # 请求数据
@@ -447,8 +552,16 @@ class TopicSearchPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['total_page'])
-            self.table.showRowContents(response['records'])
+            if response['records']:
+                self.paginator.setTotalPages(response['total_page'])
+                self.table.showRowContents(response['records'])
+                self.table.show()
+                self.no_data_label.hide()
+                self.paginator.show()
+            else:
+                self.no_data_label.show()
+                self.table.hide()
+                self.paginator.hide()
 
 
 """ 市场分析 """
@@ -466,12 +579,36 @@ class MarketAnalysisTable(QTableWidget):
         self.cellClicked.connect(self.mouseClickedCell)
         self.setMouseTracking(True)
         self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setFrameShape(QFrame.NoFrame)
+        self.setShowGrid(False)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
         self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
+        self.horizontalHeader().setStyleSheet("""
+        QHeaderView::section,
+        QTableCornerButton::section {
+            min-height: 25px;
+            padding: 1px;border: none;
+            border-right: 1px solid rgb(201,202,202);
+            border-bottom: 1px solid rgb(201,202,202);
+            background-color:rgb(243,245,248);
+            font-weight: bold;
+            font-size: 13px;
+            min-width:26px;
+        }""")
+
         self.setStyleSheet("""
-        font-size: 14px;
-        selection-color: red;
-        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        QTableWidget{
+            font-size: 14px;
+            alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+            background-color: rgb(240,240, 240)
+        }
+        QTableWidget::item{
+            border-bottom: 1px solid rgb(201,202,202);
+            border-right: 1px solid rgb(201,202,202);
+        }
+        QTableWidget::item:selected{
+            background-color: rgb(215, 215, 215);
+        }
         """)
 
     def mouseMoveEvent(self, event):
@@ -516,18 +653,26 @@ class MarketAnalysisTable(QTableWidget):
             item3.file_url = row_item['file_url']
             self.setItem(row, 3, item3)
 
+
 # 市场分析主页
 class MarketAnalysisPage(QWidget):
     def __init__(self, *args, **kwargs):
         super(MarketAnalysisPage, self).__init__(*args, **kwargs)
-        layout = QVBoxLayout(margin=0)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(QMargins(0, 0, 0, 5))
+        layout.setSpacing(2)
+        self.table = MarketAnalysisTable()
+        layout.addWidget(self.table)
+
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无市场分析数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
         # 页码控制布局
         self.paginator = Paginator()
         self.paginator.setMargins(0, 10, 3, 0)
         self.paginator.clicked.connect(self.getCurrentMarketContents)
-        layout.addWidget(self.paginator, alignment=Qt.AlignRight)
-        self.table = MarketAnalysisTable()
-        layout.addWidget(self.table)
+        layout.addWidget(self.paginator, alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
     # 请求数据
@@ -542,12 +687,23 @@ class MarketAnalysisPage(QWidget):
         except Exception as e:
             self.network_message_label.setText(str(e))
         else:
-            self.paginator.setTotalPages(response['total_page'])
-            self.table.showRowContents(response['records'])
+            if response['records']:
+                self.paginator.setTotalPages(response['total_page'])
+                self.table.showRowContents(response['records'])
+                self.table.show()
+                self.no_data_label.hide()
+                self.paginator.show()
+            else:
+                self.no_data_label.show()
+                self.table.hide()
+                self.paginator.show()
 
 
 """ 短信通 """
 
+class TextBrowser(QTextBrowser):
+    def wheelEvent(self, event):
+        pass
 
 # 短信通控件
 class SMSLinkWidget(QWidget):
@@ -565,7 +721,7 @@ class SMSLinkWidget(QWidget):
         self.open_button.setCursor(Qt.PointingHandCursor)
         option_layout.addWidget(self.open_button, alignment=Qt.AlignRight)
         layout.addLayout(option_layout)
-        self.text_browser = QTextBrowser(objectName='textBrowser')
+        self.text_browser = TextBrowser(objectName='textBrowser')
         self.text_browser.setText(sms_data['content'])
         self.text_browser.setFixedHeight(27)
         font = QFont()
@@ -594,17 +750,17 @@ class SMSLinkWidget(QWidget):
         """)
 
     def resize_text_browser(self):
-        print('改变text_browser大小')
-        print(self.text_browser.height(),self.text_browser.document().size().height())
+        # print('改变text_browser大小')
+        # print(self.text_browser.height(),self.text_browser.document().size().height())
         if self.open_button.text() == "展开":
-            self.text_browser.setFixedHeight(self.text_browser.document().size().height())
+            self.text_browser.setFixedHeight(self.text_browser.document().size().height() + 5)
             self.open_button.setText("合上")
         else:
             self.text_browser.setFixedHeight(27)
             self.open_button.setText("展开")
 
     def is_show_open_button(self):
-        print(self.text_browser.height(), self.text_browser.document().size().height())
+        # print(self.text_browser.height(), self.text_browser.document().size().height())
         if self.text_browser.height() >= self.text_browser.document().size().height():
             self.open_button.hide()
 
@@ -626,6 +782,9 @@ class SMSLinkPage(QScrollArea):
         self.currentScrollValue = 0  # 记录当前滚动条的滚动位置，用于填充数据后再次移动到该位置。
         # 设置滚动条样式
         self.setStyleSheet("""
+        QScrollArea{
+            border: none;
+        }
         #moreSms{
             max-width: 200px;
             min-width:200px;
@@ -647,12 +806,12 @@ class SMSLinkPage(QScrollArea):
         else:
             # 设置当前页和总页数
             self.total_page = response['total_page']
-            content = response['records'] * 50
+            content = response['records']
             for sms_item in content:
                 sms_widget = SMSLinkWidget(sms_item)
                 self.container.layout().insertWidget(insert_index, sms_widget)
-                print(sms_widget.text_browser.height())
-                print(sms_widget.text_browser.document().size())
+                # print(sms_widget.text_browser.height())
+                # print(sms_widget.text_browser.document().size())
                 insert_index += 1
             if self.current_page == 1:  # 加载更多的按钮
                 self.container.layout().addWidget(self.read_more_button, alignment=Qt.AlignHCenter)
@@ -671,37 +830,48 @@ class SMSLinkPage(QScrollArea):
         count = self.container.layout().count()   # 获取当前的数量
         self.getSMSContents(insert_index=count - 1)
 
+
 # 产品服务主页
 class InfoServicePage(QWidget):
     def __init__(self, *args, **kwargs):
         super(InfoServicePage, self).__init__(*args, **kwargs)
-        layout = QHBoxLayout(margin=2)
-        self.variety_folded = ScrollFoldedBox()
+        layout = QHBoxLayout()
+        layout.setContentsMargins(QMargins(0, 0, 0, 1))
+        layout.setSpacing(0)
+        self.variety_folded = ScrollFoldedBox(parent=self)
         self.variety_folded.left_mouse_clicked.connect(self.enter_service)
-        layout.addWidget(self.variety_folded)
-        self.frame = LoadedPage()
+        layout.addWidget(self.variety_folded, alignment=Qt.AlignLeft)
+        self.frame = LoadedPage(parent=self)
+        self.frame.remove_borders()
         layout.addWidget(self.frame)
         self.setLayout(layout)
         # 设置折叠窗的样式
         self.variety_folded.setFoldedStyleSheet("""
-            #foldedHead{
-                background-color: rgb(145,202,182);
-                border-bottom: 1px solid rgb(200,200,200);
-                max-height: 30px;
-            }
-            #headLabel{
-                padding:8px 5px;
-                font-weight: bold;
-                font-size: 15px;
-            }
-            #foldedBody{
-                background-color: rgb(240, 240, 240);
-            }
-            """)
-        self._addServiceContents()
+        QScrollArea{
+            border: none;
+        }
+        #foldedBox{
+            border-right: 1px solid rgb(180, 180, 180);
+        }
+        #foldedHead{
+            background-color: rgb(145,202,182);
+            border-bottom: 1px solid rgb(200,200,200);
+            border-right: 1px solid rgb(180, 180, 180);
+            max-height: 30px;
+        }
+        #headLabel{
+            padding:8px 5px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        #foldedBody{
+            background-color: rgb(240, 240, 240);
+            border-right: 1px solid rgb(180, 180, 180);
+        }
+        """)
 
     # 获取所有品种组和品种
-    def _addServiceContents(self):
+    def addServiceContents(self):
         contents = [
             {
                 'name': u'咨询服务',
@@ -744,7 +914,8 @@ class InfoServicePage(QWidget):
         for group_item in contents:
             head = self.variety_folded.addHead(group_item['name'])
             body = self.variety_folded.addBody(head=head)
-            body.addButtons(group_item['subs'])
+            for sub_item in group_item['subs']:
+                body.addButton(id=sub_item['id'], name=sub_item['name'])
         self.variety_folded.container.layout().addStretch()
 
     def resizeEvent(self, event):
@@ -773,9 +944,9 @@ class InfoServicePage(QWidget):
             page = PDFContentShower(file=settings.STATIC_PREFIX + 'pserver/deptbuild/部门组建.pdf', parent=self.frame)
         elif sid == 8:  # 顾问服务-制度考核
             page = PDFContentShower(file=settings.STATIC_PREFIX + 'pserver/rulexamine/制度考核.pdf', parent=self.frame)
-        elif sid == 9:  # 策略服务-交易策略
-            page = TradePolicyPage(parent=self.frame)
-            page.getTradePolicyContents()
+        # elif sid == 9:  # 策略服务-交易策略
+        #     page = TradePolicyPage(parent=self.frame)
+        #     page.getTradePolicyContents()
         elif sid == 10:  # 策略服务-投资方案
             page = InvestPlanPage(parent=self.frame)
             page.getCurrentPlanContents()

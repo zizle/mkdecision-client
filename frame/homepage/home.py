@@ -6,9 +6,9 @@ import requests
 import chardet
 from math import floor
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QScrollArea, QPushButton, \
-    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QDateEdit, QListView
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint, QDate
-from PyQt5.QtGui import QPixmap, QBrush, QColor
+    QComboBox, QTableWidget, QHeaderView, QTableWidgetItem, QAbstractItemView, QDateEdit, QListView, QFrame
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint, QDate, QMargins
+from PyQt5.QtGui import QPixmap, QBrush, QColor, QFont
 import settings
 from widgets.base import ScrollFoldedBox, PDFContentPopup, TextContentPopup, LoadedPage, TableRowReadButton, Paginator
 
@@ -283,6 +283,8 @@ class NormalReportTable(QTableWidget):
         self.setFocusPolicy(Qt.NoFocus)
         self.setAlternatingRowColors(True)  # 开启交替行颜色
         self.setMouseTracking(True)
+        self.setShowGrid(False)
+        self.setFrameShape(QFrame.NoFrame)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
         self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
         self.cellClicked.connect(self.mouseClickedCell)
@@ -291,16 +293,26 @@ class NormalReportTable(QTableWidget):
         QTableCornerButton::section {
             min-height: 25px;
             padding: 1px;border: none;
-            border-right: 1px solid rgb(211,212,212);
-            border-bottom: 1px solid rgb(211,212,212);
+            border-right: 1px solid rgb(201,202,202);
+            border-bottom: 1px solid rgb(201,202,202);
             background-color:rgb(243,245,248);
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
+            min-width:26px;
         }""")
+
         self.setStyleSheet("""
-        font-size: 14px;
-        selection-color: red;
-        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        QTableWidget{
+            font-size: 14px;
+            alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        }
+        QTableWidget::item{
+            border-bottom: 1px solid rgb(201,202,202);
+            border-right: 1px solid rgb(201,202,202);
+        }
+        QTableWidget::item:selected{
+            background-color: rgb(215, 215, 215);
+        }
         """)
 
     def mouseMoveEvent(self, event):
@@ -329,6 +341,8 @@ class NormalReportTable(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        item4font = QFont()
+        item4font.setPointSize(10)
         for row, report_item in enumerate(report_list):
             self.setRowHeight(row, 32)
             item0 = QTableWidgetItem(str(row + 1))
@@ -346,6 +360,7 @@ class NormalReportTable(QTableWidget):
             self.setItem(row, 3, item3)
             item4 = QTableWidgetItem("阅读")
             item4.setTextAlignment(Qt.AlignCenter)
+            item4.setFont(item4font)
             item4.setForeground(QBrush(QColor(50, 50, 220)))
             item4.file_url = report_item['file_url']
             self.setItem(row, 4, item4)
@@ -371,7 +386,7 @@ class NormalReportPage(QWidget):
         relate_variety_layout.addWidget(QLabel('相关品种:'))
         self.variety_combo = QComboBox(activated=self.varietyChanged, objectName='combo')
         self.variety_combo.setCursor(Qt.PointingHandCursor)
-        self.variety_combo.setMinimumWidth(60)
+        self.variety_combo.setMinimumWidth(80)
         relate_variety_layout.addWidget(self.variety_combo)
         relate_variety_layout.addStretch()
         # 页码控制
@@ -380,10 +395,19 @@ class NormalReportPage(QWidget):
         relate_variety_layout.addWidget(self.paginator)
         variety_widget.setLayout(relate_variety_layout)
         layout.addWidget(variety_widget)
-        self.report_table = NormalReportTable()
+        self.report_table = NormalReportTable(self)
+        self.report_table.setObjectName('reportTable')
         layout.addWidget(self.report_table)
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
         self.setLayout(layout)
         self.setStyleSheet("""
+        #reportTable{
+            border: none;
+            background-color:rgb(240, 240, 240);
+        }
         #varietyCombo{
             background-color: rgb(178,200,187)
         }
@@ -446,8 +470,14 @@ class NormalReportPage(QWidget):
         except Exception:
             pass
         else:
-            self.report_table.showRowContents(response['reports'])
-            self.paginator.setTotalPages(response['total_page'])
+            if response['reports']:
+                self.report_table.showRowContents(response['reports'])
+                self.paginator.setTotalPages(response['total_page'])
+                self.no_data_label.hide()
+                self.report_table.show()
+            else:
+                self.no_data_label.show()
+                self.report_table.hide()
 
 
 """ 交易通知显示相关 """
@@ -463,6 +493,8 @@ class TransactionNoticeTable(QTableWidget):
         self.setFocusPolicy(Qt.NoFocus)
         self.setAlternatingRowColors(True)
         self.setMouseTracking(True)
+        self.setShowGrid(False)
+        self.setFrameShape(QFrame.NoFrame)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.cellClicked.connect(self.mouseClickedCell)
@@ -471,16 +503,25 @@ class TransactionNoticeTable(QTableWidget):
         QTableCornerButton::section {
             min-height: 25px;
             padding: 1px;border: none;
-            border-right: 1px solid rgb(211,212,212);
-            border-bottom: 1px solid rgb(211,212,212);
+            border-right: 1px solid rgb(201,202,202);
+            border-bottom: 1px solid rgb(201,202,202);
             background-color:rgb(243,245,248);
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
+            min-width: 26px;
         }""")
         self.setStyleSheet("""
-        font-size: 14px;
-        selection-color: red;
-        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        QTableWidget{
+            font-size: 14px;
+            alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        }
+        QTableWidget::item{
+            border-bottom: 1px solid rgb(201,202,202);
+            border-right: 1px solid rgb(201,202,202);
+        }
+        QTableWidget::item:selected{
+            background-color: rgb(215, 215, 215);
+        }
         """)
 
     def mouseMoveEvent(self, event):
@@ -500,15 +541,17 @@ class TransactionNoticeTable(QTableWidget):
         popup.exec_()
 
     def showRowContents(self, notice_list):
-        print(notice_list)
         self.clear()
-        table_headers = ['序号', '标题', '日期', '']
+        table_headers = ['序号', '标题', '日期', '类型', '']
         self.setColumnCount(len(table_headers))
         self.setRowCount(len(notice_list))
         self.setHorizontalHeaderLabels(table_headers)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        item4font = QFont()
+        item4font.setPointSize(10)
         for row, row_item in enumerate(notice_list):
             self.setRowHeight(row, 32)
             item0 = QTableWidgetItem(str(row + 1))
@@ -521,11 +564,15 @@ class TransactionNoticeTable(QTableWidget):
             item2 = QTableWidgetItem(row_item['create_time'])
             item2.setTextAlignment(Qt.AlignCenter)
             self.setItem(row, 2, item2)
-            item3 = QTableWidgetItem("阅读")
-            item3.setForeground(QBrush(QColor(50, 50, 220)))
-            item3.file_url = row_item['file_url']
+            item3 = QTableWidgetItem(row_item['category'])
             item3.setTextAlignment(Qt.AlignCenter)
             self.setItem(row, 3, item3)
+            item4 = QTableWidgetItem("阅读")
+            item4.setFont(item4font)
+            item4.setForeground(QBrush(QColor(50, 50, 220)))
+            item4.file_url = row_item['file_url']
+            item4.setTextAlignment(Qt.AlignCenter)
+            self.setItem(row, 4, item4)
         # 设置表格高度
         self.setMinimumHeight(self.rowCount() * 32 + 45)
         if self.rowCount() >= 45:
@@ -533,8 +580,6 @@ class TransactionNoticeTable(QTableWidget):
             self.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
         else:
             self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)  # 固定行高，设置的大小
-
-
 
 
 # 显示交易通知
@@ -554,6 +599,12 @@ class TransactionNoticePage(QWidget):
         layout.addWidget(contro_widget)
         self.notice_table = TransactionNoticeTable()
         layout.addWidget(self.notice_table)
+
+        # 无数据的显示
+        self.no_data_label = QLabel('暂无相关数据...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        layout.addWidget(self.no_data_label)
+
         self.setLayout(layout)
         self.setStyleSheet("""
         #controlWidget{
@@ -576,8 +627,14 @@ class TransactionNoticePage(QWidget):
         except Exception:
             pass
         else:
-            self.notice_table.showRowContents(response['exnotices'])
-            self.paginator.setTotalPages(response['total_page'])
+            if response['exnotices']:
+                self.notice_table.showRowContents(response['exnotices'])
+                self.paginator.setTotalPages(response['total_page'])
+                self.notice_table.show()
+                self.no_data_label.hide()
+            else:
+                self.no_data_label.show()
+                self.notice_table.hide()
 
 
 """ 现货报表相关 """
@@ -585,23 +642,14 @@ class TransactionNoticePage(QWidget):
 
 # 现货报表表格
 class SpotCommodityTable(QTableWidget):
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('name', '名称'),
-        ('area', '地区'),
-        ('level', '等级'),
-        ('price', '价格'),
-        ('increase', '增减'),
-        ('note', '备注'),
-        ('date', '日期'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(SpotCommodityTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setFrameShape(QFrame.NoFrame)
         self.setAlternatingRowColors(True)  # 开启交替行颜色
+        self.setShowGrid(False)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
         self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
         self.horizontalHeader().setStyleSheet("""
@@ -609,16 +657,25 @@ class SpotCommodityTable(QTableWidget):
         QTableCornerButton::section {
             min-height: 25px;
             padding: 1px;border: none;
-            border-right: 1px solid rgb(211,212,212);
-            border-bottom: 1px solid rgb(211,212,212);
+            border-right: 1px solid rgb(201,202,202);
+            border-bottom: 1px solid rgb(201,202,202);
             background-color:rgb(243,245,248);
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
+            min-width: 26px;
         }""")
         self.setStyleSheet("""
-        font-size: 14px;
-        selection-color: red;
-        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        QTableWidget{
+            font-size: 14px;
+            alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        }
+        QTableWidget::item{
+            border-bottom: 1px solid rgb(201,202,202);
+            border-right: 1px solid rgb(201,202,202);
+        }
+        QTableWidget::item:selected{
+            background-color: rgb(215, 215, 215);
+        }
         """)
 
     def showRowContents(self, row_list):
@@ -742,20 +799,13 @@ class SpotCommodityPage(QWidget):
 
 # 财经日历显示表格
 class FinanceCalendarTable(QTableWidget):
-    KEY_LABELS = [
-        ('id', '序号'),
-        ('date', '日期'),
-        ('time', '时间'),
-        ('country', '地区'),
-        ('event', '事件'),
-        ('expected', '预期值'),
-    ]
-
     def __init__(self, *args, **kwargs):
         super(FinanceCalendarTable, self).__init__(*args, **kwargs)
         self.verticalHeader().hide()
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setShowGrid(False)
         self.setAlternatingRowColors(True)  # 开启交替行颜色
         self.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中时为一行
         self.setSelectionMode(QAbstractItemView.SingleSelection)  # 只能选中一行
@@ -764,16 +814,25 @@ class FinanceCalendarTable(QTableWidget):
         QTableCornerButton::section {
             min-height: 25px;
             padding: 1px;border: none;
-            border-right: 1px solid rgb(211,212,212);
-            border-bottom: 1px solid rgb(211,212,212);
+            border-right: 1px solid rgb(201,202,202);
+            border-bottom: 1px solid rgb(201,202,202);
             background-color:rgb(243,245,248);
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
+            min-width: 26px;
         }""")
         self.setStyleSheet("""
-        font-size: 14px;
-        selection-color: red;
-        alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        QTableWidget{
+            font-size: 14px;
+            alternate-background-color: rgb(245, 250, 248);  /* 设置交替行颜色 */
+        }
+        QTableWidget::item{
+            border-bottom: 1px solid rgb(201,202,202);
+            border-right: 1px solid rgb(201,202,202);
+        }
+        QTableWidget::item:selected{
+            background-color: rgb(215, 215, 215);
+        }
         """)
 
     def showRowContents(self, row_list):
@@ -888,20 +947,34 @@ class HomePage(QScrollArea):
     def __init__(self, *args, **kwargs):
         super(HomePage, self).__init__(*args, **kwargs)
         container = QWidget(parent=self)  # 页面容器
-        layout = QVBoxLayout(margin=2)
-        news_slider_layout = QHBoxLayout()  # 新闻-轮播布局
+        layout = QVBoxLayout()
+        layout.setContentsMargins(QMargins(0, 1, 0, 1))
+        layout.setSpacing(1)
+        news_slider_layout = QHBoxLayout(margin=0)  # 新闻-轮播布局
+        news_slider_layout.setSpacing(1)
         # 新闻公告栏
         self.news_box = NewsBox(parent=self)
         self.news_box.news_item_clicked.connect(self.read_news_item)
         news_slider_layout.addWidget(self.news_box, alignment=Qt.AlignLeft)
+
+        # 无新闻公告数据的显示
+        self.no_data_label = QLabel('暂无相关公告...', styleSheet='color:rgb(200,100,50)', alignment=Qt.AlignCenter)
+        self.no_data_label.hide()
+        news_slider_layout.addWidget(self.no_data_label, alignment=Qt.AlignLeft)
         # 广告图片轮播栏
         self.image_slider = ImageSlider(parent=self)
         self.image_slider.image_clicked.connect(self.read_advertisement)
         news_slider_layout.addWidget(self.image_slider)
+
+        # 无新闻公告数据的显示
+        self.no_ad_label = QLabel('广而告之...', styleSheet='color:rgb(220, 200, 220);background-color:rgb(120, 160, 160)',alignment=Qt.AlignCenter)
+        news_slider_layout.addWidget(self.no_ad_label)
+        self.no_ad_label.hide()
         layout.addLayout(news_slider_layout)
         # 左下角菜单折叠窗
         # 菜单-显示窗布局
-        box_frame_layout = QHBoxLayout()
+        box_frame_layout = QHBoxLayout(margin=0)
+        box_frame_layout.setSpacing(1)
         # 菜单滚动折叠窗
         self.folded_box = ScrollFoldedBox(parent=self)
         # self.folded_box.getFoldedBoxMenu()  # 初始化获取它的内容再加入布局
@@ -909,18 +982,26 @@ class HomePage(QScrollArea):
         box_frame_layout.addWidget(self.folded_box, alignment=Qt.AlignLeft)
         # 显示窗
         self.frame_window = LoadedPage(parent=self)
+        self.frame_window.remove_borders()
         box_frame_layout.addWidget(self.frame_window)
         layout.addLayout(box_frame_layout)
         container.setLayout(layout)
         self.setWidget(container)
         self.setWidgetResizable(True)  # 内部控件可随窗口调整大小
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         # 设置折叠窗的样式
         self.folded_box.setFoldedStyleSheet("""
+        QScrollArea{
+            border: none; /*整个外边框*/
+        }
+        #foldedBox{
+            border-right: 1px solid rgb(180, 180, 180);
+        }
         #foldedHead{
             background-color: rgb(145,202,182);
             border-bottom: 1px solid rgb(200,200,200);
+            border-right: 1px solid rgb(180, 180, 180);
             max-height: 30px;
         }
         #headLabel{
@@ -930,14 +1011,21 @@ class HomePage(QScrollArea):
         }
         #foldedBody{
             background-color: rgb(240, 240, 240);
+            border-right: 1px solid rgb(180, 180, 180);
         }
         """)
-        # 设置滚动条样式
-        with open("media/ScrollBar.qss", "rb") as fp:
-            content = fp.read()
-            encoding = chardet.detect(content) or {}
-            content = content.decode(encoding.get("encoding") or "utf-8")
-        self.setStyleSheet(content)
+        # # 设置滚动条样式
+        # with open("media/ScrollBar.qss", "rb") as fp:
+        #     content = fp.read()
+        #     encoding = chardet.detect(content) or {}
+        #     content = content.decode(encoding.get("encoding") or "utf-8")
+
+        # self.setStyleSheet(content)
+        self.setStyleSheet("""
+        QScrollArea{
+            border: none; /*整个外边框*/
+        }
+        """)
 
     def resizeEvent(self, event):
         super(HomePage, self).resizeEvent(event)
@@ -945,14 +1033,17 @@ class HomePage(QScrollArea):
         box_width = self.parent().width() * 0.3
         box_height = box_width / 8 * 3
         self.news_box.setFixedSize(box_width, box_height)
+        self.no_data_label.setFixedSize(box_width, box_height)
         # 计算当前控件能容纳的条目数
         self.news_box.setItemCount(floor(box_height / 25))
         # 控制广告图形的高度
         self.image_slider.setFixedHeight(box_height)
+        self.no_ad_label.setMinimumSize(self.parent().width() * 0.7 - 2, box_height)
         # 控制左下角折叠窗的宽度
         self.folded_box.setMinimumWidth(box_width)
         # 重新设置body的排序数量
         self.folded_box.setBodyHorizationItemCount()
+
     # 阅读更多新闻
     def read_more_news(self):
         page = MoreNewsPage()
@@ -978,19 +1069,32 @@ class HomePage(QScrollArea):
         except Exception:
             pass
         else:
-            news_list = [NewsItem(
-                title=news_item['title'],
-                create_time=news_item['create_time'],
-                item_id=news_item['id'],
-                file_url=news_item['file_url']
-            ) for news_item in response['bulletins']]
-            self.news_box.addItems(news_list)
-            more_button = self.news_box.setMoreNewsButton()
-            more_button.clicked.connect(self.read_more_news)  # 阅读更多新闻
+            if response['bulletins']:
+                news_list = [NewsItem(
+                    title=news_item['title'],
+                    create_time=news_item['create_time'],
+                    item_id=news_item['id'],
+                    file_url=news_item['file_url']
+                ) for news_item in response['bulletins']]
+                self.news_box.addItems(news_list)
+                more_button = self.news_box.setMoreNewsButton()
+                more_button.clicked.connect(self.read_more_news)  # 阅读更多新闻
+                self.news_box.show()
+                self.no_data_label.hide()
+            else:
+                self.no_data_label.show()
+                self.news_box.hide()
 
     # 获取当前广告轮播数据
     def getCurrentSliderAdvertisement(self):
-        self.image_slider.addImages(['media/slider/' + path for path in os.listdir('media/slider')])
+        ad_files = os.listdir('media/slider')
+        if ad_files:
+            self.image_slider.addImages(['media/slider/' + path for path in ad_files])
+            self.image_slider.show()
+            self.no_ad_label.hide()
+        else:
+            self.no_ad_label.show()
+            self.image_slider.hide()
 
     # 点击阅读广告
     def read_advertisement(self, name):

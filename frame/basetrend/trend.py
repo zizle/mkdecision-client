@@ -5,7 +5,8 @@ import requests
 import pandas as pd
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QGridLayout, QPushButton, QScrollArea, QVBoxLayout, QLabel, \
     QTableWidget, QTableWidgetItem
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QUrl
 from PyQt5.QtGui import QPainter, QFont, QBrush, QColor
 from PyQt5.QtChart import QChart
 from widgets.chart import ChartView, DetailChartView
@@ -228,22 +229,37 @@ class ChartsFrameView(QScrollArea):
         return chart, table_df
 
 
+class WebEngineView(QWebEngineView):
+    def showEvent(self, event):
+        super(WebEngineView, self).showEvent(event)
+
+
 # 数据分析主页
 class TrendPage(QWidget):
     def __init__(self, *args, **kwargs):
         super(TrendPage, self).__init__(*args, **kwargs)
-        layout = QHBoxLayout(margin=2)
+        layout = QHBoxLayout(margin=0)
+        layout.setSpacing(0)
         self.variety_folded = ScrollFoldedBox()
         self.variety_folded.left_mouse_clicked.connect(self.variety_clicked)
         layout.addWidget(self.variety_folded)
-        self.frame = LoadedPage()
-        layout.addWidget(self.frame)
+
+        self.web_charts = WebEngineView(self, objectName='webEngine')
+
+        layout.addWidget(self.web_charts)
         self.setLayout(layout)
         # 设置折叠窗的样式
         self.variety_folded.setFoldedStyleSheet("""
+        QScrollArea{
+            border: none;
+        }
+        #foldedBox{
+            border-right: 1px solid rgb(180, 180, 180);
+        }
         #foldedHead{
             background-color: rgb(145,202,182);
             border-bottom: 1px solid rgb(200,200,200);
+            border-right: 1px solid rgb(180, 180, 180);
             max-height: 30px;
         }
         #headLabel{
@@ -253,6 +269,7 @@ class TrendPage(QWidget):
         }
         #foldedBody{
             background-color: rgb(240, 240, 240);
+            border-right: 1px solid rgb(180, 180, 180);
         }
         /*折叠窗内滚动条样式*/
         #foldedBox QScrollBar:vertical{
@@ -269,12 +286,22 @@ class TrendPage(QWidget):
             background: rgba(0, 0, 0, 80);
         }
         """)
+        self.setStyleSheet("""
+        #webEngine{
+            background-color: rgb(240, 240, 240);
+        }
+        """)
+        self._get_all_charts()
 
     def resizeEvent(self, event):
         # 设置折叠窗的大小
         box_width = self.parent().width() * 0.228
         self.variety_folded.setFixedWidth(box_width + 5)
         self.variety_folded.setBodyHorizationItemCount()
+        self.web_charts.reload()
+
+    def _get_all_charts(self, variety_id=0):
+        self.web_charts.load(QUrl(settings.SERVER_ADDR + 'trend/charts/?is_render=1' + '&variety=' + str(variety_id)))
 
     # 获取所有品种组和品种
     def getGroupVarieties(self):
@@ -286,45 +313,16 @@ class TrendPage(QWidget):
         except Exception:
             pass
         else:
-            print(response)
             for group_item in response['variety']:
                 head = self.variety_folded.addHead(group_item['name'])
                 body = self.variety_folded.addBody(head=head)
-                body.addButtons([variety_item for variety_item in group_item['subs']])
+                for sub_item in group_item['subs']:
+                    body.addButton(sub_item['id'], sub_item['name'])
+                # body.addButtons([variety_item for variety_item in group_item['subs']])
             self.variety_folded.container.layout().addStretch()
-
-    # 获取主页的图表
-    def getTrendPageCharts(self):
-        try:
-            r = requests.get(url=settings.SERVER_ADDR + 'trend/chart/?mc=' + settings.app_dawn.value('machine'))
-            if r.status_code != 200:
-                raise ValueError('获取主页图表失败!')
-            response = json.loads(r.content.decode('utf-8'))
-        except Exception:
-            pass
-        else:
-            # 展示图表
-            self.frame.clear()
-            charts_frame = ChartsFrameView(charts=response['data'])
-            charts_frame.show_charts()
-            self.frame.addWidget(charts_frame)
 
     # 点击了品种,请求当前品种下的品种页显示图表
     def variety_clicked(self, vid, text):
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'trend/' + str(
-                    vid) + '/chart/?mc=' + settings.app_dawn.value('machine')
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception:
-            pass
-        else:
-            # 展示图表
-            self.frame.clear()
-            charts_frame = ChartsFrameView(charts=response['data'])
-            charts_frame.show_charts()
-            self.frame.addWidget(charts_frame)
+
+        self._get_all_charts(variety_id=vid)
 

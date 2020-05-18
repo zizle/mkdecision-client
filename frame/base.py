@@ -4,6 +4,7 @@ import os
 import json
 import time
 import pickle
+import shutil
 import requests
 from PyQt5.QtWidgets import QWidget, QDesktopWidget, QVBoxLayout, QLabel, QSplashScreen, QStatusBar
 from PyQt5.QtGui import QIcon, QEnterEvent, QPen, QPainter, QColor, QPixmap, QFont, QImage
@@ -15,6 +16,7 @@ from utils.machine import get_machine_code
 from utils.channel import DeliveryChannel, NavigationBarChannel
 from popup.tips import InformationPopup
 from frame.usercenter import UserCenter
+from settings import BASE_DIR
 
 
 """ 欢迎页 """
@@ -155,6 +157,19 @@ class BaseWindow(QWidget):
         layout.addWidget(self.page_container)
         self.setLayout(layout)
         self.navigation_bar_channel = NavigationBarChannel()
+
+    def close(self):
+        super(BaseWindow, self).close()
+        # 清理缓存目录
+        cache_path = os.path.join(BASE_DIR, 'cache/')
+        shutil.rmtree(cache_path)
+
+    def show(self):
+        super(BaseWindow, self).show()
+        # 创建缓存目录
+        cache_path = os.path.join(BASE_DIR, 'cache/')
+        if not os.path.exists(cache_path):
+            os.mkdir(cache_path)
 
     # 用户点击【登录】
     def user_to_login(self):
@@ -427,22 +442,6 @@ class BaseWindow(QWidget):
         super(BaseWindow, self).showNormal()
         self.layout().setContentsMargins(self.MARGIN, self.MARGIN, self.MARGIN, self.MARGIN)
 
-    # 获取系统的普通模块
-    def getSystemStartModules(self):
-        try:
-            r = requests.get(
-                url=settings.SERVER_ADDR + 'module/start/?mc=' + settings.app_dawn.value('machine')
-            )
-            response = json.loads(r.content.decode('utf-8'))
-            if r.status_code != 200:
-                raise ValueError(response['message'])
-        except Exception:
-            modules = []
-        else:
-            modules = response['data']
-            # 设置模块菜单
-            self.navigation_bar.module_bar.setMenus(modules)
-
     # 跳转个人中心
     def skip_to_usercenter(self, user_id):
         self.page_container.clear()
@@ -468,16 +467,16 @@ class BaseWindow(QWidget):
         if module_id == -9:
             if module_text == u"首页管理":
                 from frame.homepage.homeCollector import HomePageCollector
-                page = HomePageCollector(parent=self.page_container)
+                page = HomePageCollector()
             elif module_text == u"产品服务":
                 from frame.proservice.infoServiceCollector import InfoServicePageCollector
-                page = InfoServicePageCollector(parent=self.page_container)
+                page = InfoServicePageCollector()
             elif module_text == u'基本分析':
                 from frame.basetrend.trendCollector import TrendPageCollector
-                page = TrendPageCollector(parent=self.page_container)
-            elif module_text == u'交割服务':
-                from frame.hedging.deliveryCollector import DeliveryPageCollector
-                page = DeliveryPageCollector(parent=self.page_container)
+                page = TrendPageCollector()
+            # elif module_text == u'交割服务':
+            #     from frame.hedging.deliveryCollector import DeliveryPageCollector
+            #     page = DeliveryPageCollector(parent=self.page_container)
             else:
                 page = QLabel(parent=self.page_container,
                               styleSheet='font-size:16px;font-weight:bold;color:rgb(230,50,50)',
@@ -501,25 +500,25 @@ class BaseWindow(QWidget):
             else:  # 模块权限验证通过
                 if module_text == u'首页':
                     from frame.homepage.home import HomePage
-                    page = HomePage(parent=self.page_container)
+                    page = HomePage()
                     page.getCurrentNews()
                     page.getCurrentSliderAdvertisement()
                     page.getFoldedBoxContent()
-                    page.folded_box_clicked(category_id=1, head_text='常规报告') # 默认点击常规报告分类id=1
+                    page.folded_box_clicked(category_id=1, head_text='常规报告')  # 默认点击常规报告分类id=1
                 elif module_text == u'产品服务':
                     from frame.proservice.infoService import InfoServicePage
-                    page = InfoServicePage(parent=self.page_container)
+                    page = InfoServicePage()
+                    page.addServiceContents()
                 elif module_text == '基本分析':
                     from frame.basetrend.trend import TrendPage
-                    page = TrendPage(parent=self.page_container)
+                    page = TrendPage()
                     page.getGroupVarieties()
-                    page.getTrendPageCharts()
-                elif module_text == '交割服务':
-                    from frame.hedging.delivery import DeliveryServicePage
-                    page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
-                elif module_text == '公式计算':
+                # elif module_text == '交割服务':
+                #     from frame.hedging.delivery import DeliveryServicePage
+                #     page = DeliveryServicePage(parent=self.page_container, navigation_bar_channel=self.navigation_bar_channel)
+                elif module_text == '计算平台':
                     from frame.formulas.index_page import FormulasCalculate
-                    page = FormulasCalculate(parent=self.page_container)
+                    page = FormulasCalculate()
                     page.getGroupVarieties()
                 # elif module_text == '数据管理':
                 #     from frame.collector import CollectorMaintain
